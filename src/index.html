@@ -1971,11 +1971,12 @@
           const left = myStop.time - now;
           const lead = alertLead(myTrain, myTrip.dest); // longer gaps warn earlier
           if (androidRideAlert) {
-            if (!alertSent.current && document.visibilityState === "visible" &&
+            if (!myTrip.n5 && !alertSent.current && document.visibilityState === "visible" &&
                 (state.phase === "atStop" || (left >= 0 && left <= lead))) {
               alertSent.current = true;
               androidRideAlert.postMessage(JSON.stringify({ arrival: state.phase === "atStop"
                 ? `At ${myStop.name}` : `Approaching ${myStop.name}` }));
+              setMyTrip({ ...myTrip, n5: true });
             }
           } else if (!myTrip.n5 && state.phase !== "atStop" && left <= lead && left > 70000) {
             fireAlert(`${Math.max(1, Math.round(left / 60000))} minutes to ${myStop.name}`,
@@ -2000,7 +2001,7 @@
         if (myTrip.notify) {
           androidRideAlert.postMessage("cancel");
           setMyTrip({ ...myTrip, notify: false, pushErr: null });
-        } else if (!alertSent.current) {
+        } else if (!myTrip.n5 && !alertSent.current) {
           const ride = myTrip;
           androidRideAlert.onmessage = ({ data }) => {
             setMyTrip(current => current && current.boardedAt === ride.boardedAt &&
