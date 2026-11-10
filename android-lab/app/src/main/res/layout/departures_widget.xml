@@ -1,7 +1,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root" android:layout_width="match_parent"
     android:layout_height="match_parent" android:orientation="vertical"
-    android:padding="14dp" android:background="#101013">
+    android:paddingStart="12dp" android:paddingEnd="12dp"
+    android:paddingTop="5dp" android:paddingBottom="5dp" android:background="#101013">
     <TextView android:id="@+id/widget_station" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:text="VRE departures"
         android:textColor="#FAFAFA" android:textSize="16sp" android:textStyle="bold"
