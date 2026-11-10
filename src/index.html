@@ -1939,6 +1939,22 @@
           })() : null;
       window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
     }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor]);
+    const lockBridge = window.VreLockCard;
+    const [lockState, setLockState] = useState("off");
+    const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
+      : waitingFor ? [waitingFor.trip, waitingFor.dest, waitingFor.started, "waiting"].join(":") : "";
+    useEffect(() => {
+      setLockState("off");
+      if (!lockBridge) return;
+      lockBridge.onmessage = ({ data }) => setLockState(data);
+      return () => { lockBridge.onmessage = null; };
+    }, [lockBridge, lockTripKey]);
+    const lockControl = lockBridge && lockTripKey && html`
+      <button className="btn ghost" aria-pressed=${lockState === "on"}
+        onClick=${() => lockBridge.postMessage(lockState === "on" ? "hide" : "show")}>
+        ${lockState === "on" ? "Hide from lock screen" : "Show on lock screen"}
+      </button>
+      ${lockState === "blocked" && html`<div className="meta">Allow notifications in Android settings.</div>`}`;
     const boardRows = useMemo(() => tab === "board" ? VRECore.stationBoard(boardSta, now, liveByTrip, 8) : [],
       [tab, boardSta, Math.floor(now / 15000), liveByTrip]);
 
@@ -2128,6 +2144,7 @@
             <div style=${{ padding: "0 10px 5px" }}>
               <button className="btn ghost" onClick=${() => { setSelected(waitingFor.trip); setPicking(true); }}>I'm on the train</button>
               <button className="btn ghost" onClick=${() => setWaitingFor(null)}>Stop waiting</button>
+              ${lockControl}
             </div>
           </div>`}
         ${summary && html`<${SummaryCard} rec=${summary} onDismiss=${() => setSummary(null)} />`}
@@ -2139,6 +2156,7 @@
               onNotify=${toggleNotify} onWake=${toggleWake}
               onChange=${() => { if (myTrain) { setSelected(myTrain.tripId); setPicking(true); } }}
               onLeave=${finishRide} />
+            ${lockControl}
           </div>`}
 
         ${!myTrip && html`

@@ -21,7 +21,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private class Timetable(context: Context) {
+internal class Timetable(context: Context) {
     val data = JSONObject(context.assets.open("app/widget-schedule.json").bufferedReader().use { it.readText() })
     val stations = data.getJSONObject("stations")
     private val eastern = ZoneId.of("America/New_York")
