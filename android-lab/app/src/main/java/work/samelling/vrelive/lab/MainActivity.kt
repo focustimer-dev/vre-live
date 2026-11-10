@@ -52,6 +52,12 @@ class MainActivity : Activity() {
     private var alertArmed = false
     private var alertPermissionReply: JavaScriptReplyProxy? = null
     private val alertChannel = "ride_arrival"
+    private val lockChannel = "ride_lock_screen"
+    private val lockNotification = 2
+    private var lockReply: Pair<String, JavaScriptReplyProxy>? = null
+    private var lockKey: String? = null
+    private var widgetSnapshot = JSONObject()
+    private val lockTimetable by lazy { Timetable(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,7 +115,23 @@ class MainActivity : Activity() {
                     view, message, origin, isMainFrame, _ ->
                 if (isMainFrame && isPreviewOrigin(origin) &&
                     Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
-                ) DeparturesWidget.cache(this, message.data.orEmpty())
+                ) {
+                    val payload = message.data.orEmpty()
+                    if (payload.length <= 120000) {
+                        val snapshot = runCatching { JSONObject(payload) }.getOrNull()
+                        if (snapshot != null) {
+                            widgetSnapshot = snapshot
+                            DeparturesWidget.cache(this, payload)
+                            updateLockCard()
+                        }
+                    }
+                }
+            }
+            WebViewCompat.addWebMessageListener(webView, "VreLockCard", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, reply ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) handleLockCard(message.data.orEmpty(), reply)
             }
             WebViewCompat.addWebMessageListener(webView, "VreRideAlert", setOf("https://$host")) {
                     view, message, origin, isMainFrame, reply ->
@@ -152,6 +174,10 @@ class MainActivity : Activity() {
                 )
             }
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                lockKey = null
+                lockReply = null
+                widgetSnapshot = JSONObject()
+                getSystemService(NotificationManager::class.java)?.cancel(lockNotification)
                 alertArmed = false
                 alertPermissionReply = null
                 mainFrameFailed = false
@@ -223,8 +249,78 @@ class MainActivity : Activity() {
         reply.postMessage(if (alertArmed) "armed" else "blocked")
     }
 
+    private fun currentLockKey(): String? = widgetSnapshot.optJSONObject("ride")?.let {
+        "${it.optLong("started")}:${it.optString("trip")}:${it.optString("dest")}:${it.optBoolean("waiting")}"
+    }
+
+    private fun handleLockCard(action: String, reply: JavaScriptReplyProxy) {
+        if (action == "hide") {
+            lockKey = null
+            lockReply = null
+            getSystemService(NotificationManager::class.java)?.cancel(lockNotification)
+            reply.postMessage("off")
+        } else if (action == "show" && currentLockKey() != null && lockReply == null) {
+            if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            ) {
+                val key = currentLockKey() ?: return
+                lockReply = key to reply
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 42)
+            } else enableLockCard(reply)
+        }
+    }
+
+    private fun enableLockCard(reply: JavaScriptReplyProxy) {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager?.createNotificationChannel(NotificationChannel(
+            lockChannel, "Lock-screen train card", NotificationManager.IMPORTANCE_LOW
+        ).apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC })
+        lockKey = if (manager?.areNotificationsEnabled() == true &&
+            manager.getNotificationChannel(lockChannel)?.importance != NotificationManager.IMPORTANCE_NONE
+        ) currentLockKey() else null
+        updateLockCard()
+        reply.postMessage(if (lockKey == null) "blocked" else "on")
+    }
+
+    private fun updateLockCard() {
+        val key = lockKey ?: return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        val display = lockTimetable.ride(widgetSnapshot)
+        if (key != currentLockKey() || display == null) {
+            lockKey = null
+            manager.cancel(lockNotification)
+            return
+        }
+        if (!manager.areNotificationsEnabled()) return
+        val (title, row) = display
+        val ride = widgetSnapshot.optJSONObject("ride") ?: return
+        val now = System.currentTimeMillis()
+        val expires = when (row.status) {
+            "Live arrival" -> (ride.optLong("ts") + 300000 - now)
+            "Scheduled arrival" -> (ride.optLong("scheduled") - now).coerceAtMost(1800000)
+            else -> 300000L
+        }.coerceAtLeast(1)
+        val open = Intent(this, MainActivity::class.java).setAction("work.samelling.vrelive.lab.OPEN_LOCK_CARD")
+        manager.notify(lockNotification, Notification.Builder(this, lockChannel)
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(listOfNotNull("Train ${row.train}", row.time.takeIf { it.isNotEmpty() }, row.status).joinToString(" · "))
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setOngoing(true)
+            .setShowWhen(false)
+            .setTimeoutAfter(expires)
+            .setContentIntent(android.app.PendingIntent.getActivity(this, 2, open, android.app.PendingIntent.FLAG_IMMUTABLE))
+            .build())
+    }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grants)
+        if (requestCode == 42) {
+            val (key, reply) = lockReply ?: return
+            lockReply = null
+            if (key == currentLockKey()) enableLockCard(reply) else reply.postMessage("off")
+        }
         if (requestCode == 41) {
             val reply = alertPermissionReply ?: return
             alertPermissionReply = null
@@ -253,7 +349,7 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        openEntryPoint(intent)
+        if (intent.action != "work.samelling.vrelive.lab.OPEN_LOCK_CARD") openEntryPoint(intent)
     }
 
     private fun openEntryPoint(intent: Intent) {
@@ -288,6 +384,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        getSystemService(NotificationManager::class.java)?.cancel(lockNotification)
         webView.destroy()
         super.onDestroy()
     }
