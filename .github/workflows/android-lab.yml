@@ -5,6 +5,11 @@ on:
     paths:
       - "android-lab/**"
       - ".github/workflows/android-lab.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android-lab/**"
+      - ".github/workflows/android-lab.yml"
   workflow_dispatch:
 
 permissions:
@@ -12,6 +17,7 @@ permissions:
 
 jobs:
   debug-apk:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -37,3 +43,70 @@ jobs:
           path: android-lab/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+  release-apk:
+    # Do not make release signing secrets available to pull-request code.
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Android SDK 36
+        run: |
+          SDKMANAGER="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$SDKMANAGER"
+          "$SDKMANAGER" --install "platforms;android-36" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Build unsigned release APK
+        run: gradle -p android-lab :app:assembleRelease --no-daemon
+      - name: Align, sign, and verify release APK
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.VRE_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.VRE_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_BASE64" || -z "$KEYSTORE_PASSWORD" ]]; then
+            echo "::error::VRE release signing secrets are missing or empty."
+            exit 1
+          fi
+          umask 077
+          temp="$(mktemp -d)"
+          trap 'rm -rf "$temp"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$temp/vre-release-keystore.p12"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$temp/store-password.txt"
+          tools="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0"
+          unsigned="android-lab/app/build/outputs/apk/release/app-release-unsigned.apk"
+          signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.0-signed.apk"
+          test -s "$unsigned"
+          "$tools/zipalign" -p -f 4 "$unsigned" "$temp/aligned.apk"
+          "$tools/apksigner" sign \
+            --ks "$temp/vre-release-keystore.p12" \
+            --ks-key-alias "vre-live-release" \
+            --ks-pass "file:$temp/store-password.txt" \
+            --key-pass "file:$temp/store-password.txt" \
+            --out "$signed" \
+            "$temp/aligned.apk"
+          "$tools/apksigner" verify --verbose --print-certs "$signed"
+          actual="$("$tools/apksigner" verify --print-certs "$signed" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:lower:]' '[:upper:]')"
+          expected="7AF80EB4C104DF1FD4079D50B8C535DE6A67DD3DEDB1B557BE18E74D6D0D7E93"
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Release certificate fingerprint does not match the VRE Live signing key."
+            exit 1
+          fi
+          echo "Release certificate fingerprint matched."
+      - name: Upload verified release-signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vre-live-lab-0.1.0-signed-release-apk
+          path: android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.0-signed.apk
+          if-no-files-found: error
+          retention-days: 14

@@ -13,9 +13,15 @@ This standalone Android Lab is an **online WebView validation shell** for the se
 
 ## CI
 
-A GitHub Actions workflow assembles a **debug** APK on PRs that change this project. It never deploys Workers. Download the `vre-live-lab-debug-apk` artifact from a successful Actions run.
+The GitHub Actions workflow builds a **debug** APK on pull requests. On changes merged into `main`, or a manual workflow dispatch from `main`, it builds a **release** APK and signs it using the separate VRE Live certificate. The workflow never deploys the Cloudflare Worker.
 
-Debug APKs use ephemeral CI debug signing. Do not assume a fresh CI artifact upgrades an older installation. Establish a stable, dedicated VRE signing key before distributing release APKs. Do not reuse the Go, Hipster, Go! signer.
+- PR artifact: `vre-live-lab-debug-apk` (temporary debug-signed test build).
+- Main/dispatch artifact: `vre-live-lab-0.1.0-signed-release-apk` (release-signed, verified; 14-day GitHub artifact retention).
+- GitHub Actions repository secrets: `VRE_RELEASE_KEYSTORE_BASE64` contains the Base64-encoded PKCS12 keystore; `VRE_RELEASE_KEYSTORE_PASSWORD` contains its password.
+- The signing alias `vre-live-release` and pinned certificate SHA-256 fingerprint are not secrets. CI checks the resulting APK against the pinned fingerprint.
+- The secrets are available **only to the main-branch release job**, never to pull-request jobs. Keep signing material backed up outside GitHub.
+
+Release APKs use package `work.samelling.vrelive.lab`, distinct from Go, Hipster, Go!. **You must uninstall the older CI debug-signed VRE Lab APK before installing the release-signed APK** (Android does not allow updating an installed app with a different signing certificate). Once you install the release-signed version, preserve this signing key and increment `versionCode` for subsequent updates.
 
 Build locally with JDK 17, Android SDK 36, Gradle 8.11.1:
 
