@@ -1,0 +1,22 @@
+# Restored from production Worker metadata 2026-11-10.
+# WARNING: deploying this configuration targets the EXISTING production Worker.
+# Do not deploy without explicit review and authorization.
+name = "vre-live"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[[kv_namespaces]]
+binding = "RIDES"
+id = "00610b2a0b1e4a9db055b1960f4b71ed"
+
+# This is a PUBLIC VAPID key (not the private signing key).
+[vars]
+VAPID_PUBLIC_KEY = "BEyweAQuV1jZK3jtDDV_DNgthSoLyDBjKEXnCP0lMpPLq04BOYs-39SRGIkLzOHYwD8pxtTCZALCZi8kZVU0DFw"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.svg"]

@@ -1,0 +1,36 @@
+// VRE Live service worker: installability, arrival notifications, background push.
+// No fetch caching on purpose - the app's data must stay live.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+
+// Background push: payload-less pushes wake us; fetch the composed message
+// from the worker (same-origin, auth cookie rides along automatically).
+self.addEventListener("push", (e) => {
+  e.waitUntil((async () => {
+    let title = "VRE Live", body = "Open for your train's status";
+    try {
+      if (e.data) {
+        const d = e.data.json();
+        title = d.title || title; body = d.body || body;
+      } else {
+        const sub = await self.registration.pushManager.getSubscription();
+        if (sub) {
+          const r = await fetch("push/msg?e=" + encodeURIComponent(btoa(sub.endpoint)), { cache: "no-store" });
+          if (r.ok) { const m = await r.json(); title = m.title || title; body = m.body || body; }
+        }
+      }
+    } catch (_) { /* always show something - required for push events */ }
+    await self.registration.showNotification(title, {
+      body, tag: "vre-eta", icon: "icon.svg", badge: "icon.svg",
+      vibrate: [200, 100, 200],
+    });
+  })());
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true })
+      .then((cs) => (cs.length ? cs[0].focus() : self.clients.openWindow("./")))
+  );
+});
+
