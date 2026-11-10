@@ -1723,7 +1723,7 @@
           <div className="ride-bar">
             <button className=${"icon-btn" + (notify ? " on glow" : "")} aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"}
               aria-pressed=${notify}
-              title=${androidRideAlert ? "Arrival alert works while VRE Live is open" : notify ? (pushActive ? "Alerts on — works with app closed" : "Alerts on") : "Enable arrival alerts"}
+              title=${androidRideAlert ? "Monitor this ride and alert near your stop" : notify ? (pushActive ? "Alerts on — works with app closed" : "Alerts on") : "Enable arrival alerts"}
               onClick=${onNotify}><${BellIcon} size=${16} /></button>
             ${canWake && html`
               <button className=${"icon-btn" + (wake ? " on" : "")} aria-label="Keep screen on"
@@ -1935,7 +1935,8 @@
       const live = Object.fromEntries(Object.entries(liveByTrip).map(([id, train]) =>
         [id, { ts: train.ts, stops: Object.fromEntries(train.stops.map(stop => [stop.code, stop.time])) }]));
       const ride = rideTrip && rideDest
-        ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num,
+        ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num, sourceTrip: myTrain?.sourceTripId || rideTrip,
+            lead: alertLead(myTrain, rideDest),
             ts: observedTrain?.ts, eta: observedTrain && myStop?.time }
         : waitingFor ? (() => {
             const train = liveByTrip[waitingFor.trip];
@@ -2038,13 +2039,7 @@
           const left = myStop.time - now;
           const lead = alertLead(myTrain, myTrip.dest); // longer gaps warn earlier
           if (androidRideAlert) {
-            if (!myTrip.n5 && !alertSent.current && document.visibilityState === "visible" &&
-                (state.phase === "atStop" || (left >= 0 && left <= lead))) {
-              alertSent.current = true;
-              androidRideAlert.postMessage(JSON.stringify({ arrival: state.phase === "atStop"
-                ? `At ${myStop.name}` : `Approaching ${myStop.name}` }));
-              setMyTrip({ ...myTrip, n5: true });
-            }
+            // The Android service owns delivery, including while the phone is locked.
           } else if (!myTrip.n5 && state.phase !== "atStop" && left <= lead && left > 70000) {
             fireAlert(`${Math.max(1, Math.round(left / 60000))} minutes to ${myStop.name}`,
               `Train ${myTrain.num} · arriving ~${fmtClock(myStop.time)}`);
@@ -2057,6 +2052,19 @@
       } else document.title = "VRE Live";
     }, [now]);
 
+    useEffect(() => {
+      if (!androidRideAlert || !myTrip) return;
+      const sync = () => {
+        androidRideAlert.onmessage = ({ data }) => {
+          setMyTrip(current => current ? { ...current, notify: data === "armed", push: false,
+            pushErr: data === "blocked" ? "Allow notifications in Android settings" : null } : current);
+        };
+        androidRideAlert.postMessage("status");
+      };
+      sync();
+      document.addEventListener("visibilitychange", sync);
+      return () => document.removeEventListener("visibilitychange", sync);
+    }, [myTrip?.tripId, myTrip?.dest]);
     const servicePaused = !activeRide && !automaticServiceWindow(now);
     const age = fetchedAt ? now - fetchedAt : null;
     const health = !fetchedAt ? "dead" : error || age > REFRESH_MS + 60000 ? "stale" : "live";
