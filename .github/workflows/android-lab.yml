@@ -1,0 +1,37 @@
+name: VRE Live Android Lab APK
+
+on:
+  pull_request:
+    paths:
+      - "android-lab/**"
+      - ".github/workflows/android-lab.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager --install "platforms;android-36" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Assemble isolated debug APK
+        run: gradle -p android-lab :app:assembleDebug --no-daemon
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vre-live-lab-debug-apk
+          path: android-lab/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
