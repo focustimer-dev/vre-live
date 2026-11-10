@@ -1,0 +1,10 @@
+# Preview only; distinct from the existing production Worker.
+# No production KV binding, no cron, no VAPID private key.
+# Secret APP_PASSWORD must be set separately via Cloudflare.
+name = "vre-live-lab-preview"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[triggers]
+crons = []
