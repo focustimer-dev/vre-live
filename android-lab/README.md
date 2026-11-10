@@ -34,6 +34,7 @@ gradle -p android-lab :app:assembleDebug --no-daemon
 1. Install VRE Live Lab; verify it is separate from the installed PWA.
 2. Open its preview login and enter the preview password.
 3. Check Map, Schedule, Board, train selection and refresh.
+   Long-press the launcher icon for **Departures**, then select a station and use **Pin this station to Home**. Reopen the pinned station after closing the app.
 4. Check Android Back, app switching, reopening and cookie persistence.
 5. Start a new ride and verify that Arrival alerts starts off.
 6. Turn on airplane mode, then reconnect and Retry.

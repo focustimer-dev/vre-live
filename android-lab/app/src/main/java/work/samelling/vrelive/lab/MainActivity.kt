@@ -85,7 +85,7 @@ class MainActivity : Activity() {
             .addPathHandler(assetPath, WebViewAssetLoader.AssetsPathHandler(this))
             .build()
         val shortcuts = getSystemService(ShortcutManager::class.java)
-        if (shortcuts.isRequestPinShortcutSupported &&
+        if (shortcuts != null && shortcuts.isRequestPinShortcutSupported &&
             WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
         ) {
             WebViewCompat.addWebMessageListener(webView, "VreStationShortcut", setOf("https://$host")) {
