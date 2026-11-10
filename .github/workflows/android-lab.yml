@@ -82,7 +82,8 @@ jobs:
           temp="$(mktemp -d)"
           trap 'rm -rf "$temp"' EXIT
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$temp/vre-release-keystore.p12"
-          printf '%s' "$KEYSTORE_PASSWORD" > "$temp/store-password.txt"
+          printf '%s\n' "$KEYSTORE_PASSWORD" > "$temp/store-password.txt"
+          printf '%s\n' "$KEYSTORE_PASSWORD" > "$temp/key-password.txt"
           tools="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0"
           unsigned="android-lab/app/build/outputs/apk/release/app-release-unsigned.apk"
           signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.0-signed.apk"
@@ -92,7 +93,7 @@ jobs:
             --ks "$temp/vre-release-keystore.p12" \
             --ks-key-alias "vre-live-release" \
             --ks-pass "file:$temp/store-password.txt" \
-            --key-pass "file:$temp/store-password.txt" \
+            --key-pass "file:$temp/key-password.txt" \
             --out "$signed" \
             "$temp/aligned.apk"
           "$tools/apksigner" verify --verbose --print-certs "$signed"
