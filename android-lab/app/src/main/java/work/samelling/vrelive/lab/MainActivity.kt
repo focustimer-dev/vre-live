@@ -52,7 +52,7 @@ class MainActivity : Activity() {
     private var alertArmed = false
     private var alertPermissionReply: JavaScriptReplyProxy? = null
     private val alertChannel = "ride_arrival"
-    private val lockChannel = "ride_lock_screen"
+    private val lockChannel = "ride_lock_screen_card"
     private val lockNotification = 2
     private var lockReply: Pair<String, JavaScriptReplyProxy>? = null
     private var lockKey: String? = null
@@ -272,9 +272,17 @@ class MainActivity : Activity() {
 
     private fun enableLockCard(reply: JavaScriptReplyProxy) {
         val manager = getSystemService(NotificationManager::class.java)
+        if (manager?.getNotificationChannel("ride_lock_screen")?.importance == NotificationManager.IMPORTANCE_NONE) {
+            reply.postMessage("blocked")
+            return
+        }
         manager?.createNotificationChannel(NotificationChannel(
-            lockChannel, "Lock-screen train card", NotificationManager.IMPORTANCE_LOW
-        ).apply { lockscreenVisibility = Notification.VISIBILITY_PUBLIC })
+            lockChannel, "Lock-screen train card", NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            setSound(null, null)
+            enableVibration(false)
+        })
         lockKey = if (manager?.areNotificationsEnabled() == true &&
             manager.getNotificationChannel(lockChannel)?.importance != NotificationManager.IMPORTANCE_NONE
         ) currentLockKey() else null
