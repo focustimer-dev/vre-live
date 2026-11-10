@@ -41,7 +41,7 @@ for (const id of ["vre-core", "vre-app"]) {
     }
     for (const rows of Object.values(departures)) rows.sort((a, b) => a[0] - b[0]);
     await writeFile(join(output, "widget-schedule.json"), JSON.stringify({
-      stations, departures, noService: VRECore.SCHEDULE.noService
+      stations, departures, trips: VRECore.SCHEDULE.trips, noService: VRECore.SCHEDULE.noService
     }));
   }
   if (id === "vre-app") {

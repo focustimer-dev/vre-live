@@ -88,7 +88,7 @@ jobs:
           printf '%s\n' "$KEYSTORE_PASSWORD" > "$temp/key-password.txt"
           tools="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0"
           unsigned="android-lab/app/build/outputs/apk/release/app-release-unsigned.apk"
-          signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.3-signed.apk"
+          signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.4-signed.apk"
           test -s "$unsigned"
           "$tools/zipalign" -p -f 4 "$unsigned" "$temp/aligned.apk"
           "$tools/apksigner" sign \
@@ -109,7 +109,7 @@ jobs:
       - name: Upload verified release-signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: vre-live-lab-0.1.3-signed-release-apk
-          path: android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.3-signed.apk
+          name: vre-live-lab-0.1.4-signed-release-apk
+          path: android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.4-signed.apk
           if-no-files-found: error
           retention-days: 14

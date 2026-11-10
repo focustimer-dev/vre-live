@@ -1898,6 +1898,19 @@
       if (observedTrain) setMyTrip(m => m ? { ...m, snapshot: observedTrain } : m);
     }, [observedTrain]);
     const myStop = myTrain && myTrip ? myTrain.stops.find(s => s.code === myTrip.dest) : null;
+    const rideDest = myTrip?.dest;
+    const rideStarted = myTrip?.boardedAt;
+    const rideTrip = myTrip?.tripId;
+    useEffect(() => {
+      if (!window.VreWidgetData) return;
+      const live = Object.fromEntries(Object.entries(liveByTrip).map(([id, train]) =>
+        [id, { ts: train.ts, stops: Object.fromEntries(train.stops.map(stop => [stop.code, stop.time])) }]));
+      const ride = rideTrip && rideDest
+        ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num,
+            ts: observedTrain?.ts, eta: observedTrain && myStop?.time }
+        : null;
+      window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain]);
     const boardRows = useMemo(() => tab === "board" ? VRECore.stationBoard(boardSta, now, liveByTrip, 8) : [],
       [tab, boardSta, Math.floor(now / 15000), liveByTrip]);
 

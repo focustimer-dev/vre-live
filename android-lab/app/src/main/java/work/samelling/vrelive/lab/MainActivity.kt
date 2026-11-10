@@ -105,6 +105,12 @@ class MainActivity : Activity() {
             }
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            WebViewCompat.addWebMessageListener(webView, "VreWidgetData", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, _ ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) DeparturesWidget.cache(this, message.data.orEmpty())
+            }
             WebViewCompat.addWebMessageListener(webView, "VreRideAlert", setOf("https://$host")) {
                     view, message, origin, isMainFrame, reply ->
                 if (isMainFrame && isPreviewOrigin(origin) &&
