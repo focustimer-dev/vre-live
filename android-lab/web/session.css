@@ -1,0 +1,24 @@
+.lab-session {
+  width: min(100% - 2rem, 24rem);
+  margin: 12vh auto 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.lab-session [hidden], .lab-session[hidden] { display: none; }
+.lab-session h1 { margin: 0 0 .5rem; font-size: 1.3rem; }
+.lab-session p { margin: 0 0 1rem; color: var(--muted); }
+.lab-session label, .lab-session input { display: block; }
+.lab-session input, .lab-session button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: .5rem;
+  padding: .5rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: .5rem;
+  font: inherit;
+}
+.lab-session input { color: var(--fg); background: var(--bg); }
+.lab-session button { color: var(--bg); background: var(--fg); }
