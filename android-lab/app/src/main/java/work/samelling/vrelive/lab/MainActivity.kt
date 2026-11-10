@@ -254,7 +254,14 @@ class MainActivity : Activity() {
     private fun openEntryPoint(intent: Intent) {
         val url = if (intent.action == boardAction) {
             val station = intent.getStringExtra("station").orEmpty().takeIf(stationCode::matches).orEmpty()
-            Uri.parse(launchUrl).buildUpon().appendQueryParameter("board", station).build().toString()
+            val destination = intent.getStringExtra("destination").orEmpty().takeIf(stationCode::matches)
+            val entry = Uri.parse(launchUrl).buildUpon()
+            if (destination != null && station.isNotEmpty() && station != destination) {
+                entry.appendQueryParameter("from", station).appendQueryParameter("to", destination)
+            } else {
+                entry.appendQueryParameter("board", station)
+            }
+            entry.build().toString()
         } else launchUrl
         webView.loadUrl(url)
     }

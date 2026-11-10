@@ -54,7 +54,12 @@ private class Timetable(context: Context) {
             if (departure < now.toInstant().toEpochMilli()) return@mapNotNull null
             val delay = (departure - scheduled) / 60000
             departure to Row(trip.getString("num"), format(departure),
-                if (updated <= 0) "Scheduled" else if (delay > 0) "Updated · +${delay}m" else "Updated",
+                when {
+                    updated <= 0 -> "Scheduled"
+                    delay > 0 -> "+$delay min"
+                    delay < 0 -> "${-delay} min early"
+                    else -> "On time"
+                },
                 trip.getString("line"))
         }.sortedBy { it.first }.take(2).map { it.second }
     }
@@ -69,7 +74,7 @@ private class Timetable(context: Context) {
         val eta = ride.optLong("eta")
         val live = eta > 0 && fresh(ride, now)
         return stations.getString(station) to Row(ride.optString("num", "Train"),
-            if (live) format(eta) else "ETA unavailable", if (live) "Arrival · Updated" else "Live update unavailable", "")
+            if (live) format(eta) else "", if (live) "Live arrival" else "Live ETA unavailable", "")
     }
 
     private fun fresh(item: JSONObject?, now: ZonedDateTime): Boolean =
@@ -143,29 +148,31 @@ class DeparturesWidget : AppWidgetProvider() {
         val title = if (ride == null) "${timetable.stations.getString(from)} → ${timetable.stations.getString(to)}"
             else "Arrival at ${ride.first}"
         views.setTextViewText(R.id.widget_station, title)
-        views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let(::styled) ?: "No more departures today")
+        views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let { styled(it, true) } ?: "No more departures today")
         val width = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val second = rows.getOrNull(1)
         views.setViewVisibility(R.id.route_second, if (width >= 240 && second != null) View.VISIBLE else View.GONE)
-        if (second != null) views.setTextViewText(R.id.route_second, styled(second))
+        if (second != null) views.setTextViewText(R.id.route_second, styled(second, false))
         val intent = Intent(context, MainActivity::class.java)
-        if (ride == null) intent.setAction("work.samelling.vrelive.lab.OPEN_BOARD").putExtra("station", from)
+        if (ride == null) intent.setAction("work.samelling.vrelive.lab.OPEN_BOARD").putExtra("station", from).putExtra("destination", to)
         views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(
             context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         ))
         manager.updateAppWidget(id, views)
     }
 
-    private fun styled(row: Timetable.Row): CharSequence {
-        val headline = "${row.train}  ${row.time}"
+    private fun styled(row: Timetable.Row, primary: Boolean): CharSequence {
+        if (row.time.isEmpty()) return row.status
+        val headline = "${row.time}  ${row.train}"
         return SpannableString("$headline\n${row.status}").apply {
-            setSpan(RelativeSizeSpan(1.32f), 0, headline.length, 0)
+            setSpan(RelativeSizeSpan(if (primary) 1.36f else 1.22f), 0, row.time.length, 0)
+            if (primary) setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, row.time.length, 0)
             val color = when (row.line) {
                 "F" -> Color.rgb(255, 127, 127)
                 "M" -> Color.rgb(133, 184, 255)
                 else -> Color.WHITE
             }
-            setSpan(ForegroundColorSpan(color), 0, row.train.length, 0)
+            setSpan(ForegroundColorSpan(color), headline.length - row.train.length, headline.length, 0)
         }
     }
 
