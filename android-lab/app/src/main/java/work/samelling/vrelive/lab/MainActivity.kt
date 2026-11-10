@@ -167,6 +167,11 @@ class MainActivity : Activity() {
                 if (!mainFrameFailed) errorPanel.visibility = View.GONE
             }
         }
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT
+            ) { dismissSheetOrGoBack { if (isTaskRoot) moveTaskToBack(false) else finish() } }
+        }
         openEntryPoint(intent)
     }
 
@@ -269,10 +274,17 @@ class MainActivity : Activity() {
     private fun isPreviewOrigin(uri: Uri): Boolean =
         uri.scheme == "https" && uri.host == host && (uri.port == -1 || uri.port == 443)
 
+    private fun dismissSheetOrGoBack(fallback: () -> Unit) {
+        webView.evaluateJavascript("Boolean(window.vreDismissSheet?.())") { handled ->
+            if (handled != "true" && !isFinishing && !isDestroyed) {
+                if (webView.canGoBack()) webView.goBack() else fallback()
+            }
+        }
+    }
+
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (webView.canGoBack()) webView.goBack()
-        else super.onBackPressed()
+        dismissSheetOrGoBack { super.onBackPressed() }
     }
 
     override fun onDestroy() {

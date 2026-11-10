@@ -18,7 +18,7 @@
 <style>
   :root{
     --bg:#09090b; --card:#101013; --card-2:#17171b; --border:#26262b;
-    --fg:#fafafa; --muted:#a1a1aa; --muted-2:#71717a;
+    --fg:#fafafa; --muted:#a1a1aa; --muted-2:#92929d;
     --red:#ef4444; --blue:#60a5fa; --green:#22c55e; --amber:#f59e0b;
     --radius:16px;
     /* type scale: micro / secondary / row / subhead / title / hero */
@@ -116,7 +116,7 @@
   .ride-bar{display:flex; align-items:center; gap:8px; border-top:1px solid var(--border);
     margin-top:14px; padding:11px 2px 0}
   .icon-btn{appearance:none; background:transparent; border:1px solid var(--border); border-radius:10px;
-    width:44px; height:44px; display:grid; place-items:center; color:var(--muted-2); cursor:pointer;
+    width:48px; height:48px; display:grid; place-items:center; color:var(--muted-2); cursor:pointer;
     transition:color .2s, border-color .2s, box-shadow .3s}
   .icon-btn:active{transform:scale(.96)}
   .icon-btn.on{color:var(--accent, var(--green)); border-color:currentColor}
@@ -221,7 +221,7 @@
   }
 
   /* Keep compact visuals while giving controls room for a finger and clear focus. */
-  .tabs button,.btn.ghost,.chip{min-height:44px}
+  .tabs button,.btn.ghost,.chip,.ride-actions .btn,.stop-btn.destination{min-height:48px}
   .sched-filters{flex-wrap:wrap}
   .eta-hero>.row{flex-wrap:wrap}
   .switch::before{content:"";position:absolute;inset:-9px 0}
@@ -824,6 +824,18 @@
   const { assemble, parseAlerts, STATIONS, LINE_F, LINE_M, isServiceDay, scheduleRows,
     schedStopsMs, schedPositionNow, nextDepartures } = VRECore;
 
+  const serviceClock = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  });
+  function automaticServiceWindow(now) {
+    const parts = Object.fromEntries(serviceClock.formatToParts(now).map(p => [p.type, p.value]));
+    if (["Sat", "Sun"].includes(parts.weekday) ||
+        VRECore.SCHEDULE.noService.includes(parts.year + parts.month + parts.day)) return false;
+    const minute = Number(parts.hour) * 60 + Number(parts.minute);
+    return VRECore.SCHEDULE.trips.some(({ stops }) =>
+      minute >= stops[0][1] - 20 && minute <= stops[stops.length - 1][1] + 20);
+  }
   const REFRESH_MS = 180000;          // 3 minutes
   const MIN_FETCH_GAP = 65000;        // never hit the proxy/feeds faster than this
   const LINE_COLOR = { F: "#ef4444", M: "#60a5fa" };
@@ -1639,12 +1651,6 @@
 
   function EtaBanner({ train, dest, notify, pushActive, pushErr, wake, now, onNotify, onWake, onChange, onLeave }) {
     const [showSet, setShowSet] = useState(false);
-    const collapseT = useRef(null);
-    // after flipping a switch, tuck the settings panel away again
-    const scheduleCollapse = () => {
-      clearTimeout(collapseT.current);
-      collapseT.current = setTimeout(() => setShowSet(false), 1200);
-    };
     const stop = train && train.stops.find(s => s.code === dest);
     if (!train) return html`
       <div className="card fade"><div className="eta-hero">
@@ -1709,7 +1715,7 @@
             <span>${stop.name}</span>
           </div>
           ${(notify || androidRideAlert) && !pushActive && pushErr && html`
-            <div className="stale-note" style=${{ marginTop: 8 }}>background push: ${pushErr} — tap the bell to retry</div>`}
+            <div className="stale-note" style=${{ marginTop: 8 }}>${androidRideAlert ? pushErr : "Background alerts: " + pushErr}</div>`}
           <div className="ride-bar">
             <button className=${"icon-btn" + (notify ? " on glow" : "")} aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"}
               aria-pressed=${notify}
@@ -1723,38 +1729,14 @@
             <button className=${"icon-btn" + (showSet ? " on" : "")} aria-label="Trip options"
               aria-expanded=${showSet} onClick=${() => setShowSet(!showSet)}><${GearIcon} /></button>
           </div>
+          ${androidRideAlert && notify && html`<div className="meta">Keep VRE Live open for your arrival alert.</div>`}
           <div className="ride-actions">
             <button className="btn outline" onClick=${onChange}>Change stop</button>
             <button className="btn" onClick=${() => onLeave(true)}>I'm off the train</button>
           </div>
           ${showSet && html`
             <div className="fade">
-              <div className="alert-row" style=${{ borderTop: 0, marginTop: 2, paddingTop: 8 }}>
-                <div>
-                  <div className="lbl"><${BellIcon} /> Arrival alerts</div>
-                  <div className="cap">${(() => {
-                    const m = Math.round(alertLead(train, dest) / 60000);
-                    if (!state.fresh) return "Arrival alerts wait for a fresh live position.";
-                    if (notify && pushActive) return `Alerts ~${m}m out and on arrival — even if you close the app.`;
-                    if (androidRideAlert) return "One alert for this ride. Keep VRE Live open.";
-                    if (canNotify) return `Chime + notification ~${m}m out and on arrival. Keep the app open.`;
-                    return `Chime + vibration ~${m}m out and on arrival (notifications unsupported here). Keep the app open.`;
-                  })()}</div>
-                </div>
-                <button className=${"switch" + (notify ? " on" : "")} role="switch" aria-checked=${notify}
-                  aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"} onClick=${() => { onNotify(); scheduleCollapse(); }}></button>
-              </div>
-              ${canWake && html`
-                <div className="alert-row" style=${{ marginTop: 0, borderTop: 0, paddingTop: 6 }}>
-                  <div>
-                    <div className="lbl"><${ScreenIcon} /> Keep screen on</div>
-                    <div className="cap">Stay lit like a dashboard while you ride.</div>
-                  </div>
-                  <button className=${"switch" + (wake ? " on" : "")} role="switch" aria-checked=${wake}
-                    aria-label="Keep screen on" onClick=${() => { onWake(); scheduleCollapse(); }}></button>
-                </div>`}
               <div className="row" style=${{ marginTop: 10, gap: 8 }}>
-                <button className="btn ghost" onClick=${onChange}>Change destination</button>
                 <button className="btn ghost" style=${{ color: "var(--red)" }} onClick=${() => onLeave(false)}>Stop tracking</button>
               </div>
             </div>`}
@@ -1771,7 +1753,16 @@
     const destination = future.find(s => s.code === choice);
     const switching = !!activeTrip && !sameRide;
     const closeRef = useRef(null);
-    useEffect(() => { closeRef.current && closeRef.current.focus(); }, []);
+    useEffect(() => {
+      const previous = document.activeElement;
+      const dismiss = () => { closeRef.current?.click(); return true; };
+      window.vreDismissSheet = dismiss;
+      closeRef.current?.focus();
+      return () => {
+        if (window.vreDismissSheet === dismiss) delete window.vreDismissSheet;
+        if (previous?.isConnected) previous.focus();
+      };
+    }, []);
     return html`
       <div className="sheet" role="dialog" aria-label=${"Choose destination for train " + train.num}
         onKeyDown=${e => { if (e.key === "Escape") onClose(); }}>
@@ -1844,9 +1835,9 @@
     const alertSent = useRef(false);
     const lastFetch = useRef(0);
 
-    const refresh = useCallback(async (force) => {
+    const refresh = useCallback(async () => {
       const t = Date.now();
-      if (!force && t - lastFetch.current < MIN_FETCH_GAP) return;
+      if (t - lastFetch.current < MIN_FETCH_GAP) return;
       lastFetch.current = t;
       try {
         const [veh, tu] = await Promise.all([fetchFeed("VehiclePositionFeed"), fetchFeed("TripUpdateFeed")]);
@@ -1864,8 +1855,26 @@
       } catch (_) { /* no alert feed available */ }
     }, []);
 
-    useEffect(() => { refresh(true); const id = setInterval(() => refresh(true), REFRESH_MS); return () => clearInterval(id); }, [refresh]);
-    useEffect(() => { seedHistory().then(log => { if (log) setDevlog(log); }); }, []);
+    const activeRide = !!myTrip;
+    const historySeeded = useRef(false);
+    useEffect(() => {
+      const poll = () => {
+        if (document.visibilityState !== "visible") return;
+        if (!activeRide && !automaticServiceWindow(Date.now())) return;
+        refresh();
+        if (!historySeeded.current) {
+          historySeeded.current = true;
+          seedHistory().then(log => { if (log) setDevlog(log); });
+        }
+      };
+      poll();
+      const id = setInterval(poll, REFRESH_MS);
+      document.addEventListener("visibilitychange", poll);
+      return () => {
+        clearInterval(id);
+        document.removeEventListener("visibilitychange", poll);
+      };
+    }, [refresh, activeRide]);
     useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
     useEffect(() => {
       try { myTrip ? localStorage.setItem(LS_KEY, JSON.stringify(myTrip)) : localStorage.removeItem(LS_KEY); } catch (_) {}
@@ -2008,6 +2017,7 @@
       } else document.title = "VRE Live";
     }, [now]);
 
+    const servicePaused = !activeRide && !automaticServiceWindow(now);
     const age = fetchedAt ? now - fetchedAt : null;
     const health = !fetchedAt ? "dead" : error || age > REFRESH_MS + 60000 ? "stale" : "live";
     const nextIn = fetchedAt ? Math.max(0, REFRESH_MS - (now - lastFetch.current)) : 0;
@@ -2080,7 +2090,7 @@
           <h1><span className=${"dot " + (health === "live" ? "" : health)}></span>
             <${TrainIcon} size=${20} /> VRE Live</h1>
           <div className="sub">
-            ${fetchedAt ? html`<span>updated ${fmtAge(age)} ago<br/>next in ${Math.ceil(nextIn / 1000 / 60)}m</span>` : "connecting…"}
+            ${servicePaused ? "Live refresh paused" : fetchedAt ? html`<span>updated ${fmtAge(age)} ago<br/>next in ${Math.ceil(nextIn / 1000 / 60)}m</span>` : "connecting…"}
           </div>
         </div>
 
@@ -2150,7 +2160,7 @@
                   ? html`<${Map} trains=${trains} ghosts=${ghostTrains} selected=${selected}
                       myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick} />`
                   : html`<div className="empty">No trains reporting right now.<br/>VRE runs weekday commuter service.</div>`
-                : html`<div className="empty">Loading live data…</div>`}
+                : html`<div className="empty">${servicePaused ? "Live refresh is paused. Check Schedule or refresh below." : error || "Loading live data…"}</div>`}
             </div>
             <div className="map-legend" aria-label="Map marker legend">
               <span><i className="map-key solid" aria-hidden="true"></i>Live feed</span>
@@ -2174,7 +2184,7 @@
 
         <div className="foot">
           <span>Feed ${data && data.feedTs ? "stamped " + fmtClock(data.feedTs) : ""}</span>
-          <button className="btn ghost" onClick=${() => refresh(false)}
+          <button className="btn ghost" onClick=${() => refresh()}
             disabled=${now - lastFetch.current < MIN_FETCH_GAP}>
             ${now - lastFetch.current < MIN_FETCH_GAP
               ? `refresh in ${Math.ceil((MIN_FETCH_GAP - (now - lastFetch.current)) / 1000)}s`
