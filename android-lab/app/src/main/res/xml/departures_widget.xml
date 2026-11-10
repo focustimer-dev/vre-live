@@ -1,0 +1,7 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp" android:minHeight="90dp"
+    android:targetCellWidth="3" android:targetCellHeight="2"
+    android:initialLayout="@layout/departures_widget"
+    android:updatePeriodMillis="1800000"
+    android:configure="work.samelling.vrelive.lab.DeparturesSetup"
+    android:widgetCategory="home_screen" />

@@ -1,0 +1,13 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:orientation="vertical"
+    android:padding="14dp" android:background="#101013">
+    <TextView android:id="@+id/widget_station" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="VRE departures"
+        android:textColor="#FAFAFA" android:textSize="16sp" android:textStyle="bold"
+        android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/widget_times" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:text="Scheduled departures" android:textColor="#D4D4D8"
+        android:textSize="13sp" android:maxLines="3" android:ellipsize="end" />
+</LinearLayout>
