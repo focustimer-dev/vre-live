@@ -1821,9 +1821,15 @@
     const [selected, setSelected] = useState(null);  // tripId shown in sheet
     const [picking, setPicking] = useState(false);
     const [devlog, setDevlog] = useState(() => lsGet(DEV_KEY, {}));
-    const [route, setRoute] = useState(() => lsGet(ROUTE_KEY, null));
+    const widgetRoute = useMemo(() => {
+      if (window.location.pathname !== "/__vre_android__/app/index.html") return null;
+      const params = new URLSearchParams(window.location.search);
+      const a = params.get("from"), b = params.get("to");
+      return a !== b && ALL_CODES.includes(a) && ALL_CODES.includes(b) ? { a, b } : null;
+    }, []);
+    const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [editRoute, setEditRoute] = useState(false);
-    const [flipDir, setFlipDir] = useState(null); // null = auto by time of day
+    const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
       const requested = window.location.pathname === "/__vre_android__/app/index.html"
         ? new URLSearchParams(window.location.search).get("board") : null;
@@ -1864,7 +1870,6 @@
     useEffect(() => {
       try { myTrip ? localStorage.setItem(LS_KEY, JSON.stringify(myTrip)) : localStorage.removeItem(LS_KEY); } catch (_) {}
     }, [myTrip]);
-    useEffect(() => { if (route) lsSet(ROUTE_KEY, route); }, [route]);
     useEffect(() => { lsSet("vre-live-board", boardSta); }, [boardSta]);
 
     const trains = data ? data.trains : [];
@@ -2114,7 +2119,7 @@
                   const showReturn = flipDir === null ? autoReturn : flipDir;
                   return html`<${CommuteCard}
                     from=${showReturn ? route.b : route.a} to=${showReturn ? route.a : route.b}
-                    auto=${flipDir === null} now=${now} liveByTrip=${liveByTrip}
+                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)} now=${now} liveByTrip=${liveByTrip}
                     onEdit=${() => setEditRoute(true)}
                     onFlip=${() => setFlipDir(!showReturn)}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
@@ -2122,7 +2127,7 @@
               : html`<div className="card">
                   <div className="card-h">${route ? "Edit commute" : "Set up your commute"}</div>
                   <${RouteSetup} initial=${route}
-                    onSave=${r => { setRoute(r); setEditRoute(false); setFlipDir(null); }}
+                    onSave=${r => { lsSet(ROUTE_KEY, r); setRoute(r); setEditRoute(false); setFlipDir(null); }}
                     onCancel=${route ? (() => setEditRoute(false)) : null} />
                 </div>`}
           </div>`}
