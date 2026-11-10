@@ -1745,12 +1745,16 @@
   }
 
   /* ---------------- bottom sheet: train details / destination picker ---------------- */
-  function Sheet({ train, now, devSamples, activeTrip, defaultDest, busy, onDest, onClose }) {
-    const future = VRECore.remainingStops(train, now);
+  function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, onDest, onWait, onClose }) {
+    const boardingIndex = train.stops.findIndex(s => s.code === boardingStation);
+    const future = VRECore.remainingStops(train, now).filter(s =>
+      train.stops.findIndex(stop => stop.code === s.code) > boardingIndex);
     const sameRide = activeTrip && (activeTrip.tripId === train.tripId || activeTrip.tripId === train.sourceTripId);
     const initial = sameRide ? activeTrip.dest : defaultDest;
     const [choice, setChoice] = useState(() => future.some(s => s.code === initial) ? initial : "");
+    const [waiting, setWaiting] = useState(false);
     const destination = future.find(s => s.code === choice);
+    const waitStop = destination && destination.code !== train.stops.at(-1)?.code;
     const switching = !!activeTrip && !sameRide;
     const closeRef = useRef(null);
     useEffect(() => {
@@ -1779,10 +1783,11 @@
           </div>
           <button ref=${closeRef} className="btn ghost" onClick=${onClose} aria-label="Close destination picker"><${XIcon} /></button>
         </div>
-        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>Where will you get off?</div>
+        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>${waiting ? "Where are you waiting?" : "Where will you get off?"}</div>
+        ${!activeTrip && html`<button className="btn ghost" type="button" aria-pressed=${waiting} onClick=${() => { setWaiting(!waiting); setChoice(""); }}>${waiting ? "I’m already on the train" : "I’m waiting for this train"}</button>`}
         ${switching && html`<div className="stale-note" style=${{ marginTop: 6 }}>You are tracking train ${String(activeTrip.tripId).split("-")[0]}. Switching stops its alerts.</div>`}
-        <div className="stops" role="group" aria-label="Destination stations">
-          ${future.length ? future.map(s => html`
+        <div className="stops" role="group" aria-label=${waiting ? "Boarding stations" : "Destination stations"}>
+          ${future.length ? future.filter(s => !waiting || s.code !== train.stops.at(-1)?.code).map(s => html`
             <button key=${s.code} className=${"stop-btn destination" + (choice === s.code ? " chosen" : "")}
               aria-pressed=${choice === s.code} onClick=${() => setChoice(s.code)}>
               <span>${s.name}</span>
@@ -1791,10 +1796,10 @@
           : html`<div className="empty">No remaining stops in the latest data. Close this panel and try another train.</div>`}
         </div>
         <div style=${{ marginTop: 12 }}>
-          <button className="btn" disabled=${!destination || busy} onClick=${() => destination && onDest(destination.code)}>
-            ${busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start tracking"} · ${destination.name}` : "Choose a destination"}
+          <button className="btn" disabled=${!destination || busy || (waiting && !waitStop)} onClick=${() => destination && (waiting ? onWait(destination.code) : onDest(destination.code))}>
+            ${waiting ? (destination ? "Track arrival at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start tracking"} · ${destination.name}` : "Choose a destination"}
           </button>
-          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>You choose when to end the ride.</div>
+          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "The Android widget shows the arrival at your station." : "You choose when to end the ride."}</div>
         </div>
       </div>`;
   }
@@ -1855,7 +1860,12 @@
       } catch (_) { /* no alert feed available */ }
     }, []);
 
-    const activeRide = !!myTrip;
+    const [waitingFor, setWaitingFor] = useState(() => lsGet("vre-waiting-train", null));
+    useEffect(() => { lsSet("vre-waiting-train", waitingFor); }, [waitingFor]);
+    useEffect(() => {
+      if (waitingFor && now - waitingFor.started >= 4 * 3600000) setWaitingFor(null);
+    }, [waitingFor, now]);
+    const activeRide = !!myTrip || !!(waitingFor && now - waitingFor.started < 4 * 3600000);
     const historySeeded = useRef(false);
     useEffect(() => {
       const poll = () => {
@@ -1922,9 +1932,13 @@
       const ride = rideTrip && rideDest
         ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num,
             ts: observedTrain?.ts, eta: observedTrain && myStop?.time }
-        : null;
+        : waitingFor ? (() => {
+            const train = liveByTrip[waitingFor.trip];
+            const stop = train?.stops.find(s => s.code === waitingFor.dest);
+            return { ...waitingFor, waiting: true, ts: train?.ts, eta: stop?.time };
+          })() : null;
       window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain]);
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor]);
     const boardRows = useMemo(() => tab === "board" ? VRECore.stationBoard(boardSta, now, liveByTrip, 8) : [],
       [tab, boardSta, Math.floor(now / 15000), liveByTrip]);
 
@@ -1975,9 +1989,9 @@
           notify: same && !androidRideAlert ? !!myTrip.notify : false, push: false, pushErr: null,
           n5: false, n0: false,
           boardedAt: same ? myTrip.boardedAt : Date.now(),
-          from: same ? myTrip.from : null, snapshot: train,
+          from: same ? myTrip.from : waitingFor?.trip === train.tripId ? waitingFor.dest : null, snapshot: train,
         };
-        setMyTrip(next); setSelected(null); setPicking(false); setSummary(null);
+        setWaitingFor(null); setMyTrip(next); setSelected(null); setPicking(false); setSummary(null);
         if (next.notify && !train.ghost && canNotify && Notification.permission === "granted") {
           const err = await pushSubscribe(train, code);
           setMyTrip(m => m && m.tripId === next.tripId && m.dest === code && m.boardedAt === next.boardedAt
@@ -2109,6 +2123,13 @@
             </div>
           </div>`}
 
+        ${waitingFor && !myTrip && html`
+          <div className="card"><div className="card-h">Waiting at ${STATIONS[waitingFor.dest]?.name} · Train ${waitingFor.num}</div>
+            <div style=${{ padding: "0 10px 5px" }}>
+              <button className="btn ghost" onClick=${() => { setSelected(waitingFor.trip); setPicking(true); }}>I'm on the train</button>
+              <button className="btn ghost" onClick=${() => setWaitingFor(null)}>Stop waiting</button>
+            </div>
+          </div>`}
         ${summary && html`<${SummaryCard} rec=${summary} onDismiss=${() => setSummary(null)} />`}
 
         ${myTrip && html`
@@ -2194,9 +2215,16 @@
         ${selTrain && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
             activeTrip=${myTrip} busy=${rideBusy}
+            boardingStation=${waitingFor?.trip === selTrain.tripId ? waitingFor.dest : null}
             defaultDest=${route ? ((flipDir === null ? new Date(now).getHours() >= 12 : flipDir) ? route.a : route.b) : null}
             devSamples=${devlog[selTrain.tripId]}
             onBoard=${() => setPicking(true)}
+            onWait=${code => {
+              const scheduled = VRECore.SCHEDULE.trips.find(t => t.trip === selTrain.tripId);
+              setWaitingFor({ trip: selTrain.tripId, num: selTrain.num, dest: code, started: Date.now(),
+                scheduled: scheduled ? schedStopsMs(scheduled, now).find(s => s.code === code)?.time : null });
+              setSelected(null); setPicking(false);
+            }}
             onDest=${startRide}
             onClose=${() => { setSelected(null); setPicking(false); }} />`}
       </div>`;

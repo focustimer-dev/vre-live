@@ -73,7 +73,16 @@ private class Timetable(context: Context) {
         if (!stations.has(station)) return null
         val eta = ride.optLong("eta")
         val live = eta > 0 && fresh(ride, now)
-        return stations.getString(station) to Row(ride.optString("num", "Train"),
+        if (ride.optBoolean("waiting")) {
+            if (age > 14400000L) return null
+            val scheduled = ride.optLong("scheduled")
+            val showScheduled = scheduled > now.toInstant().toEpochMilli()
+            val approaching = live && eta >= now.toInstant().toEpochMilli() - 60000
+            return "Waiting at ${stations.getString(station)}" to Row(ride.optString("num", "Train"),
+                if (approaching) format(eta) else if (showScheduled) format(scheduled) else "",
+                if (approaching) "Live arrival" else if (showScheduled) "Scheduled arrival" else "Arrival unconfirmed", "")
+        }
+        return "Arrival at ${stations.getString(station)}" to Row(ride.optString("num", "Train"),
             if (live) format(eta) else "", if (live) "Live arrival" else "Live ETA unavailable", "")
     }
 
@@ -146,7 +155,7 @@ class DeparturesWidget : AppWidgetProvider() {
         val rows = if (ride == null) timetable.route(from, to, cache) else listOf(ride.second)
         val views = RemoteViews(context.packageName, R.layout.route_widget)
         val title = if (ride == null) "${timetable.stations.getString(from)} → ${timetable.stations.getString(to)}"
-            else "Arrival at ${ride.first}"
+            else ride.first
         views.setTextViewText(R.id.widget_station, title)
         views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let { styled(it, true) } ?: "No more departures today")
         val width = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
