@@ -36,7 +36,7 @@ class MainActivity : Activity() {
     private val assetPath = "/__vre_android__/"
     private val launchUrl = "https://$host${assetPath}app/index.html"
     private val boardAction = "work.samelling.vrelive.lab.OPEN_BOARD"
-    private val stationCode = Regex("[0-9]{2}")
+    private val stationCode = Regex("[0-9A-Z]{2}")
     private val feedPaths = setOf(
         "/feed/history", "/feed/TripUpdateFeed", "/feed/VehiclePositionFeed", "/feed/AlertFeed"
     )
