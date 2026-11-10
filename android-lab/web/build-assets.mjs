@@ -1,4 +1,5 @@
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { runInNewContext } from "node:vm";
 import { join } from "node:path";
 
 const output = process.argv[2];
@@ -31,6 +32,18 @@ for (const id of ["vre-core", "vre-app"]) {
   const block = page.match(new RegExp(`<script id="${id}">([\\s\\S]*?)</script>`));
   if (!block) throw new Error("Missing inline script: " + id);
   let code = block[1];
+  if (id === "vre-core") {
+    const { VRECore } = runInNewContext(code + "\n;globalThis");
+    const stations = Object.fromEntries(Object.entries(VRECore.STATIONS).map(([id, s]) => [id, s.name]));
+    const departures = Object.fromEntries(Object.keys(stations).map(id => [id, []]));
+    for (const trip of VRECore.SCHEDULE.trips) {
+      for (const [id, minute] of trip.stops.slice(0, -1)) departures[id].push([minute, trip.head]);
+    }
+    for (const rows of Object.values(departures)) rows.sort((a, b) => a[0] - b[0]);
+    await writeFile(join(output, "widget-schedule.json"), JSON.stringify({
+      stations, departures, noService: VRECore.SCHEDULE.noService
+    }));
+  }
   if (id === "vre-app") {
     code = code.replace(/^  .*navigator\.serviceWorker\.register.*\n/m, "");
     const feeds = code.replace('fetch("feed/history",', 'window.vreFeed("/feed/history",')

@@ -1162,6 +1162,7 @@
       }
     } catch (_) {}
   }
+  const androidRideAlert = window.VreRideAlert;
   const canNotify = "Notification" in window;
   const canPush = "PushManager" in window && "serviceWorker" in navigator;
   const canWake = "wakeLock" in navigator;
@@ -1707,10 +1708,10 @@
             <span>${train.stops[0] ? train.stops[0].name : ""}</span>
             <span>${stop.name}</span>
           </div>
-          ${notify && !pushActive && pushErr && html`
+          ${(notify || androidRideAlert) && !pushActive && pushErr && html`
             <div className="stale-note" style=${{ marginTop: 8 }}>background push: ${pushErr} — tap the bell to retry</div>`}
           <div className="ride-bar">
-            <button className=${"icon-btn" + (notify ? " on glow" : "")} aria-label="Arrival alerts"
+            <button className=${"icon-btn" + (notify ? " on glow" : "")} aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"}
               aria-pressed=${notify}
               title=${notify ? (pushActive ? "Alerts on — works with app closed" : "Alerts on") : "Enable arrival alerts"}
               onClick=${onNotify}><${BellIcon} size=${16} /></button>
@@ -1735,12 +1736,13 @@
                     const m = Math.round(alertLead(train, dest) / 60000);
                     if (!state.fresh) return "Arrival alerts wait for a fresh live position.";
                     if (notify && pushActive) return `Alerts ~${m}m out and on arrival — even if you close the app.`;
+                    if (androidRideAlert) return "One alert for this ride. Keep VRE Live open.";
                     if (canNotify) return `Chime + notification ~${m}m out and on arrival. Keep the app open.`;
                     return `Chime + vibration ~${m}m out and on arrival (notifications unsupported here). Keep the app open.`;
                   })()}</div>
                 </div>
                 <button className=${"switch" + (notify ? " on" : "")} role="switch" aria-checked=${notify}
-                  aria-label="Arrival alerts" onClick=${() => { onNotify(); scheduleCollapse(); }}></button>
+                  aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"} onClick=${() => { onNotify(); scheduleCollapse(); }}></button>
               </div>
               ${canWake && html`
                 <div className="alert-row" style=${{ marginTop: 0, borderTop: 0, paddingTop: 6 }}>
@@ -1829,7 +1831,11 @@
         : lsGet("vre-live-board", null) || (lsGet(ROUTE_KEY, null) || {}).a || "01";
     });
     const [summary, setSummary] = useState(null);
-    const [myTrip, setMyTrip] = useState(() => lsGet(LS_KEY, null));
+    const [myTrip, setMyTrip] = useState(() => {
+      const saved = lsGet(LS_KEY, null);
+      return saved && androidRideAlert ? { ...saved, notify: false, push: false, pushErr: null } : saved;
+    });
+    const alertSent = useRef(false);
     const lastFetch = useRef(0);
 
     const refresh = useCallback(async (force) => {
@@ -1913,6 +1919,7 @@
     }, [myTrip, myTrain, Math.floor(now / 30000)]);
 
     const finishRide = (completed = false) => {
+      androidRideAlert?.postMessage("cancel");
       if (myTrip && myTrip.push) pushUnsubscribe();
       let rec = null;
       if (completed && myTrip && myTrip.boardedAt) {
@@ -1933,10 +1940,12 @@
       if (same && myTrip.dest === code) { setSelected(null); setPicking(false); return; }
       setRideBusy(true);
       try {
+        androidRideAlert?.postMessage("cancel");
+        alertSent.current = false;
         if (myTrip && myTrip.push) await pushUnsubscribe();
         const next = {
           ...(same ? myTrip : {}), tripId: train.tripId, dest: code,
-          notify: same ? !!myTrip.notify : false, push: false, pushErr: null,
+          notify: same && !androidRideAlert ? !!myTrip.notify : false, push: false, pushErr: null,
           n5: false, n0: false,
           boardedAt: same ? myTrip.boardedAt : Date.now(),
           from: same ? myTrip.from : null, snapshot: train,
@@ -1961,7 +1970,14 @@
         if (myTrip.notify && !myTrip.push && state.fresh && ["enroute", "due", "atStop"].includes(state.phase)) {
           const left = myStop.time - now;
           const lead = alertLead(myTrain, myTrip.dest); // longer gaps warn earlier
-          if (!myTrip.n5 && state.phase !== "atStop" && left <= lead && left > 70000) {
+          if (androidRideAlert) {
+            if (!alertSent.current && document.visibilityState === "visible" &&
+                (state.phase === "atStop" || (left >= 0 && left <= lead))) {
+              alertSent.current = true;
+              androidRideAlert.postMessage(JSON.stringify({ arrival: state.phase === "atStop"
+                ? `At ${myStop.name}` : `Approaching ${myStop.name}` }));
+            }
+          } else if (!myTrip.n5 && state.phase !== "atStop" && left <= lead && left > 70000) {
             fireAlert(`${Math.max(1, Math.round(left / 60000))} minutes to ${myStop.name}`,
               `Train ${myTrain.num} · arriving ~${fmtClock(myStop.time)}`);
             setMyTrip({ ...myTrip, n5: true });
@@ -1980,6 +1996,23 @@
     const pick = id => { setSelected(id === selected ? null : id); setPicking(false); };
     const toggleNotify = async () => {
       if (!myTrip) return;
+      if (androidRideAlert) {
+        if (myTrip.notify) {
+          androidRideAlert.postMessage("cancel");
+          setMyTrip({ ...myTrip, notify: false, pushErr: null });
+        } else if (!alertSent.current) {
+          const ride = myTrip;
+          androidRideAlert.onmessage = ({ data }) => {
+            setMyTrip(current => current && current.boardedAt === ride.boardedAt &&
+                current.tripId === ride.tripId && current.dest === ride.dest
+              ? { ...current, notify: data === "armed",
+                  pushErr: data === "armed" ? null : "Allow notifications in Android settings" }
+              : current);
+          };
+          androidRideAlert.postMessage("arm");
+        }
+        return;
+      }
       if (myTrip.notify) {
         setMyTrip({ ...myTrip, notify: false, push: false });
         pushUnsubscribe();
