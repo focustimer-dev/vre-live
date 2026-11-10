@@ -11,8 +11,8 @@ android {
         applicationId 'work.samelling.vrelive.lab'
         minSdk 26
         targetSdk 36
-        versionCode 1
-        versionName '0.1.0'
+        versionCode 2
+        versionName '0.1.1'
     }
     buildTypes {
         release { minifyEnabled false }
@@ -23,3 +23,27 @@ android {
     }
     kotlinOptions { jvmTarget = '17' }
 }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.14.0'
+}
+
+def webAssets = rootProject.layout.projectDirectory.dir('web')
+def sharedHtml = rootProject.layout.projectDirectory.file('../src/index.html')
+def generatedAssets = layout.buildDirectory.dir('generated/vre-assets')
+def npmInstall = tasks.register('installVreWebDependencies', Exec) {
+    workingDir webAssets.asFile
+    commandLine 'npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'
+    inputs.files(webAssets.file('package.json'), webAssets.file('package-lock.json'))
+    outputs.dir(webAssets.dir('node_modules'))
+}
+def prepareAssets = tasks.register('prepareVreAssets', Exec) {
+    dependsOn npmInstall
+    workingDir webAssets.asFile
+    commandLine 'node', 'build-assets.mjs', generatedAssets.get().dir('app').asFile.absolutePath
+    inputs.files(sharedHtml, webAssets.file('build-assets.mjs'), webAssets.file('session.js'),
+        webAssets.file('session.css'), webAssets.file('package-lock.json'))
+    outputs.dir(generatedAssets)
+}
+android.sourceSets.main.assets.srcDir(generatedAssets)
+tasks.named('preBuild').configure { dependsOn prepareAssets }
