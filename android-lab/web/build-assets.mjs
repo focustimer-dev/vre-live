@@ -41,6 +41,7 @@ for (const id of ["vre-core", "vre-app"]) {
     }
     for (const rows of Object.values(departures)) rows.sort((a, b) => a[0] - b[0]);
     await writeFile(join(output, "widget-schedule.json"), JSON.stringify({
+      stopAliases: runInNewContext("(" + source.match(/const CHILD2PARENT = (\{[\s\S]*?\});/)[1] + ")"),
       stations, departures, trips: VRECore.SCHEDULE.trips, noService: VRECore.SCHEDULE.noService
     }));
   }

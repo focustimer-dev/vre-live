@@ -4,7 +4,7 @@ The APK packages the VRE Live interface and its JavaScript dependencies. The sep
 
 ## Scope
 
-- Application ID: `work.samelling.vrelive.lab`, version 0.1.10, Android API 26+.
+- Application ID: `work.samelling.vrelive.lab`, version 0.1.11, Android API 26+.
 - Kotlin Activity and WebViewAssetLoader serve the packaged UI under a reserved path on the preview origin. The existing HttpOnly preview cookie authenticates the same-origin feed requests.
 - Only packaged assets and the HTTPS preview login and train feed routes are allowed in the WebView. Third-party cookies, file/content access, and cleartext traffic are disabled.
 - Android Back and retry on main-frame network errors.
@@ -16,7 +16,7 @@ The APK packages the VRE Live interface and its JavaScript dependencies. The sep
 The GitHub Actions workflow builds a **debug** APK on pull requests. On changes merged into `main`, or a manual workflow dispatch from `main`, it builds a **release** APK and signs it using the separate VRE Live certificate. The workflow never deploys the Cloudflare Worker.
 
 - PR artifact: `vre-live-lab-debug-apk` (temporary debug-signed test build).
-- Main/dispatch artifact: `vre-live-lab-0.1.10-signed-release-apk` (release-signed, verified; 14-day GitHub artifact retention).
+- Main/dispatch artifact: `vre-live-lab-0.1.11-signed-release-apk` (release-signed, verified; 14-day GitHub artifact retention).
 - GitHub Actions repository secrets: `VRE_RELEASE_KEYSTORE_BASE64` contains the Base64-encoded PKCS12 keystore; `VRE_RELEASE_KEYSTORE_PASSWORD` contains its password.
 - The signing alias `vre-live-release` and pinned certificate SHA-256 fingerprint are not secrets. CI checks the resulting APK against the pinned fingerprint.
 - The secrets are available **only to the main-branch release job**, never to pull-request jobs. Keep signing material backed up outside GitHub.

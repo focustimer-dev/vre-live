@@ -51,7 +51,7 @@ class MainActivity : Activity() {
     private var mainFrameFailed = false
     private var alertArmed = false
     private var alertPermissionReply: JavaScriptReplyProxy? = null
-    private val alertChannel = "ride_arrival"
+    private val alertChannel = "ride_arrival_vibration"
     private val lockChannel = "ride_lock_screen_card"
     private val lockNotification = 2
     private var lockReply: Pair<String, JavaScriptReplyProxy>? = null
@@ -204,10 +204,15 @@ class MainActivity : Activity() {
     private fun handleRideAlert(data: String, reply: JavaScriptReplyProxy) {
         val manager = getSystemService(NotificationManager::class.java) ?: return
         when (data) {
+            "status" -> {
+                reply.postMessage(if (RideMonitor.activeKey != null) "armed" else "off")
+                return
+            }
             "cancel" -> {
                 alertArmed = false
                 alertPermissionReply = null
                 manager.cancel(1)
+                stopService(Intent(this, RideMonitor::class.java))
                 return
             }
             "arm" -> {
@@ -242,12 +247,26 @@ class MainActivity : Activity() {
     private fun completeAlertOptIn(reply: JavaScriptReplyProxy) {
         val manager = getSystemService(NotificationManager::class.java)
         manager?.createNotificationChannel(
-            NotificationChannel(alertChannel, "Ride arrival alerts", NotificationManager.IMPORTANCE_HIGH)
+            NotificationChannel(alertChannel, "Ride arrival alerts", NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) }
         )
         alertArmed = manager?.areNotificationsEnabled() == true &&
             manager.getNotificationChannel(alertChannel)?.importance != NotificationManager.IMPORTANCE_NONE
+        if (manager?.getNotificationChannel("ride_arrival")?.importance == NotificationManager.IMPORTANCE_NONE) alertArmed = false
+        val ride = widgetSnapshot.optJSONObject("ride")
+        if (alertArmed && ride != null && !ride.optBoolean("waiting")) {
+            val cookie = CookieManager.getInstance().getCookie("https://$host").orEmpty()
+            if (cookie.isEmpty()) alertArmed = false
+            else try {
+                startForegroundService(Intent(this, RideMonitor::class.java)
+                    .putExtra("ride", ride.toString()).putExtra("cookie", cookie))
+            } catch (_: Exception) { alertArmed = false }
+        } else alertArmed = false
         reply.postMessage(if (alertArmed) "armed" else "blocked")
     }
+
+    companion object { @Volatile var visible = false }
+    override fun onStart() { super.onStart(); visible = true }
+    override fun onStop() { visible = false; super.onStop() }
 
     private fun currentLockKey(): String? = widgetSnapshot.optJSONObject("ride")?.let {
         "${it.optLong("started")}:${it.optString("trip")}:${it.optString("dest")}:${it.optBoolean("waiting")}"

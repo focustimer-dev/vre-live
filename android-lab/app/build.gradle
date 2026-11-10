@@ -11,8 +11,8 @@ android {
         applicationId 'work.samelling.vrelive.lab'
         minSdk 26
         targetSdk 36
-        versionCode 11
-        versionName '0.1.10'
+        versionCode 12
+        versionName '0.1.11'
     }
     buildTypes {
         release { minifyEnabled false }
@@ -26,6 +26,7 @@ android {
 
 dependencies {
     implementation 'androidx.webkit:webkit:1.14.0'
+    implementation 'org.mobilitydata:gtfs-realtime-bindings:0.0.8'
 }
 
 def webAssets = rootProject.layout.projectDirectory.dir('web')
