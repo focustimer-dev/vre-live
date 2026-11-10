@@ -1076,6 +1076,11 @@
               ${ALL_CODES.map(c => html`<option key=${c} value=${c}>${STATIONS[c].name}</option>`)}
             </select>
           </label>
+          ${window.VreStationShortcut && html`
+            <button type="button" className="btn ghost"
+              onClick=${() => window.VreStationShortcut.postMessage(JSON.stringify({
+                station, label: STATIONS[station].name
+              }))}>Pin this station to Home</button>`}
         </div>
         <div style=${{ padding: "4px 8px 10px" }}>
           ${rows.length ? rows.map(r => {
@@ -1809,15 +1814,20 @@
     const [fetchedAt, setFetchedAt] = useState(0);
     const [error, setError] = useState(null);
     const [now, setNow] = useState(Date.now());
-    const [tab, setTab] = useState("map");
+    const [tab, setTab] = useState(() =>
+      window.location.pathname === "/__vre_android__/app/index.html" && new URLSearchParams(window.location.search).has("board") ? "board" : "map");
     const [selected, setSelected] = useState(null);  // tripId shown in sheet
     const [picking, setPicking] = useState(false);
     const [devlog, setDevlog] = useState(() => lsGet(DEV_KEY, {}));
     const [route, setRoute] = useState(() => lsGet(ROUTE_KEY, null));
     const [editRoute, setEditRoute] = useState(false);
     const [flipDir, setFlipDir] = useState(null); // null = auto by time of day
-    const [boardSta, setBoardSta] = useState(() => lsGet("vre-live-board", null)
-      || (lsGet(ROUTE_KEY, null) || {}).a || "01");
+    const [boardSta, setBoardSta] = useState(() => {
+      const requested = window.location.pathname === "/__vre_android__/app/index.html"
+        ? new URLSearchParams(window.location.search).get("board") : null;
+      return ALL_CODES.includes(requested) ? requested
+        : lsGet("vre-live-board", null) || (lsGet(ROUTE_KEY, null) || {}).a || "01";
+    });
     const [summary, setSummary] = useState(null);
     const [myTrip, setMyTrip] = useState(() => lsGet(LS_KEY, null));
     const lastFetch = useRef(0);

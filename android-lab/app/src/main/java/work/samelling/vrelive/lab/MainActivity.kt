@@ -1,6 +1,9 @@
 package work.samelling.vrelive.lab
 
 import android.app.Activity
+import android.content.pm.ShortcutInfo
+import android.content.pm.ShortcutManager
+import android.graphics.drawable.Icon
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -19,16 +22,21 @@ import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.Toast
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import org.json.JSONObject
 import androidx.webkit.WebViewAssetLoader
 
 /**
  * Packaged VRE interface with a same-origin preview API.
- * No native notifications, credentials, bridge or background services yet.
  */
 class MainActivity : Activity() {
     private val host = "vre-live-lab-preview.samelling.workers.dev"
     private val assetPath = "/__vre_android__/"
     private val launchUrl = "https://$host${assetPath}app/index.html"
+    private val boardAction = "work.samelling.vrelive.lab.OPEN_BOARD"
+    private val stationCode = Regex("[0-9A-Z]{2}")
     private val feedPaths = setOf(
         "/feed/history", "/feed/TripUpdateFeed", "/feed/VehiclePositionFeed", "/feed/AlertFeed"
     )
@@ -55,7 +63,7 @@ class MainActivity : Activity() {
         errorPanel = findViewById(R.id.errorPanel)
         findViewById<Button>(R.id.retry).setOnClickListener {
             errorPanel.visibility = View.GONE
-            webView.loadUrl(launchUrl)
+            openEntryPoint(intent)
         }
         with(webView.settings) {
             javaScriptEnabled = true
@@ -76,6 +84,17 @@ class MainActivity : Activity() {
             .setDomain(host)
             .addPathHandler(assetPath, WebViewAssetLoader.AssetsPathHandler(this))
             .build()
+        val shortcuts = getSystemService(ShortcutManager::class.java)
+        if (shortcuts != null && shortcuts.isRequestPinShortcutSupported &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+        ) {
+            WebViewCompat.addWebMessageListener(webView, "VreStationShortcut", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, _ ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) pinStation(shortcuts, message.data.orEmpty())
+            }
+        }
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -123,7 +142,39 @@ class MainActivity : Activity() {
                 if (!mainFrameFailed) errorPanel.visibility = View.GONE
             }
         }
-        webView.loadUrl(launchUrl)
+        openEntryPoint(intent)
+    }
+
+    private fun pinStation(shortcuts: ShortcutManager, data: String) {
+        if (data.length > 160) return
+        val request = runCatching { JSONObject(data) }.getOrNull() ?: return
+        val station = request.optString("station")
+        val label = request.optString("label").trim()
+        if (!stationCode.matches(station) || label.isEmpty() || label.length > 60) return
+        val shortcut = ShortcutInfo.Builder(this, "station-$station")
+            .setShortLabel(label)
+            .setLongLabel("$label departures")
+            .setIcon(Icon.createWithResource(this, R.drawable.ic_launcher))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(boardAction)
+                .putExtra("station", station))
+            .build()
+        if (!shortcuts.requestPinShortcut(shortcut, null)) {
+            Toast.makeText(this, "Your launcher couldn’t pin this station.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openEntryPoint(intent)
+    }
+
+    private fun openEntryPoint(intent: Intent) {
+        val url = if (intent.action == boardAction) {
+            val station = intent.getStringExtra("station").orEmpty().takeIf(stationCode::matches).orEmpty()
+            Uri.parse(launchUrl).buildUpon().appendQueryParameter("board", station).build().toString()
+        } else launchUrl
+        webView.loadUrl(url)
     }
 
     private fun isPreviewOrigin(uri: Uri): Boolean =

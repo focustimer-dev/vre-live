@@ -1,0 +1,11 @@
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="departures"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_departures">
+        <intent
+            android:action="work.samelling.vrelive.lab.OPEN_BOARD"
+            android:targetPackage="work.samelling.vrelive.lab"
+            android:targetClass="work.samelling.vrelive.lab.MainActivity" />
+    </shortcut>
+</shortcuts>
