@@ -78,6 +78,31 @@
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
   .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .waiting-card{margin-bottom:12px}
+  .waiting-body{padding:14px 16px 16px}
+  .waiting-countdown{font-size:clamp(32px,11vw,46px);font-weight:800;letter-spacing:-.04em;
+    line-height:1.15;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+  .waiting-source{margin-top:5px}
+  .waiting-unconfirmed{color:var(--amber)}
+  .waiting-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 5px}
+  .waiting-actions .btn{min-height:48px}
+  .waiting-card .btn.ghost{padding-left:0}
+  .today-commute{margin-bottom:12px}
+  .today-body{padding:10px 14px 12px}
+  .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
+    border-top:1px solid var(--border);min-height:72px;padding:10px 0}
+  .today-row:first-of-type{border-top:0}
+  .today-row strong,.today-head strong{display:block;font-size:var(--fs-3)}
+  .today-plan{width:auto;min-width:108px;min-height:44px;padding:8px 12px;font-size:var(--fs-2)}
+  .today-skip{margin-top:6px}
+  .today-head{margin:4px 0 12px}
+  .today-train{width:100%;min-height:54px;border:0;border-top:1px solid var(--border);
+    background:transparent;color:var(--fg);font:inherit;font-weight:600;display:flex;
+    align-items:center;justify-content:space-between;cursor:pointer;text-align:left}
+  .today-train:focus-visible,.today-plan:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .today-footnote{padding-top:10px}
+  .today-back{padding-left:0}
+
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
     background:var(--fg); color:#0a0a0a; font-size:15px;
@@ -917,6 +942,7 @@
       platformMinutes: within(raw.platformMinutes, 60),
       bufferMinutes: within(raw.bufferMinutes, 60),
       checkIn: validTime(raw.checkIn) ? raw.checkIn : "06:45",
+      checkInEnabled: raw.checkInEnabled === true,
       days
     };
   }
@@ -980,7 +1006,7 @@
     return { id: "commute-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
       name: "New commute", from: from || "01", to: to || "03", preferredTrains: [],
       mode: "other", travelMinutes: 0, platformMinutes: 0, bufferMinutes: 5,
-      checkIn: "06:45", days: [...DAYS] };
+      checkIn: "06:45", checkInEnabled: false, days: [...DAYS] };
   }
   g.VRECommutes = Object.freeze({ KEY, choices, normalizeProfile, normalizeRecord,
     migrateLegacy, load, save, upsert, remove, blank });
@@ -1021,8 +1047,11 @@
   const LINE_COLOR = { F: "#ef4444", M: "#60a5fa" };
   function isCurrentRide(ride, now = Date.now()) {
     const started = Number(ride && ride.boardedAt);
+    // The ride timestamp is taken at tap time while the screen clock ticks once per
+    // second. Treat small forward skew as valid, or the cleanup effect can erase a
+    // ride immediately after "Start arrival countdown" before its banner renders.
     return !!ride && Number.isFinite(started) && started > 0 &&
-      now >= started && now - started < 4 * 3600000 &&
+      started - now <= 5000 && now - started < 4 * 3600000 &&
       VRECore.serviceDateKey(started) === VRECore.serviceDateKey(now);
   }
   const LS_KEY = "vre-live-mytrip";
@@ -1226,6 +1255,9 @@
     const save = () => {
       if (!draft.name.trim()) { setError("Give this commute a name."); return; }
       if (!draft.days.length) { setError("Select at least one weekday."); return; }
+      if (draft.checkInEnabled && !draft.preferredTrains.length) {
+        setError("Select at least one train before enabling check-ins."); return;
+      }
       if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
         setError("Choose stations served by a direct train."); return;
       }
@@ -1304,7 +1336,14 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        field("Planned daily check-in (Eastern; not active yet)", h("input", {
+        typeof window.VreCommutePrefs !== "undefined"
+          ? field("Daily check-in notifications", h("span", { style: {
+              display: "flex", alignItems: "center", gap: 10
+            } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
+              onChange: e => change("checkInEnabled", e.target.checked) }),
+              h("span", null, "Ask if I'm taking the train on my commute days")))
+          : h("div", { className: "meta" }, "Daily check-in notifications are available in the Android app."),
+        field("Check-in time (Eastern)", h("input", {
           type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
         })),
         h("div", { className: "meta" }, "Typical commuting days"),
@@ -1314,7 +1353,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Saved locally only. This version does not activate alarms, notifications, or background polling."),
+          "Android check-in reminders are optional and local. Confirming a train does not yet activate live leave-time alerts or background monitoring."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1323,6 +1362,82 @@
           className: "btn ghost", style: { color: "var(--red)", alignSelf: "start" }, onClick: remove
         }, confirmRemove ? "Confirm remove commute" : "Remove commute") : null
       ));
+  }
+
+  /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
+  function TodayCommute({ profiles, day, selectedId, onSelect, onAction }) {
+    if (!profiles.length) return null;
+    const now = Date.now();
+    const dateKey = VRECore.serviceDateKey(now);
+    if (!isServiceDay(new Date(now))) return null;
+    const selected = profiles.find(p => p.id === selectedId);
+    const skippedDay = !!day?.skippedDay;
+    const planned = day?.planned || {};
+    const skipped = day?.skippedTrips || {};
+    const easternClock = Object.fromEntries(serviceClock.formatToParts(new Date(now))
+      .map(p => [p.type, p.value]));
+    const currentMinutes = Number(easternClock.hour) * 60 + Number(easternClock.minute);
+    const reduced = VRECore.SCHEDULE.reducedService.includes(dateKey);
+    const options = selected ? VRECommutes.choices(VRECore, selected.from, selected.to)
+      .filter(t => selected.preferredTrains.includes(t.num) &&
+        (!reduced || VRECore.SCHEDULE.sTrains.has(t.num))) : [];
+    const timeLabel = minutes => {
+      const hour = Math.floor(minutes / 60);
+      return String(hour % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") +
+        (hour < 12 ? " AM" : " PM");
+    };
+    return html`
+      <div className="card today-commute">
+        <div className="card-h">Today's commute</div>
+        <div className="today-body">
+          ${skippedDay && !selected ? html`
+            <div className="meta">You marked today as a non-riding day. You can change that below.</div>`
+          : null}
+          ${selected ? html`
+            <button className="btn ghost today-back" onClick=${() => onSelect(null)}>‹ All commutes</button>
+            <div className="today-head">
+              <strong>${selected.name}</strong>
+              <span className="meta">${STATIONS[selected.from].name} → ${STATIONS[selected.to].name}</span>
+            </div>
+            ${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
+              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html`
+                <button key=${t.num} className="today-train" onClick=${() => {
+                  onAction("plan", selected.id, t.num); onSelect(null);
+                }}>
+                  <span>Train ${t.num}</span>
+                  <span>${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
+                </button>`)
+              : html`<div className="meta">No preferred departures remain today.</div>`}
+            <div className="meta today-footnote">
+              Choosing a train saves today's plan locally. Live leave-time alerts come later.
+            </div>
+            <button className="btn ghost" onClick=${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
+              Skip this trip
+            </button>`
+          : html`
+            ${profiles.map(p => html`
+              <div className="today-row" key=${p.id}>
+                <div>
+                  <strong>${p.name}</strong>
+                  <div className="meta">${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
+                  ${planned[p.id]
+                    ? html`<div className="meta">Train ${planned[p.id]} planned · no live alerts yet</div>`
+                    : skipped[p.id]
+                      ? html`<div className="meta">Skipped today</div>`
+                      : null}
+                </div>
+                <button className="btn outline today-plan" onClick=${() => {
+                    if (skippedDay || skipped[p.id]) onAction("reactivate", p.id);
+                    onSelect(p.id);
+                  }}>
+                  ${planned[p.id] ? "Change" : "Choose train"}
+                </button>
+              </div>`)}
+            <button className="btn ghost today-skip" onClick=${() => onAction("skipToday", "")}>
+              Not riding today
+            </button>`}
+        </div>
+      </div>`;
   }
 
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
@@ -1365,8 +1480,8 @@
             <div className="card">
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
-                Save specific trains, travel times, and a future check-in schedule.
-                These settings do not enable notifications or background monitoring yet.
+                Choose preferred trains and optional local daily check-ins.
+                Live leave-time alerts and background tracking are not active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
@@ -1996,6 +2111,57 @@
       </div>`;
   }
 
+  /* Countdown to the station where the commuter plans to board, not the destination. */
+  function waitingArrival(waiting, train, now) {
+    if (!waiting) return { phase: "unavailable", eta: null, minutes: null, source: "none" };
+    const stop = train?.stops?.find(s => s.code === waiting.dest);
+    const fresh = !!train && !train.ghost && !train.signalLost && Number.isFinite(train.ts) &&
+      now - train.ts >= -60000 && now - train.ts <= 5 * 60000;
+    const scheduled = Number.isFinite(waiting.scheduled) ? waiting.scheduled : null;
+    const liveEta = fresh && Number.isFinite(stop?.time) ? stop.time : null;
+    const eta = liveEta ?? scheduled ?? (Number.isFinite(stop?.time) ? stop.time : null);
+    const source = liveEta != null ? "live" : eta != null ? "schedule" : "none";
+    if (eta == null) return { phase: "unavailable", eta: null, minutes: null, source };
+    const phase = liveEta != null ? VRECore.rideStatus(train, waiting.dest, now).phase : null;
+    if (phase === "atStop") return { phase: "atStation", eta, minutes: 0, source };
+    if (phase === "passed") return { phase: "passed", eta, minutes: null, source };
+    const left = eta - now;
+    if (left < -90000) return { phase: "overdue", eta, minutes: null, source };
+    if (left <= 0) return { phase: "due", eta, minutes: 0, source };
+    return { phase: "approaching", eta, minutes: Math.max(1, Math.ceil(left / 60000)), source };
+  }
+
+  function WaitingCard({ waiting, train, now, onBoard, onStop, lockButton, lockError }) {
+    const arrival = waitingArrival(waiting, train, now);
+    const station = STATIONS[waiting.dest]?.name || "your station";
+    const number = arrival.phase === "approaching" ? arrival.minutes + " min" :
+      arrival.phase === "atStation" ? "At station" :
+      arrival.phase === "due" ? "Due now" :
+      arrival.phase === "passed" ? "Train passed" :
+      arrival.phase === "overdue" ? "Awaiting update" : "ETA unavailable";
+    const confidence = arrival.source === "live" ? "Live arrival estimate" :
+      arrival.source === "schedule" ? "Timetable estimate · live arrival unconfirmed" :
+      "No scheduled or live arrival time available";
+    return html`
+      <div className="card waiting-card" role="region" aria-label="Boarding station arrival">
+        <div className="card-h">Waiting at ${station} · Train ${waiting.num}</div>
+        <div className="waiting-body">
+          <div className="waiting-countdown" role="timer" aria-label=${"Estimated train arrival: " + number}>${number}</div>
+          <div className="meta">Train ${waiting.num} ${arrival.eta != null
+            ? "expected at " + fmtClock(arrival.eta) : "arrival not available"}</div>
+          <div className=${"meta waiting-source" + (arrival.source !== "live" ? " waiting-unconfirmed" : "")}>
+            ${confidence}
+          </div>
+          <div className="waiting-actions">
+            <button className="btn" onClick=${onBoard}>I've boarded · choose destination</button>
+            <button className="btn outline" onClick=${onStop}>Stop waiting</button>
+          </div>
+          ${lockButton}
+          ${lockError}
+        </div>
+      </div>`;
+  }
+
   /* ---------------- ETA banner (riding mode) ---------------- */
   const ScreenIcon = ({ size = 15 }) => html`
     <svg width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2105,7 +2271,7 @@
   }
 
   /* ---------------- bottom sheet: train details / destination picker ---------------- */
-  function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, onDest, onWait, onClose }) {
+  function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, error, onDest, onWait, onClose }) {
     const boardingIndex = train.stops.findIndex(s => s.code === boardingStation);
     const future = VRECore.remainingStops(train, now).filter(s =>
       train.stops.findIndex(stop => stop.code === s.code) > boardingIndex);
@@ -2113,6 +2279,7 @@
     const initial = sameRide ? activeTrip.dest : defaultDest;
     const [choice, setChoice] = useState(() => future.some(s => s.code === initial) ? initial : "");
     const [waiting, setWaiting] = useState(false);
+    const boardingNow = !!boardingStation && !activeTrip;
     const destination = future.find(s => s.code === choice);
     const waitStop = destination && destination.code !== train.stops.at(-1)?.code;
     const switching = !!activeTrip && !sameRide;
@@ -2143,8 +2310,11 @@
           </div>
           <button ref=${closeRef} className="btn ghost" onClick=${onClose} aria-label="Close destination picker"><${XIcon} /></button>
         </div>
-        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>${waiting ? "Where are you waiting?" : "Where will you get off?"}</div>
-        ${!activeTrip && html`<button className="btn ghost" type="button" aria-pressed=${waiting} onClick=${() => { setWaiting(!waiting); setChoice(""); }}>${waiting ? "I’m already on the train" : "I’m waiting for this train"}</button>`}
+        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>${waiting ? "Where are you waiting?" : boardingNow ? "You've boarded. Where will you get off?" : "Where will you get off?"}</div>
+        ${boardingNow && html`<div className="meta" style=${{ marginTop: 5 }}>
+          Choose your destination to start the arrival countdown.
+        </div>`}
+        ${!activeTrip && !boardingNow && html`<button className="btn ghost" type="button" aria-pressed=${waiting} onClick=${() => { setWaiting(!waiting); setChoice(""); }}>${waiting ? "I'm on the train · choose destination" : "I'm waiting for this train"}</button>`}
         ${switching && html`<div className="stale-note" style=${{ marginTop: 6 }}>You are tracking train ${String(activeTrip.tripId).split("-")[0]}. Switching stops its alerts.</div>`}
         <div className="stops" role="group" aria-label=${waiting ? "Boarding stations" : "Destination stations"}>
           ${future.length ? future.filter(s => !waiting || s.code !== train.stops.at(-1)?.code).map(s => html`
@@ -2157,9 +2327,10 @@
         </div>
         <div style=${{ marginTop: 12 }}>
           <button className="btn" disabled=${!destination || busy || (waiting && !waitStop)} onClick=${() => destination && (waiting ? onWait(destination.code) : onDest(destination.code))}>
-            ${waiting ? (destination ? "Track arrival at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start tracking"} · ${destination.name}` : "Choose a destination"}
+            ${waiting ? (destination ? "Wait for train at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start arrival countdown"} · ${destination.name}` : "Choose a destination"}
           </button>
-          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "The Android widget shows the arrival at your station." : "You choose when to end the ride."}</div>
+          ${error && html`<div className="stale-note" role="alert" style=${{ marginTop: 8 }}>${error}</div>`}
+          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "You'll see an arrival countdown while waiting; the estimate may be scheduled or live." : boardingNow ? "Your destination countdown starts once you select a stop." : "You choose when to end the ride."}</div>
         </div>
       </div>`;
   }
@@ -2185,11 +2356,34 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [commuteDay, setCommuteDay] = useState(null);
+    const [planProfile, setPlanProfile] = useState(() => {
+      const requested = new URLSearchParams(window.location.search).get("plan");
+      return requested && /^[A-Za-z0-9_-]{1,72}$/.test(requested) ? requested : null;
+    });
+    const nativeCommute = message => {
+      try { window.VreCommutePrefs?.postMessage(JSON.stringify(message)); } catch (_) {}
+    };
     const saveCommutes = next => {
       if (!VRECommutes.save(localStorage, next, VRECore)) return false;
       setCommutes(next);
+      nativeCommute({ type: "sync", version: 1, profiles: next.profiles, prompt: true });
       return true;
     };
+    useEffect(() => {
+      const bridge = window.VreCommutePrefs;
+      if (!bridge) return;
+      bridge.onmessage = event => {
+        const data = (() => { try { return JSON.parse(event.data); } catch (_) { return null; } })();
+        if (data && data.type === "state") setCommuteDay(data);
+      };
+      // No alerts are enabled by a one-time legacy migration.
+      if (!commutes.unsupportedVersion) nativeCommute({
+        type: "sync", version: 1, profiles: commutes.profiles, prompt: false
+      });
+      else nativeCommute({ type: "state" });
+      return () => { bridge.onmessage = null; };
+    }, []);
     const [preferencesSection, setPreferencesSection] = useState(null);
     const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
@@ -2232,7 +2426,9 @@
       if (waitingFor && now - waitingFor.started >= 4 * 3600000) setWaitingFor(null);
     }, [waitingFor, now]);
     useEffect(() => {
-      if (myTrip && !isCurrentRide(myTrip, now)) {
+      // Reconcile against the actual wall clock, not the previous render's
+      // one-second timer snapshot. Guard against clearing freshly started rides.
+      if (myTrip && !isCurrentRide(myTrip, Date.now())) {
         setMyTrip(null);
         if (androidRideAlert) androidRideAlert.postMessage("cancel");
       }
@@ -2292,6 +2488,7 @@
     const myTrain = myTrip ? observedTrain || (myTrip.snapshot ? { ...myTrip.snapshot, signalLost: true }
       : ghostTrains.find(t => t.tripId === myTrip.tripId) || null) : null;
     const [rideBusy, setRideBusy] = useState(false);
+    const [rideStartError, setRideStartError] = useState(null);
     useEffect(() => {
       if (observedTrain) setMyTrip(m => m ? { ...m, snapshot: observedTrain } : m);
     }, [observedTrain]);
@@ -2371,7 +2568,12 @@
       setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false);
     };
     const startRide = async code => {
-      if (rideBusy || !selTrain || !VRECore.remainingStops(selTrain, now).some(s => s.code === code)) return;
+      if (rideBusy) return;
+      if (!selTrain || !VRECore.remainingStops(selTrain, Date.now()).some(s => s.code === code)) {
+        setRideStartError("That stop is no longer available for this train. Close and select the train again.");
+        return;
+      }
+      setRideStartError(null);
       const train = selTrain;
       const same = myTrip && (myTrip.tripId === train.tripId || myTrip.tripId === train.sourceTripId);
       if (same && myTrip.dest === code) { setSelected(null); setPicking(false); return; }
@@ -2393,6 +2595,8 @@
           setMyTrip(m => m && m.tripId === next.tripId && m.dest === code && m.boardedAt === next.boardedAt
             ? { ...m, push: !err, pushErr: err } : m);
         }
+      } catch (_) {
+        setRideStartError("Couldn't start arrival tracking. Try again.");
       } finally { setRideBusy(false); }
     };
 
@@ -2542,14 +2746,10 @@
           </div>`}
 
         ${waitingFor && !myTrip && html`
-          <div className="card"><div className="card-h">Waiting at ${STATIONS[waitingFor.dest]?.name} · Train ${waitingFor.num}</div>
-            <div style=${{ padding: "0 10px 5px" }}>
-              <button className="btn ghost" onClick=${() => { setSelected(waitingFor.trip); setPicking(true); }}>I'm on the train</button>
-              <button className="btn ghost" onClick=${() => setWaitingFor(null)}>Stop waiting</button>
-              ${lockControl(false)}
-              ${lockError}
-            </div>
-          </div>`}
+          <${WaitingCard} waiting=${waitingFor} train=${liveByTrip[waitingFor.trip] || null} now=${now}
+            onBoard=${() => { setSelected(waitingFor.trip); setPicking(true); }}
+            onStop=${() => setWaitingFor(null)}
+            lockButton=${lockControl(false)} lockError=${lockError} />`}
         ${summary && html`<${SummaryCard} rec=${summary} onDismiss=${() => setSummary(null)} />`}
 
         ${myTrip && html`
@@ -2560,6 +2760,11 @@
               onChange=${() => { if (myTrain) { setSelected(myTrain.tripId); setPicking(true); } }}
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
+
+        ${tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
+          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
 
         ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
@@ -2634,7 +2839,7 @@
 
         ${selTrain && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
-            activeTrip=${myTrip} busy=${rideBusy}
+            activeTrip=${myTrip} busy=${rideBusy} error=${rideStartError}
             boardingStation=${waitingFor?.trip === selTrain.tripId ? waitingFor.dest : null}
             defaultDest=${route ? ((flipDir === null ? new Date(now).getHours() >= 12 : flipDir) ? route.a : route.b) : null}
             devSamples=${devlog[selTrain.tripId]}
@@ -2651,7 +2856,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();

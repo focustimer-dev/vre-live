@@ -51,6 +51,7 @@ class MainActivity : Activity() {
     private var mainFrameFailed = false
     private var alertArmed = false
     private var alertPermissionReply: JavaScriptReplyProxy? = null
+    private var commutePromptPending = false
     private val alertChannel = "ride_arrival_vibration"
     private val lockChannel = "ride_lock_screen_card"
     private val lockNotification = 2
@@ -69,7 +70,8 @@ class MainActivity : Activity() {
             root.setOnApplyWindowInsetsListener { view, insets ->
                 val bars = insets.getInsets(WindowInsets.Type.systemBars())
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                insets
+                // Insets are owned by the native root; do not pass them into WebView again.
+                WindowInsets.CONSUMED
             }
             root.requestApplyInsets()
         } else root.fitsSystemWindows = true
@@ -139,6 +141,12 @@ class MainActivity : Activity() {
                     Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
                 ) handleRideAlert(message.data.orEmpty(), reply)
             }
+            WebViewCompat.addWebMessageListener(webView, "VreCommutePrefs", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, reply ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) handleCommutePrefs(message.data.orEmpty(), reply)
+            }
         }
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
@@ -198,7 +206,39 @@ class MainActivity : Activity() {
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT
             ) { dismissSheetOrGoBack { if (isTaskRoot) moveTaskToBack(false) else finish() } }
         }
+        CommuteCheckIns.reschedule(this)
+        if (intent.action == CommuteCheckIns.CONFIRM) {
+            CommuteCheckIns.confirm(this, intent.getStringExtra("profileId").orEmpty())
+        }
         openEntryPoint(intent)
+    }
+
+    private fun handleCommutePrefs(data: String, reply: JavaScriptReplyProxy) {
+        if (data.length > 32768) return
+        val message = runCatching { JSONObject(data) }.getOrNull() ?: return
+        when (message.optString("type")) {
+            "state" -> { /* state is returned below */ }
+            "sync" -> {
+                if (!CommuteCheckIns.sync(this, message)) return
+                val enabled = message.optJSONArray("profiles")?.let { array ->
+                    (0 until array.length()).any { array.optJSONObject(it)?.optBoolean("checkInEnabled") == true }
+                } == true
+                if (enabled && message.optBoolean("prompt") && Build.VERSION.SDK_INT >= 33 &&
+                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    commutePromptPending = true
+                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 43)
+                }
+            }
+            "plan" -> CommuteCheckIns.plan(this,
+                message.optString("profileId"), message.optString("train"))
+            "skipTrip" -> CommuteCheckIns.skipTrip(this, message.optString("profileId"))
+            "skipToday" -> CommuteCheckIns.skipToday(this)
+            "reactivate" -> CommuteCheckIns.reactivate(this, message.optString("profileId"))
+            "confirm" -> CommuteCheckIns.confirm(this, message.optString("profileId"))
+            else -> return
+        }
+        reply.postMessage(CommuteCheckIns.state(this))
     }
 
     private fun handleRideAlert(data: String, reply: JavaScriptReplyProxy) {
@@ -343,6 +383,14 @@ class MainActivity : Activity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grants: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grants)
+        if (requestCode == 43 && commutePromptPending) {
+            commutePromptPending = false
+            CommuteCheckIns.reschedule(this)
+            if (grants.firstOrNull() != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "Enable VRE Live notifications to receive commute check-ins.",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
         if (requestCode == 42) {
             val (key, reply) = lockReply ?: return
             lockReply = null
@@ -376,6 +424,9 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.action == CommuteCheckIns.CONFIRM) {
+            CommuteCheckIns.confirm(this, intent.getStringExtra("profileId").orEmpty())
+        }
         if (intent.action != "work.samelling.vrelive.lab.OPEN_LOCK_CARD") openEntryPoint(intent)
     }
 
@@ -390,6 +441,11 @@ class MainActivity : Activity() {
                 entry.appendQueryParameter("board", station)
             }
             entry.build().toString()
+        } else if (intent.action == CommuteCheckIns.CONFIRM || intent.action == CommuteCheckIns.OPEN_PLAN) {
+            val id = intent.getStringExtra("profileId").orEmpty()
+            if (Regex("[A-Za-z0-9_-]{1,72}").matches(id)) {
+                Uri.parse(launchUrl).buildUpon().appendQueryParameter("plan", id).build().toString()
+            } else launchUrl
         } else launchUrl
         webView.loadUrl(url)
     }

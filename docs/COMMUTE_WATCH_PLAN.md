@@ -1,6 +1,6 @@
 # VRE Live — Commute Watch implementation plan
 
-**Status:** Phase A implemented on the feature branch; phases B–E not yet implemented.
+**Status:** Phase A merged; Phase B Android Lab implementation under review (not deployed). Phase C–E not yet implemented.
 **Baseline:** PR #13; production Worker's cron and existing Android ride monitor are intentionally unchanged.
 
 ## Product goal
@@ -21,6 +21,10 @@ Save commuter routines once, confirm intent daily, and only monitor a train afte
 **Gate A:** `npm run check` passes; Android Lab debug build packages and loads `vre-commutes.js`; existing schedule/map/widget and ride-monitor behavior remains unchanged.
 
 ## Phase B: Android local daily intent
+
+**Implementation notes (PR #15 candidate):** Android now persists advanced commute preferences only after user opt-in, schedules a device-local check-in alarm, and offers notification actions **Yes**, **Not sure** (one ten-minute retry), and **Not riding today**. A native bridge carries manual plan, skip-trip, whole-day skip, and reactivation decisions between the packaged UI and the receiver. A day skip suppresses every saved commute, and reactivating one leaves others skipped. Selected trains are local *intent only*, not background watches. Holidays, weekends, and reduced-service restrictions are checked against packaged timetables. Notifications require Android permission and should be checked for Doze-related timing drift. The screenshot's Android-only top gap is addressed by consuming system bar insets in the native root and disabling duplicate WebView safe-area padding; actual visual confirmation on a Pixel remains a required gate.
+
+
 
 - Introduce an Android-native notification scheduler with explicit permissions handling and correct local date/time interpretation using `America/New_York`.
 - Notifications: **Yes**, **Not sure** (local reminder in 10 minutes), and **Not riding today** (both directions).

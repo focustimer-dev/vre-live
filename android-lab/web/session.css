@@ -22,3 +22,7 @@
 }
 .lab-session input { color: var(--fg); background: var(--bg); }
 .lab-session button { color: var(--bg); background: var(--fg); }
+
+/* Android native FrameLayout owns all system-bar insets. Do not add WebView safe-area padding. */
+html body { padding-top: 0; padding-bottom: 0; }
+.lab-session[hidden] { display: none !important; margin: 0; padding: 0; }
