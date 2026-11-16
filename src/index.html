@@ -1369,58 +1369,58 @@
       return String(hour % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") +
         (hour < 12 ? " AM" : " PM");
     };
-    return html\`
+    return html`
       <div className="card today-commute">
         <div className="card-h">Today's commute</div>
         <div className="today-body">
-          \${skippedDay && !selected ? html\`
-            <div className="meta">You marked today as a non-riding day. You can change that below.</div>\`
+          ${skippedDay && !selected ? html`
+            <div className="meta">You marked today as a non-riding day. You can change that below.</div>`
           : null}
-          \${selected ? html\`
-            <button className="btn ghost today-back" onClick=\${() => onSelect(null)}>‹ All commutes</button>
+          ${selected ? html`
+            <button className="btn ghost today-back" onClick=${() => onSelect(null)}>‹ All commutes</button>
             <div className="today-head">
-              <strong>\${selected.name}</strong>
-              <span className="meta">\${STATIONS[selected.from].name} → \${STATIONS[selected.to].name}</span>
+              <strong>${selected.name}</strong>
+              <span className="meta">${STATIONS[selected.from].name} → ${STATIONS[selected.to].name}</span>
             </div>
-            \${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
-              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html\`
-                <button key=\${t.num} className="today-train" onClick=\${() => {
+            ${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
+              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html`
+                <button key=${t.num} className="today-train" onClick=${() => {
                   onAction("plan", selected.id, t.num); onSelect(null);
                 }}>
-                  <span>Train \${t.num}</span>
-                  <span>\${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
-                </button>\`)
-              : html\`<div className="meta">No preferred departures remain today.</div>\`}
+                  <span>Train ${t.num}</span>
+                  <span>${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
+                </button>`)
+              : html`<div className="meta">No preferred departures remain today.</div>`}
             <div className="meta today-footnote">
               Choosing a train saves today's plan locally. Live leave-time alerts come later.
             </div>
-            <button className="btn ghost" onClick=\${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
+            <button className="btn ghost" onClick=${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
               Skip this trip
-            </button>\`
-          : html\`
-            \${profiles.map(p => html\`
-              <div className="today-row" key=\${p.id}>
+            </button>`
+          : html`
+            ${profiles.map(p => html`
+              <div className="today-row" key=${p.id}>
                 <div>
-                  <strong>\${p.name}</strong>
-                  <div className="meta">\${STATIONS[p.from].name} → \${STATIONS[p.to].name}</div>
-                  \${planned[p.id]
-                    ? html\`<div className="meta">Train \${planned[p.id]} planned · no live alerts yet</div>\`
+                  <strong>${p.name}</strong>
+                  <div className="meta">${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
+                  ${planned[p.id]
+                    ? html`<div className="meta">Train ${planned[p.id]} planned · no live alerts yet</div>`
                     : skipped[p.id]
-                      ? html\`<div className="meta">Skipped today</div>\`
+                      ? html`<div className="meta">Skipped today</div>`
                       : null}
                 </div>
-                <button className="btn outline today-plan" onClick=\${() => {
+                <button className="btn outline today-plan" onClick=${() => {
                     if (skippedDay || skipped[p.id]) onAction("reactivate", p.id);
                     onSelect(p.id);
                   }}>
-                  \${planned[p.id] ? "Change" : "Choose train"}
+                  ${planned[p.id] ? "Change" : "Choose train"}
                 </button>
-              </div>\`)}
-            <button className="btn ghost today-skip" onClick=\${() => onAction("skipToday", "")}>
+              </div>`)}
+            <button className="btn ghost today-skip" onClick=${() => onAction("skipToday", "")}>
               Not riding today
-            </button>\`}
+            </button>`}
         </div>
-      </div>\`;
+      </div>`;
   }
 
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
