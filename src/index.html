@@ -59,6 +59,8 @@
     color:var(--muted); font:inherit; font-weight:600; font-size:var(--fs-2); padding:8px 0; cursor:pointer;
     transition:background .15s,color .15s}
   .tabs button.on{background:var(--fg); color:#0a0a0a}
+  .tabs button.pref-nav{flex:0 0 48px;display:inline-flex;align-items:center;justify-content:center;
+    padding:8px;min-width:44px}
   .tabs button{min-width:0}
   .preferences{display:grid;gap:12px}
   .pref-list{padding:6px 8px 8px}
@@ -1372,7 +1374,7 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onEdit, onFlip, onPickLive }) {
+  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
     const service = isServiceDay(new Date(now));
@@ -1384,8 +1386,6 @@
           <span style=${{ display: "flex", gap: 2 }}>
             <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onFlip}
               aria-label="Swap direction"><${FlipIcon} /></button>
-            <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onEdit}
-              aria-label="Edit commute"><${GearIcon} /></button>
           </span>
         </div>
         <div style=${{ padding: "4px 8px 8px" }}>
@@ -2511,6 +2511,21 @@
           </div>
         </div>
 
+        <nav className="tabs" role="tablist" aria-label="VRE Live navigation">
+          <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
+            onClick=${() => setTab("map")}>Map</button>
+          <button className=${tab === "sched" ? "on" : ""} role="tab" aria-selected=${tab === "sched"}
+            onClick=${() => setTab("sched")}>Schedule</button>
+          <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
+            onClick=${() => setTab("board")}>Board</button>
+          <button className=${"pref-nav " + (tab === "preferences" ? "on" : "")}
+            role="tab" aria-selected=${tab === "preferences"}
+            aria-label="Preferences" title="Preferences"
+            onClick=${() => { setPreferencesSection(null); setTab("preferences"); }}>
+            <${GearIcon} />
+          </button>
+        </nav>
+
         ${alerts.length > 0 && html`
           <div className="card fade" style=${{ marginBottom: 12, borderColor: "#713f12" }}>
             <div className="card-h" style=${{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 7 }}>
@@ -2557,7 +2572,6 @@
                     from=${showReturn ? route.b : route.a} to=${showReturn ? route.a : route.b}
                     auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
                     now=${now} liveByTrip=${liveByTrip}
-                    onEdit=${() => { setPreferencesSection("commute"); setTab("preferences"); }}
                     onFlip=${() => setFlipDir(!showReturn)}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
@@ -2571,17 +2585,6 @@
                   </div>
                 </div>`}
           </div>`}
-
-        <div className="tabs" role="tablist">
-          <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
-            onClick=${() => setTab("map")}>Map</button>
-          <button className=${tab === "sched" ? "on" : ""} role="tab" aria-selected=${tab === "sched"}
-            onClick=${() => setTab("sched")}>Schedule</button>
-          <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
-            onClick=${() => setTab("board")}>Board</button>
-          <button className=${tab === "preferences" ? "on" : ""} role="tab" aria-selected=${tab === "preferences"}
-            onClick=${() => { setPreferencesSection(null); setTab("preferences"); }}>Preferences</button>
-        </div>
 
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
