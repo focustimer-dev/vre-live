@@ -67,5 +67,6 @@ assert.doesNotMatch(native, /https?:\/\/|HttpURLConnection|URL\(|fetch\(|RideMon
 assert.match(manifest, /RECEIVE_BOOT_COMPLETED/, "native scheduler can recover after reboot");
 assert.match(manifest, /CommuteCheckReceiver/, "broadcast receiver registered");
 const gradle = read("android-lab/app/build.gradle");
-assert.match(gradle, /versionCode 15/, "distinct Android QA build");
+assert.match(gradle, /: 15/, "PR debug build keeps its distinct baseline version");
+assert.match(gradle, /vreLabRunNumber/, "main signed Lab builds use independent monotonically increasing versions");
 console.log("VRE Commute Watch B: check-in/insets regression checks passed");
