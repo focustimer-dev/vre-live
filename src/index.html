@@ -1243,6 +1243,9 @@
     const save = () => {
       if (!draft.name.trim()) { setError("Give this commute a name."); return; }
       if (!draft.days.length) { setError("Select at least one weekday."); return; }
+      if (draft.checkInEnabled && !draft.preferredTrains.length) {
+        setError("Select at least one train before enabling check-ins."); return;
+      }
       if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
         setError("Choose stations served by a direct train."); return;
       }
