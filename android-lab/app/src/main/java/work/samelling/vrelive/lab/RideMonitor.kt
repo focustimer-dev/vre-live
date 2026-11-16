@@ -63,6 +63,28 @@ class RideMonitor : Service() {
         if (stopped) return
         val age = System.currentTimeMillis() - ride.optLong("started")
         if (age !in 0L..14400000L || !stopMatches()) { stopSelf(); return }
+        // An old ride cannot cross a service-day boundary or override a closure.
+        // Check the bundled calendar before acquiring a wake lock or opening a socket.
+        val eastern = ZoneId.of("America/New_York")
+        val now = ZonedDateTime.now(eastern)
+        val started = java.time.Instant.ofEpochMilli(ride.optLong("started")).atZone(eastern)
+        val todayKey = now.format(DateTimeFormatter.BASIC_ISO_DATE)
+        val holidays = timetable.getJSONArray("noService")
+        val noService = now.dayOfWeek.value >= 6 || (0 until holidays.length()).any {
+            holidays.getString(it) == todayKey
+        }
+        val minute = now.hour * 60 + now.minute
+        val trips = timetable.getJSONArray("trips")
+        val inServiceWindow = (0 until trips.length()).any { i ->
+            val stops = trips.getJSONObject(i).getJSONArray("stops")
+            val first = stops.getJSONArray(0).getInt(1)
+            val last = stops.getJSONArray(stops.length() - 1).getInt(1)
+            minute >= first - 20 && minute <= last + 120
+        }
+        if (started.toLocalDate() != now.toLocalDate() || noService || !inServiceWindow) {
+            stopSelf()
+            return
+        }
         val wake = getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "vre:ride-check")
         try {
             wake.acquire(30000)
