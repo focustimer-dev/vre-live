@@ -14,8 +14,21 @@ assert.doesNotThrow(() => new Script(appScript), "App JavaScript parses");
 assert.match(appScript, /function PreferencesPanel\(/, "Preferences panel exists");
 assert.match(appScript, /<\$\{PreferencesPanel\}/, "Preferences panel is routed");
 assert.match(appScript, /tab === "preferences"/, "Preferences is a distinct tab");
+assert.equal((appScript.match(/<nav className="tabs" role="tablist"/g) || []).length, 1,
+  "exactly one navigation bar");
+assert.ok(appScript.indexOf('<nav className="tabs"') < appScript.indexOf('${alerts.length > 0'),
+  "navigation appears directly below header, before alerts");
+assert.ok(appScript.indexOf('<nav className="tabs"') < appScript.indexOf('<${CommuteCard}'),
+  "navigation precedes commute card");
+assert.match(appScript, /aria-label="Preferences" title="Preferences"/,
+  "top navigation has an accessible Preferences gear");
+assert.match(appScript, /<\$\{GearIcon\} \/>/, "preferences gear is rendered in the tab bar");
+assert.equal((appScript.match(/<\$\{GearIcon\}/g) || []).length, 1,
+  "there is only one rendered gear button");
+assert.doesNotMatch(appScript, /onEdit=|onEdit, onFlip/,
+  "commute card no longer exposes a duplicate settings gear");
 assert.match(appScript, /setPreferencesSection\("commute"\); setTab\("preferences"\)/,
-  "Commute gear goes to simple preferences");
+  "first-run commute setup opens the basic editor through Preferences");
 assert.match(appScript, /<\$\{CommuteCard\}/, "existing live timetable remains");
 assert.match(appScript, /onFlip=\$\{\(\) => setFlipDir\(!showReturn\)\}/,
   "manual timetable direction flip remains");
