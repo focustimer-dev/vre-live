@@ -1562,7 +1562,9 @@
             </div>
             ${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
               ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => {
-                const leave = VRELeaveBy.calculate(selected, t.num, VRECore, liveByTrip, samples, now);
+                const leave = VRELeaveBy.calculate({
+                  ...selected, travelMinutes: overrides[selected.id] ?? selected.travelMinutes
+                }, t.num, VRECore, liveByTrip, samples, now);
                 return html`
                 <button key=${t.num} className="today-train" onClick=${() => {
                   onAction("plan", selected.id, t.num); onSelect(null);
