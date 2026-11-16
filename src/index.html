@@ -1324,11 +1324,13 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        field("Daily check-in notifications", h("span", { style: {
-          display: "flex", alignItems: "center", gap: 10
-        } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
-          onChange: e => change("checkInEnabled", e.target.checked) }),
-          h("span", null, "Ask if I'm taking the train on my commute days"))),
+        typeof window.VreCommutePrefs !== "undefined"
+          ? field("Daily check-in notifications", h("span", { style: {
+              display: "flex", alignItems: "center", gap: 10
+            } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
+              onChange: e => change("checkInEnabled", e.target.checked) }),
+              h("span", null, "Ask if I'm taking the train on my commute days")))
+          : h("div", { className: "meta" }, "Daily check-in notifications are available in the Android app."),
         field("Check-in time (Eastern)", h("input", {
           type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
         })),
