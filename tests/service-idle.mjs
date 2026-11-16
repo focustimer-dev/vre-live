@@ -68,6 +68,22 @@ for (const iso of [
   assert.equal(cronWindow(when(iso)), true, "server service " + iso);
 }
 
+// DST boundary regression: the same 6 AM Eastern clock time maps to different
+// UTC instants before/after the March and November transitions.
+for (const [iso, expected] of [
+  ["2027-03-12T11:00:00Z", true], // 6 AM EST before spring forward
+  ["2027-03-14T10:00:00Z", false], // 6 AM EDT on transition Sunday
+  ["2027-03-15T10:00:00Z", true], // 6 AM EDT after spring forward
+  ["2027-11-05T10:00:00Z", true], // 6 AM EDT before fall back
+  ["2027-11-07T11:00:00Z", false], // 6 AM EST on transition Sunday
+  ["2027-11-08T11:00:00Z", true], // 6 AM EST after fall back
+  ["2027-03-15T07:00:00Z", false], // 3 AM EDT, still off hours
+  ["2027-11-08T08:00:00Z", false], // 3 AM EST, still off hours
+]) {
+  assert.equal(browserWindow(when(iso)), expected, "browser DST " + iso);
+  assert.equal(cronWindow(when(iso)), expected, "server DST " + iso);
+}
+
 const noon = when("2026-11-16T17:00:00Z");
 assert.equal(currentRide({boardedAt: noon - 60000}, noon), true);
 assert.equal(currentRide({boardedAt: noon - 5 * 3600000}, noon), false);
