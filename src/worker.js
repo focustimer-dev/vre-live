@@ -731,7 +731,7 @@ function ok(buf, stale = false) {
 }
 __name(ok, "ok");
 var RIDES_KEY = "rides";
-var RIDE_TTL_MS = 6 * 36e5;
+var RIDE_TTL_MS = 4 * 36e5;
 var b64url = /* @__PURE__ */ __name((u8) => btoa(String.fromCharCode(...new Uint8Array(u8))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""), "b64url");
 var strB64url = /* @__PURE__ */ __name((s) => b64url(new TextEncoder().encode(s)), "strB64url");
 var endpointId = /* @__PURE__ */ __name((ep) => sha256hex("ep:" + ep), "endpointId");
@@ -776,12 +776,41 @@ async function sendPush(sub, env) {
 __name(sendPush, "sendPush");
 var loadRides = /* @__PURE__ */ __name(async (env) => await env.RIDES.get(RIDES_KEY, "json") || {}, "loadRides");
 var saveRides = /* @__PURE__ */ __name((env, rides) => env.RIDES.put(RIDES_KEY, JSON.stringify(rides), { expirationTtl: 86400 }), "saveRides");
+// Only scheduled service (with grace for an explicitly tracked delayed train)
+ // may initiate an upstream feed request. Called before KV or network work.
+function backgroundServiceWindow(now) {
+  if (!globalThis.VRECore.isServiceDay(new Date(now))) return false;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(new Date(now)).map(p => [p.type, p.value]));
+  const minute = Number(parts.hour) * 60 + Number(parts.minute);
+  return globalThis.VRECore.SCHEDULE.trips.some(({ stops }) =>
+    minute >= stops[0][1] - 20 && minute <= stops[stops.length - 1][1] + 120);
+}
+__name(backgroundServiceWindow, "backgroundServiceWindow");
 async function runAlertCron(env) {
   if (!env.RIDES || !env.VAPID_PRIVATE_KEY) return;
-  const rides = await loadRides(env);
-  const ids = Object.keys(rides);
-  if (!ids.length) return;
   const now = Date.now();
+  if (!backgroundServiceWindow(now)) return;
+  const rides = await loadRides(env);
+  let dirty = false;
+  const today = globalThis.VRECore.serviceDateKey(now);
+  // Drop expired, corrupt and previous-day subscriptions BEFORE touching VRE feeds.
+  for (const [id, ride] of Object.entries(rides)) {
+    const started = Number(ride && ride.created);
+    if (!Number.isFinite(started) || started <= 0 ||
+        started > now || now - started >= RIDE_TTL_MS ||
+        globalThis.VRECore.serviceDateKey(started) !== today ||
+        (ride.n0At && now - ride.n0At > 10 * 6e4)) {
+      delete rides[id];
+      dirty = true;
+    }
+  }
+  const ids = Object.keys(rides);
+  if (!ids.length) {
+    if (dirty) await saveRides(env, rides);
+    return;
+  }
   let trains = null;
   try {
     const [veh, tu] = await Promise.all([feedBytes("VehiclePositionFeed"), feedBytes("TripUpdateFeed")]);
@@ -789,14 +818,8 @@ async function runAlertCron(env) {
   } catch (_) {
   }
   const byTrip = trains ? globalThis.VRECore.liveTrainIndex(trains) : null;
-  let dirty = false;
   for (const id of ids) {
     const ride = rides[id];
-    if (now - ride.created > RIDE_TTL_MS || ride.n0At && now - ride.n0At > 10 * 6e4) {
-      delete rides[id];
-      dirty = true;
-      continue;
-    }
     if (!byTrip) continue;
     const train = byTrip[ride.tripId];
     if (!train) {
@@ -888,6 +911,10 @@ var worker_default = {
     if (path.startsWith("/feed/")) {
       const name = path.slice("/feed/".length);
       if (!FEEDS.has(name)) return new Response("not found", { status: 404 });
+      if (!backgroundServiceWindow(Date.now()))
+        return new Response(null, { status: 204, headers: {
+          "cache-control": "no-store", "x-vre-service-paused": "1"
+        } });
       return feed(name);
     }
     if (path.startsWith("/push/")) {
@@ -901,6 +928,8 @@ var worker_default = {
       if (req.method === "POST" && path === "/push/subscribe") {
         const b = await req.json();
         if (!b.sub || !b.sub.endpoint || !b.tripId || !b.dest) return json({ error: "bad request" }, 400);
+        if (!backgroundServiceWindow(Date.now()))
+          return json({ error: "no scheduled train service now" }, 409);
         const rides = await loadRides(env);
         rides[await endpointId(b.sub.endpoint)] = {
           sub: b.sub,
