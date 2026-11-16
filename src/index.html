@@ -1047,8 +1047,11 @@
   const LINE_COLOR = { F: "#ef4444", M: "#60a5fa" };
   function isCurrentRide(ride, now = Date.now()) {
     const started = Number(ride && ride.boardedAt);
+    // The ride timestamp is taken at tap time while the screen clock ticks once per
+    // second. Treat small forward skew as valid, or the cleanup effect can erase a
+    // ride immediately after "Start arrival countdown" before its banner renders.
     return !!ride && Number.isFinite(started) && started > 0 &&
-      now >= started && now - started < 4 * 3600000 &&
+      started - now <= 5000 && now - started < 4 * 3600000 &&
       VRECore.serviceDateKey(started) === VRECore.serviceDateKey(now);
   }
   const LS_KEY = "vre-live-mytrip";
@@ -2422,7 +2425,9 @@
       if (waitingFor && now - waitingFor.started >= 4 * 3600000) setWaitingFor(null);
     }, [waitingFor, now]);
     useEffect(() => {
-      if (myTrip && !isCurrentRide(myTrip, now)) {
+      // Reconcile against the actual wall clock, not the previous render's
+      // one-second timer snapshot. Guard against clearing freshly started rides.
+      if (myTrip && !isCurrentRide(myTrip, Date.now())) {
         setMyTrip(null);
         if (androidRideAlert) androidRideAlert.postMessage("cancel");
       }
