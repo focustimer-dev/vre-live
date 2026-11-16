@@ -78,6 +78,22 @@
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
   .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .today-commute{margin-bottom:12px}
+  .today-body{padding:10px 14px 12px}
+  .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
+    border-top:1px solid var(--border);min-height:72px;padding:10px 0}
+  .today-row:first-of-type{border-top:0}
+  .today-row strong,.today-head strong{display:block;font-size:var(--fs-3)}
+  .today-plan{width:auto;min-width:108px;min-height:44px;padding:8px 12px;font-size:var(--fs-2)}
+  .today-skip{margin-top:6px}
+  .today-head{margin:4px 0 12px}
+  .today-train{width:100%;min-height:54px;border:0;border-top:1px solid var(--border);
+    background:transparent;color:var(--fg);font:inherit;font-weight:600;display:flex;
+    align-items:center;justify-content:space-between;cursor:pointer;text-align:left}
+  .today-train:focus-visible,.today-plan:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .today-footnote{padding-top:10px}
+  .today-back{padding-left:0}
+
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
     background:var(--fg); color:#0a0a0a; font-size:15px;
@@ -1331,6 +1347,82 @@
       ));
   }
 
+  /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
+  function TodayCommute({ profiles, day, selectedId, onSelect, onAction }) {
+    if (!profiles.length) return null;
+    const now = Date.now();
+    const dateKey = VRECore.serviceDateKey(now);
+    if (!isServiceDay(new Date(now))) return null;
+    const selected = profiles.find(p => p.id === selectedId);
+    const skippedDay = !!day?.skippedDay;
+    const planned = day?.planned || {};
+    const skipped = day?.skippedTrips || {};
+    const easternClock = Object.fromEntries(serviceClock.formatToParts(new Date(now))
+      .map(p => [p.type, p.value]));
+    const currentMinutes = Number(easternClock.hour) * 60 + Number(easternClock.minute);
+    const reduced = VRECore.SCHEDULE.reducedService.includes(dateKey);
+    const options = selected ? VRECommutes.choices(VRECore, selected.from, selected.to)
+      .filter(t => selected.preferredTrains.includes(t.num) &&
+        (!reduced || VRECore.SCHEDULE.sTrains.has(t.num))) : [];
+    const timeLabel = minutes => {
+      const hour = Math.floor(minutes / 60);
+      return String(hour % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") +
+        (hour < 12 ? " AM" : " PM");
+    };
+    return html\`
+      <div className="card today-commute">
+        <div className="card-h">Today's commute</div>
+        <div className="today-body">
+          \${skippedDay && !selected ? html\`
+            <div className="meta">You marked today as a non-riding day. You can change that below.</div>\`
+          : null}
+          \${selected ? html\`
+            <button className="btn ghost today-back" onClick=\${() => onSelect(null)}>‹ All commutes</button>
+            <div className="today-head">
+              <strong>\${selected.name}</strong>
+              <span className="meta">\${STATIONS[selected.from].name} → \${STATIONS[selected.to].name}</span>
+            </div>
+            \${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
+              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html\`
+                <button key=\${t.num} className="today-train" onClick=\${() => {
+                  onAction("plan", selected.id, t.num); onSelect(null);
+                }}>
+                  <span>Train \${t.num}</span>
+                  <span>\${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
+                </button>\`)
+              : html\`<div className="meta">No preferred departures remain today.</div>\`}
+            <div className="meta today-footnote">
+              Choosing a train saves today's plan locally. Live leave-time alerts come later.
+            </div>
+            <button className="btn ghost" onClick=\${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
+              Skip this trip
+            </button>\`
+          : html\`
+            \${profiles.map(p => html\`
+              <div className="today-row" key=\${p.id}>
+                <div>
+                  <strong>\${p.name}</strong>
+                  <div className="meta">\${STATIONS[p.from].name} → \${STATIONS[p.to].name}</div>
+                  \${planned[p.id]
+                    ? html\`<div className="meta">Train \${planned[p.id]} planned · no live alerts yet</div>\`
+                    : skipped[p.id]
+                      ? html\`<div className="meta">Skipped today</div>\`
+                      : null}
+                </div>
+                <button className="btn outline today-plan" onClick=\${() => {
+                    if (skippedDay || skipped[p.id]) onAction("reactivate", p.id);
+                    onSelect(p.id);
+                  }}>
+                  \${planned[p.id] ? "Change" : "Choose train"}
+                </button>
+              </div>\`)}
+            <button className="btn ghost today-skip" onClick=\${() => onAction("skipToday", "")}>
+              Not riding today
+            </button>\`}
+        </div>
+      </div>\`;
+  }
+
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
   function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes }) {
     const open = name => onSection(name);
@@ -2191,11 +2283,34 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [commuteDay, setCommuteDay] = useState(null);
+    const [planProfile, setPlanProfile] = useState(() => {
+      const requested = new URLSearchParams(window.location.search).get("plan");
+      return requested && /^[A-Za-z0-9_-]{1,72}$/.test(requested) ? requested : null;
+    });
+    const nativeCommute = message => {
+      try { window.VreCommutePrefs?.postMessage(JSON.stringify(message)); } catch (_) {}
+    };
     const saveCommutes = next => {
       if (!VRECommutes.save(localStorage, next, VRECore)) return false;
       setCommutes(next);
+      nativeCommute({ type: "sync", version: 1, profiles: next.profiles, prompt: true });
       return true;
     };
+    useEffect(() => {
+      const bridge = window.VreCommutePrefs;
+      if (!bridge) return;
+      bridge.onmessage = event => {
+        const data = (() => { try { return JSON.parse(event.data); } catch (_) { return null; } })();
+        if (data && data.type === "state") setCommuteDay(data);
+      };
+      // No alerts are enabled by a one-time legacy migration.
+      if (!commutes.unsupportedVersion) nativeCommute({
+        type: "sync", version: 1, profiles: commutes.profiles, prompt: false
+      });
+      else nativeCommute({ type: "state" });
+      return () => { bridge.onmessage = null; };
+    }, []);
     const [preferencesSection, setPreferencesSection] = useState(null);
     const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
@@ -2566,6 +2681,11 @@
               onChange=${() => { if (myTrain) { setSelected(myTrain.tripId); setPicking(true); } }}
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
+
+        ${tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
+          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
 
         ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
