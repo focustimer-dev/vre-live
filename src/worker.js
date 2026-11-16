@@ -393,7 +393,7 @@ var manifest_default = {
     const thanks = nth(11, 4, 4);
     return [
       observed(1, 1), key(1, 2), key(1, nth(1, 1, 3)),
-      key(2, nth(2, 1, 3)), key(5, last(5, 1)),
+      key(2, nth(2, 1, 3)), key(5, last(5, 1)), observed(6, 19),
       key(9, nth(9, 1, 1)),
       key(10, nth(10, 1, 2)), observed(11, 11),
       key(11, thanks), key(11, thanks + 1),
