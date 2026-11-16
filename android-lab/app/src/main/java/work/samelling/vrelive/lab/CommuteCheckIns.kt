@@ -105,7 +105,7 @@ internal object CommuteCheckIns {
     }
 
     /** Only ask about trains that actually operate that date and serve both stations. */
-    private fun hasService(context: Context, p: JSONObject, date: LocalDate): Boolean {
+    private fun hasService(context: Context, p: JSONObject, date: LocalDate, selectedTrain: String? = null): Boolean {
         if (date.dayOfWeek.value >= 6) return false
         val data = runCatching { Timetable(context).data }.getOrNull() ?: return false
         val key = date.format(stamp)
@@ -123,7 +123,8 @@ internal object CommuteCheckIns {
         for (i in 0 until trips.length()) {
             val trip = trips.optJSONObject(i) ?: continue
             val num = trip.optString("num")
-            if (notIn(trains, num) || (reduced && notIn(special, num))) continue
+            if (notIn(trains, num) || (selectedTrain != null && selectedTrain != num) ||
+                (reduced && notIn(special, num))) continue
             val stops = trip.optJSONArray("stops") ?: continue
             var board = -1
             var destination = -1
@@ -255,7 +256,17 @@ internal object CommuteCheckIns {
         val id = pref.getString(NEXT_ID, "").orEmpty()
         val now = System.currentTimeMillis()
         if (id.isNotEmpty() && at > 0 && now >= at - 120000 && now - at <= 30 * 60000) {
-            show(context, id)
+            // Deliver all enabled commutes scheduled for the same minute, not just
+            // whichever profile won the single-alarm queue tie-break.
+            val profiles = storedProfiles(context)
+            val today = nowDate()
+            for (i in 0 until profiles.length()) {
+                val p = profiles.optJSONObject(i) ?: continue
+                if (!p.optBoolean("checkInEnabled") || !hasService(context, p, today)) continue
+                val time = runCatching { LocalTime.parse(p.optString("checkIn")) }.getOrNull() ?: continue
+                val trigger = today.atTime(time).atZone(zone).toInstant().toEpochMilli()
+                if (trigger == at) show(context, p.optString("id"))
+            }
         }
         reschedule(context, maxOf(now, at + 1000))
     }
@@ -299,7 +310,7 @@ internal object CommuteCheckIns {
     fun plan(context: Context, id: String, train: String): Boolean {
         val p = profile(context, id) ?: return false
         if (!Regex("[0-9A-Za-z_-]{1,32}").matches(train)) return false
-        if (notIn(p.optJSONArray("preferredTrains"), train) || !hasService(context, p, nowDate())) return false
+        if (notIn(p.optJSONArray("preferredTrains"), train) || !hasService(context, p, nowDate(), train)) return false
         if (!confirm(context, id)) return false
         val state = daily(context)
         val planned = state.optJSONObject("planned") ?: JSONObject()
