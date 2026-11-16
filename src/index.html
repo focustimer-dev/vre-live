@@ -87,6 +87,15 @@
   .waiting-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 5px}
   .waiting-actions .btn{min-height:48px}
   .waiting-card .btn.ghost{padding-left:0}
+  .leave-by-card{margin:9px 0 3px;padding:12px;border-radius:12px;
+    border:1px solid var(--border);background:var(--card-2)}
+  .leave-by-label{color:var(--muted);font-size:var(--fs-2);font-weight:650}
+  .leave-by-time{font-size:clamp(25px,8vw,36px);font-weight:800;letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums;line-height:1.15;margin:4px 0}
+  .leave-by-remaining{font-weight:700;font-size:var(--fs-2);margin:5px 0}
+  .leave-by-confidence{margin-top:5px}
+  .today-train-leave{display:block;color:var(--muted);font-size:var(--fs-1);font-weight:400;
+    margin-top:3px}
   .today-commute{margin-bottom:12px}
   .today-body{padding:10px 14px 12px}
   .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
@@ -1439,7 +1448,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Android check-in reminders are optional and local. Confirming a train does not yet activate live leave-time alerts or background monitoring."),
+          "Android check-ins are optional. Selecting a train shows a leave-by estimate while the app is open; automatic departure alerts and background monitoring aren't enabled yet."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1450,16 +1459,56 @@
       ));
   }
 
+  /* Read-only leave estimate for an explicitly chosen train; never activates monitoring. */
+  function LeaveByCard({ profile, train, forecast }) {
+    const time = ms => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York",
+      hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+    if (forecast.state === "needs-travel-time") return html`
+      <div className="leave-by-card">
+        <strong>Train ${train} · travel time needed</strong>
+        <div className="meta">Set the minutes to reach the platform in Preferences → Advanced Commute.</div>
+      </div>`;
+    if (forecast.state === "no-service" || forecast.state === "invalid-train") return html`
+      <div className="leave-by-card"><div className="meta">
+        This train isn't scheduled for your saved commute today.
+      </div></div>`;
+    const departed = forecast.state === "departed";
+    const urgent = forecast.state === "leave-now";
+    const confidence = forecast.confidence === "stable-delay"
+      ? "Delay verified across updates · departure buffer capped at 10 min"
+      : forecast.confidence === "earlier-live"
+        ? "Earlier live prediction · leave time moved forward"
+        : forecast.confidence === "delay-unconfirmed"
+          ? "Train appears delayed, but keep the original leave time until confirmed"
+          : "Timetable-based leave time · live delays not yet verified";
+    return html`
+      <div className="leave-by-card" aria-label=${"Leave-by estimate for train " + train}>
+        <div className="leave-by-label">${departed ? "Departure time passed" : urgent ? "Leave now for your station" : "Leave for your station by"}</div>
+        <div className="leave-by-time" aria-label=${"Recommended leave time: " + time(forecast.leaveBy)}>
+          ${time(forecast.leaveBy)}
+        </div>
+        <div className="meta">Train ${train} departs ${time(forecast.scheduled)} ·
+          ${forecast.leadMinutes} min travel + buffer
+        </div>
+        ${!departed && !urgent && html`<div className="leave-by-remaining">
+          ${forecast.remaining} min until you should leave
+        </div>`}
+        <div className="meta leave-by-confidence">${confidence}</div>
+        <div className="meta">Calculated while the app is open. Automatic leave-time notifications are coming later.</div>
+      </div>`;
+  }
+
   /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
-  function TodayCommute({ profiles, day, selectedId, onSelect, onAction }) {
+  function TodayCommute({ profiles, day, selectedId, onSelect, onAction, now, liveByTrip, samples }) {
     if (!profiles.length) return null;
-    const now = Date.now();
     const dateKey = VRECore.serviceDateKey(now);
     if (!isServiceDay(new Date(now))) return null;
     const selected = profiles.find(p => p.id === selectedId);
-    const skippedDay = !!day?.skippedDay;
-    const planned = day?.planned || {};
-    const skipped = day?.skippedTrips || {};
+    const skippedDay = !!(day?.date === dateKey && day?.skippedDay);
+    // An Android bridge response from yesterday must never show today's old plans.
+    const todayState = day?.date === dateKey ? day : null;
+    const planned = todayState?.planned || {};
+    const skipped = todayState?.skippedTrips || {};
     const easternClock = Object.fromEntries(serviceClock.formatToParts(new Date(now))
       .map(p => [p.type, p.value]));
     const currentMinutes = Number(easternClock.hour) * 60 + Number(easternClock.minute);
@@ -1486,16 +1535,22 @@
               <span className="meta">${STATIONS[selected.from].name} → ${STATIONS[selected.to].name}</span>
             </div>
             ${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
-              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html`
+              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => {
+                const leave = VRELeaveBy.calculate(selected, t.num, VRECore, liveByTrip, samples, now);
+                return html`
                 <button key=${t.num} className="today-train" onClick=${() => {
                   onAction("plan", selected.id, t.num); onSelect(null);
                 }}>
-                  <span>Train ${t.num}</span>
+                  <span>Train ${t.num}<small className="today-train-leave">${leave.leaveBy != null ?
+                    (leave.state === "departed" ? "Departure passed" : "Leave by " + new Intl.DateTimeFormat("en-US", {
+                      timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
+                    }).format(new Date(leave.leaveBy))) : "Set travel time in Advanced Commute"}</small></span>
                   <span>${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
-                </button>`)
+                </button>`;
+              })
               : html`<div className="meta">No preferred departures remain today.</div>`}
             <div className="meta today-footnote">
-              Choosing a train saves today's plan locally. Live leave-time alerts come later.
+              Choosing a train shows a leave-by estimate. Live background reminders are not enabled yet.
             </div>
             <button className="btn ghost" onClick=${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
               Skip this trip
@@ -1507,7 +1562,8 @@
                   <strong>${p.name}</strong>
                   <div className="meta">${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
                   ${planned[p.id]
-                    ? html`<div className="meta">Train ${planned[p.id]} planned · no live alerts yet</div>`
+                    ? html`<${LeaveByCard} profile=${p} train=${planned[p.id]}
+                        forecast=${VRELeaveBy.calculate(p, planned[p.id], VRECore, liveByTrip, samples, now)} />`
                     : skipped[p.id]
                       ? html`<div className="meta">Skipped today</div>`
                       : null}
@@ -1567,7 +1623,7 @@
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
                 Choose preferred trains and optional local daily check-ins.
-                Live leave-time alerts and background tracking are not active yet.
+                Leave-by estimates appear after you pick a train. Automatic background departure alerts aren't active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
@@ -2850,6 +2906,7 @@
         ${tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
           <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
             day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+            now=${now} liveByTrip=${liveByTrip} samples=${devlog}
             onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
 
         ${!myTrip && tab !== "preferences" && html`
@@ -2942,7 +2999,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
