@@ -69,7 +69,8 @@ class MainActivity : Activity() {
             root.setOnApplyWindowInsetsListener { view, insets ->
                 val bars = insets.getInsets(WindowInsets.Type.systemBars())
                 view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                insets
+                // Insets are owned by the native root; do not pass them into WebView again.
+                WindowInsets.CONSUMED
             }
             root.requestApplyInsets()
         } else root.fitsSystemWindows = true
