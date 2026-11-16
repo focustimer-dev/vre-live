@@ -23,8 +23,12 @@ assert.ok(appScript.indexOf('<nav className="tabs"') < appScript.indexOf('<${Com
 assert.match(appScript, /aria-label="Preferences" title="Preferences"/,
   "top navigation has an accessible Preferences gear");
 assert.match(appScript, /<\$\{GearIcon\} \/>/, "preferences gear is rendered in the tab bar");
-assert.equal((appScript.match(/<\$\{GearIcon\}/g) || []).length, 1,
-  "there is only one rendered gear button");
+const topNavigation = appScript.match(/<nav className="tabs" role="tablist"[\s\S]*?<\/nav>/)?.[0];
+assert.ok(topNavigation, "top navigation has a closing tag");
+assert.equal((topNavigation.match(/<\$\{GearIcon\}/g) || []).length, 1,
+  "navigation has exactly one Preferences gear");
+assert.doesNotMatch(appScript, /aria-label="Edit commute"/,
+  "commute card has no duplicate settings gear; ride controls are unaffected");
 assert.doesNotMatch(appScript, /onEdit=|onEdit, onFlip/,
   "commute card no longer exposes a duplicate settings gear");
 assert.match(appScript, /setPreferencesSection\("commute"\); setTab\("preferences"\)/,
