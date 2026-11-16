@@ -59,6 +59,23 @@
     color:var(--muted); font:inherit; font-weight:600; font-size:var(--fs-2); padding:8px 0; cursor:pointer;
     transition:background .15s,color .15s}
   .tabs button.on{background:var(--fg); color:#0a0a0a}
+  .tabs button{min-width:0}
+  .preferences{display:grid;gap:12px}
+  .pref-list{padding:6px 8px 8px}
+  .pref-choice{width:100%;min-height:72px;display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:12px 10px;text-align:left;border:0;border-bottom:1px solid var(--border);
+    color:var(--fg);background:transparent;font:inherit;cursor:pointer;border-radius:10px}
+  .pref-choice:last-child{border-bottom:0}
+  .pref-choice strong{display:block;font-size:var(--fs-3);font-weight:650}
+  .pref-choice small{display:block;color:var(--muted);font-size:var(--fs-2);line-height:1.4;margin-top:2px}
+  .pref-choice:active{background:var(--card-2)}
+  .pref-arrow{font-size:26px;line-height:1;color:var(--muted)}
+  .pref-back{appearance:none;border:0;background:transparent;color:var(--muted);
+    cursor:pointer;font:inherit;font-size:var(--fs-2);font-weight:600;
+    padding:10px 2px;min-height:44px;text-align:left;width:max-content}
+  .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
+  .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
+  .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
     background:var(--fg); color:#0a0a0a; font-size:15px;
@@ -1285,7 +1302,7 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        field("Daily check-in time (Eastern)", h("input", {
+        field("Planned daily check-in (Eastern; not active yet)", h("input", {
           type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
         })),
         h("div", { className: "meta" }, "Typical commuting days"),
@@ -1304,6 +1321,55 @@
           className: "btn ghost", style: { color: "var(--red)", alignSelf: "start" }, onClick: remove
         }, confirmRemove ? "Confirm remove commute" : "Remove commute") : null
       ));
+  }
+
+  /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes }) {
+    const open = name => onSection(name);
+    return html`
+      <section className="preferences" aria-label="Preferences">
+        ${!section ? html`
+          <div className="card">
+            <div className="card-h">Preferences</div>
+            <div className="pref-list">
+              <button className="pref-choice" type="button" onClick=${() => open("commute")}>
+                <span><strong>Commute</strong>
+                  <small>Home and destination stations · standard timetable</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+              <button className="pref-choice" type="button" onClick=${() => open("advanced")}>
+                <span><strong>Advanced Commute</strong>
+                  <small>Preferred trains, travel times, and planned alerts</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>`
+        : html`
+          <button className="pref-back" type="button" onClick=${() => onSection(null)}>
+            <span aria-hidden="true">‹</span> Preferences
+          </button>
+          ${section === "commute" ? html`
+            <div className="card">
+              <div className="card-h">Commute</div>
+              <p className="pref-description">
+                Choose your usual stations. The timetable automatically shows your morning direction
+                and the return trip in the afternoon. No alerts are enabled here.
+              </p>
+              <${RouteSetup} initial=${route}
+                onSave=${r => { onSaveRoute(r); onSection(null); }}
+                onCancel=${() => onSection(null)} />
+            </div>`
+          : html`
+            <div className="card">
+              <div className="card-h">Advanced Commute</div>
+              <p className="pref-description">
+                Save specific trains, travel times, and a future check-in schedule.
+                These settings do not enable notifications or background monitoring yet.
+              </p>
+            </div>
+            <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
+        `}
+      </section>`;
   }
 
   function CommuteCard({ from, to, auto, now, liveByTrip, onEdit, onFlip, onPickLive }) {
@@ -2124,7 +2190,7 @@
       setCommutes(next);
       return true;
     };
-    const [editRoute, setEditRoute] = useState(false);
+    const [preferencesSection, setPreferencesSection] = useState(null);
     const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
       const requested = window.location.pathname === "/__vre_android__/app/index.html"
@@ -2480,29 +2546,31 @@
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
 
-        ${!myTrip && html`
+        ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
-            ${route && !editRoute
+            ${route
               ? (() => {
-                  // round trip: mornings show home -> destination, afternoons the return
+                  // Keep the existing default timetable and direction flip unchanged.
                   const autoReturn = new Date(now).getHours() >= 12;
                   const showReturn = flipDir === null ? autoReturn : flipDir;
                   return html`<${CommuteCard}
                     from=${showReturn ? route.b : route.a} to=${showReturn ? route.a : route.b}
-                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)} now=${now} liveByTrip=${liveByTrip}
-                    onEdit=${() => setEditRoute(true)}
+                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
+                    now=${now} liveByTrip=${liveByTrip}
+                    onEdit=${() => { setPreferencesSection("commute"); setTab("preferences"); }}
                     onFlip=${() => setFlipDir(!showReturn)}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
               : html`<div className="card">
-                  <div className="card-h">${route ? "Edit commute" : "Set up your commute"}</div>
-                  <${RouteSetup} initial=${route}
-                    onSave=${r => { lsSet(ROUTE_KEY, r); setRoute(r); setEditRoute(false); setFlipDir(null); }}
-                    onCancel=${route ? (() => setEditRoute(false)) : null} />
+                  <div className="card-h">Set up your commute</div>
+                  <p className="pref-description">Save your usual stations to show your next departures here.</p>
+                  <div style=${{ padding: "0 16px 16px" }}>
+                    <button className="btn" onClick=${() => {
+                      setPreferencesSection("commute"); setTab("preferences");
+                    }}>Set up commute</button>
+                  </div>
                 </div>`}
           </div>`}
-
-        ${!myTrip && html`<${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${saveCommutes} />`}
 
         <div className="tabs" role="tablist">
           <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
@@ -2511,9 +2579,17 @@
             onClick=${() => setTab("sched")}>Schedule</button>
           <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
             onClick=${() => setTab("board")}>Board</button>
+          <button className=${tab === "preferences" ? "on" : ""} role="tab" aria-selected=${tab === "preferences"}
+            onClick=${() => { setPreferencesSection(null); setTab("preferences"); }}>Preferences</button>
         </div>
 
-        ${tab === "map" ? html`
+        ${tab === "preferences" ? html`
+          <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
+            route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
+            onSaveRoute=${r => {
+              lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
+            }} />`
+        : tab === "map" ? html`
           <div className="card">
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
@@ -2572,7 +2648,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, SummaryCard, Sparkline, Marey, BoardCard };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
