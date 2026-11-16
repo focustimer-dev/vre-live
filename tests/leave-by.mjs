@@ -93,6 +93,19 @@ assert.equal(VRELeaveBy.easternMinute(time("2026-03-09T10:45:00Z"),7*60+25),
 assert.equal(VRELeaveBy.easternMinute(time("2026-11-02T11:45:00Z"),7*60+25),
   time("2026-11-02T12:25:00Z"), "November after fall DST change is UTC-5");
 
+assert.match(app,/function DailyTravelControl\(/,"one-day adjustment control exists");
+assert.match(app,/vre-leave-day-overrides-v1/,"one-day override uses a separate storage record");
+assert.match(app,/travelOverrides\?\.date === todayKey/,"yesterday's overrides never apply today");
+assert.match(app,/travelMinutes: overrides\[p\.id\] \?\? p\.travelMinutes/,
+  "the countdown accepts today's travel time without mutating the saved profile");
+assert.match(app,/travelMinutes: overrides\[selected\.id\] \?\? selected\.travelMinutes/,
+  "alternate train previews honor today's travel override");
+assert.match(app,/overrides=\$\{todayTravel\} onTravelChange=\$\{saveTravelOverride\}/,
+  "daily overrides are passed from app state");
+const adjusted = plan({...profile,travelMinutes:20});
+assert.equal(adjusted.leaveBy,base.leaveBy-5*60000,
+  "five additional minutes to reach the station moves leave-by earlier");
+assert.equal(profile.travelMinutes,15, "original saved travel time was not changed");
 assert.match(app,/function LeaveByCard\(/,"UI component uses calculator");
 assert.match(app,/VRELeaveBy\.calculate\(p, planned\[p\.id\]/,
   "saved native plan determines the visible leave-by time");
