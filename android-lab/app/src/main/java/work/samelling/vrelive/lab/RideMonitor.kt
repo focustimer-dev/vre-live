@@ -74,12 +74,19 @@ class RideMonitor : Service() {
             holidays.getString(it) == todayKey
         }
         val minute = now.hour * 60 + now.minute
+        val reducedDates = timetable.getJSONArray("reducedService")
+        val reduced = (0 until reducedDates.length()).any { reducedDates.getString(it) == todayKey }
+        val specialTrains = timetable.getJSONArray("sTrains")
         val trips = timetable.getJSONArray("trips")
         val inServiceWindow = (0 until trips.length()).any { i ->
-            val stops = trips.getJSONObject(i).getJSONArray("stops")
+            val trip = trips.getJSONObject(i)
+            val allowed = !reduced || (0 until specialTrains.length()).any {
+                specialTrains.getString(it) == trip.getString("num")
+            }
+            val stops = trip.getJSONArray("stops")
             val first = stops.getJSONArray(0).getInt(1)
             val last = stops.getJSONArray(stops.length() - 1).getInt(1)
-            minute >= first - 20 && minute <= last + 120
+            allowed && minute >= first - 20 && minute <= last + 120
         }
         if (started.toLocalDate() != now.toLocalDate() || noService || !inServiceWindow) {
             stopSelf()
