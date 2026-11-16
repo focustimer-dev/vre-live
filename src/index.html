@@ -1305,7 +1305,12 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        field("Planned daily check-in (Eastern; not active yet)", h("input", {
+        field("Daily check-in notifications", h("span", { style: {
+          display: "flex", alignItems: "center", gap: 10
+        } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
+          onChange: e => change("checkInEnabled", e.target.checked) }),
+          h("span", null, "Ask if I'm taking the train on my commute days"))),
+        field("Check-in time (Eastern)", h("input", {
           type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
         })),
         h("div", { className: "meta" }, "Typical commuting days"),
@@ -1315,7 +1320,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Saved locally only. This version does not activate alarms, notifications, or background polling."),
+          "Android check-in reminders are optional and local. Confirming a train does not yet activate live leave-time alerts or background monitoring."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1366,8 +1371,8 @@
             <div className="card">
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
-                Save specific trains, travel times, and a future check-in schedule.
-                These settings do not enable notifications or background monitoring yet.
+                Choose preferred trains and optional local daily check-ins.
+                Live leave-time alerts and background tracking are not active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
