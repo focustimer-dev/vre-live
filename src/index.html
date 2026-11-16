@@ -2140,10 +2140,10 @@
       arrival.source === "schedule" ? "Timetable estimate · live arrival unconfirmed" :
       "No scheduled or live arrival time available";
     return html`
-      <div className="card waiting-card" role="status" aria-live="polite" aria-atomic="false">
+      <div className="card waiting-card" role="region" aria-label="Boarding station arrival">
         <div className="card-h">Waiting at ${station} · Train ${waiting.num}</div>
         <div className="waiting-body">
-          <div className="waiting-countdown" aria-label=${"Estimated train arrival: " + number}>${number}</div>
+          <div className="waiting-countdown" role="timer" aria-label=${"Estimated train arrival: " + number}>${number}</div>
           <div className="meta">Train ${waiting.num} ${arrival.eta != null
             ? "expected at " + fmtClock(arrival.eta) : "arrival not available"}</div>
           <div className=${"meta waiting-source" + (arrival.source !== "live" ? " waiting-unconfirmed" : "")}>
