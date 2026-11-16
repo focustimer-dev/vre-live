@@ -917,6 +917,7 @@
       platformMinutes: within(raw.platformMinutes, 60),
       bufferMinutes: within(raw.bufferMinutes, 60),
       checkIn: validTime(raw.checkIn) ? raw.checkIn : "06:45",
+      checkInEnabled: raw.checkInEnabled === true,
       days
     };
   }
@@ -980,7 +981,7 @@
     return { id: "commute-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
       name: "New commute", from: from || "01", to: to || "03", preferredTrains: [],
       mode: "other", travelMinutes: 0, platformMinutes: 0, bufferMinutes: 5,
-      checkIn: "06:45", days: [...DAYS] };
+      checkIn: "06:45", checkInEnabled: false, days: [...DAYS] };
   }
   g.VRECommutes = Object.freeze({ KEY, choices, normalizeProfile, normalizeRecord,
     migrateLegacy, load, save, upsert, remove, blank });
