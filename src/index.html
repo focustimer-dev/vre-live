@@ -871,7 +871,9 @@
     if (["Sat", "Sun"].includes(parts.weekday) ||
         VRECore.SCHEDULE.noService.includes(parts.year + parts.month + parts.day)) return false;
     const minute = Number(parts.hour) * 60 + Number(parts.minute);
-    return VRECore.SCHEDULE.trips.some(({ stops }) =>
+    const reduced = VRECore.SCHEDULE.reducedService.includes(parts.year + parts.month + parts.day);
+    return VRECore.SCHEDULE.trips.some(({ num, stops }) =>
+      (!reduced || VRECore.SCHEDULE.sTrains.has(num)) &&
       minute >= stops[0][1] - 20 &&
       minute <= stops[stops.length - 1][1] + (trackedRide ? 120 : 20));
   }
