@@ -11,8 +11,13 @@ android {
         applicationId 'work.samelling.vrelive.lab'
         minSdk 26
         targetSdk 36
-        versionCode 15
-        versionName '0.1.14'
+        // Pull-request builds remain disposable; main-branch signed builds use a
+        // monotonically increasing GitHub workflow run number for safe upgrades.
+        // The package ID and signing certificate must stay unchanged.
+        versionCode project.hasProperty('vreLabRunNumber')
+            ? (100000 + project.property('vreLabRunNumber').toString().toInteger()) : 15
+        versionName project.hasProperty('vreLabRunNumber')
+            ? "0.1.14-lab.${project.property('vreLabRunNumber')}" : '0.1.14'
     }
     buildTypes {
         release { minifyEnabled false }
