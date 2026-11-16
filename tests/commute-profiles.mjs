@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
+import { runInNewContext, Script } from "node:vm";
 const read = p => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const page = read("src/index.html");
 const builder = read("android-lab/web/build-assets.mjs");
@@ -10,7 +10,7 @@ const script = id => {
   return hit[1];
 };
 const appScript = script("vre-app");
-assert.doesNotThrow(() => new (await import("node:vm")).Script(appScript), "App JavaScript parses");
+assert.doesNotThrow(() => new Script(appScript), "App JavaScript parses");
 assert.match(appScript, /function PreferencesPanel\(/, "Preferences panel exists");
 assert.match(appScript, /<\$\{PreferencesPanel\}/, "Preferences panel is routed");
 assert.match(appScript, /tab === "preferences"/, "Preferences is a distinct tab");
