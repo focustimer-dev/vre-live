@@ -107,7 +107,7 @@ assert.equal(adjusted.leaveBy,base.leaveBy-5*60000,
   "five additional minutes to reach the station moves leave-by earlier");
 assert.equal(profile.travelMinutes,15, "original saved travel time was not changed");
 assert.match(app,/function LeaveByCard\(/,"UI component uses calculator");
-assert.match(app,/VRELeaveBy\.calculate\(p, planned\[p\.id\]/,
+assert.match(app,/\}, planned\[p\.id\], VRECore, liveByTrip, samples, now\)/,
   "saved native plan determines the visible leave-by time");
 assert.match(app,/now=\$\{now\} liveByTrip=\$\{liveByTrip\} samples=\$\{devlog\}/,
   "live feed and delay history reach UI while app is visible");
