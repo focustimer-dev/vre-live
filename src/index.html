@@ -87,6 +87,12 @@
   .waiting-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 5px}
   .waiting-actions .btn{min-height:48px}
   .waiting-card .btn.ghost{padding-left:0}
+  .daily-travel-control{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    margin-top:7px;font-size:var(--fs-2);color:var(--muted)}
+  .daily-travel-control input{width:64px;max-width:64px;font:inherit;font-size:var(--fs-2);
+    color:var(--fg);background:var(--card);border:1px solid var(--border);
+    border-radius:8px;padding:5px 7px;text-align:center}
+  .daily-travel-control .btn{width:auto;padding:5px 8px}
   .leave-by-card{margin:9px 0 3px;padding:12px;border-radius:12px;
     border:1px solid var(--border);background:var(--card-2)}
   .leave-by-label{color:var(--muted);font-size:var(--fs-2);font-weight:650}
@@ -1498,8 +1504,28 @@
       </div>`;
   }
 
+  function DailyTravelControl({ profile, override, onChange }) {
+    const current = override == null ? profile.travelMinutes : override;
+    return html`
+      <div className="daily-travel-control">
+        <label for=${"travel-" + profile.id}>Travel time today</label>
+        <input id=${"travel-" + profile.id} type="number" min="0" max="180"
+          step="1" inputMode="numeric" value=${current}
+          onChange=${e => {
+            const n = Number(e.target.value);
+            if (e.target.value === "") { onChange(null); return; }
+            if (Number.isInteger(n) && n >= 0 && n <= 180) onChange(n);
+          }} />
+        <span>min</span>
+        ${override != null && html`
+          <button type="button" className="btn ghost" onClick=${() => onChange(null)}>
+            Reset
+          </button>`}
+      </div>`;
+  }
+
   /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
-  function TodayCommute({ profiles, day, selectedId, onSelect, onAction, now, liveByTrip, samples }) {
+  function TodayCommute({ profiles, day, selectedId, onSelect, onAction, now, liveByTrip, samples, overrides, onTravelChange }) {
     if (!profiles.length) return null;
     const dateKey = VRECore.serviceDateKey(now);
     if (!isServiceDay(new Date(now))) return null;
@@ -1562,8 +1588,13 @@
                   <strong>${p.name}</strong>
                   <div className="meta">${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
                   ${planned[p.id]
-                    ? html`<${LeaveByCard} profile=${p} train=${planned[p.id]}
-                        forecast=${VRELeaveBy.calculate(p, planned[p.id], VRECore, liveByTrip, samples, now)} />`
+                    ? html`
+                      <${LeaveByCard} profile=${p} train=${planned[p.id]}
+                        forecast=${VRELeaveBy.calculate({
+                          ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+                        }, planned[p.id], VRECore, liveByTrip, samples, now)} />
+                      <${DailyTravelControl} profile=${p} override=${overrides[p.id]}
+                        onChange=${value => onTravelChange(p.id, value)} />`
                     : skipped[p.id]
                       ? html`<div className="meta">Skipped today</div>`
                       : null}
@@ -2498,6 +2529,18 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [travelOverrides, setTravelOverrides] = useState(() => lsGet("vre-leave-day-overrides-v1", null));
+    const todayKey = VRECore.serviceDateKey(now);
+    const todayTravel = travelOverrides?.date === todayKey ? travelOverrides.values || {} : {};
+    const saveTravelOverride = (profileId, value) => {
+      if (value != null && (!Number.isInteger(value) || value < 0 || value > 180)) return;
+      const update = { ...todayTravel };
+      if (value == null) delete update[profileId];
+      else update[profileId] = value;
+      const record = { date: VRECore.serviceDateKey(Date.now()), values: update };
+      lsSet("vre-leave-day-overrides-v1", record);
+      setTravelOverrides(record);
+    };
     const [commuteDay, setCommuteDay] = useState(null);
     const [planProfile, setPlanProfile] = useState(() => {
       const requested = new URLSearchParams(window.location.search).get("plan");
@@ -2907,6 +2950,7 @@
           <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
             day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
             now=${now} liveByTrip=${liveByTrip} samples=${devlog}
+            overrides=${todayTravel} onTravelChange=${saveTravelOverride}
             onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
 
         ${!myTrip && tab !== "preferences" && html`
@@ -2999,7 +3043,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
