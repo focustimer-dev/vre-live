@@ -787,7 +787,10 @@ function backgroundServiceWindow(now) {
     timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
   }).formatToParts(new Date(now)).map(p => [p.type, p.value]));
   const minute = Number(parts.hour) * 60 + Number(parts.minute);
-  return globalThis.VRECore.SCHEDULE.trips.some(({ stops }) =>
+  const reduced = globalThis.VRECore.SCHEDULE.reducedService
+    .includes(globalThis.VRECore.serviceDateKey(now));
+  return globalThis.VRECore.SCHEDULE.trips.some(({ num, stops }) =>
+    (!reduced || globalThis.VRECore.SCHEDULE.sTrains.has(num)) &&
     minute >= stops[0][1] - 20 && minute <= stops[stops.length - 1][1] + 120);
 }
 __name(backgroundServiceWindow, "backgroundServiceWindow");
