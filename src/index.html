@@ -157,6 +157,9 @@
   .fld select{appearance:none; background:var(--bg); border:1px solid var(--border); border-radius:10px;
     color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; outline:none; width:100%}
   .fld select:focus{border-color:#52525b}
+  .fld input:not([type="checkbox"]){background:var(--bg); border:1px solid var(--border); border-radius:10px;
+    color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; width:100%; min-width:0}
+  .fld input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
   .srow:disabled{cursor:default}
   .train.ghost{cursor:pointer}
   .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--muted-2); font-size:var(--fs-1)}
@@ -1181,6 +1184,128 @@
       </div>`;
   }
 
+  /* Offline commute routines: editable preferences only, no notification or monitoring side effects. */
+  function CommuteProfiles({ record, legacyRoute, onSave }) {
+    const h = React.createElement;
+    const [draft, setDraft] = useState(null);
+    const [error, setError] = useState("");
+    const [confirmRemove, setConfirmRemove] = useState(false);
+    const names = VRECore.STATIONS;
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const stationOptions = Object.entries(names).map(([code, station]) =>
+      h("option", { key: code, value: code }, station.name));
+    const change = (key, value) => setDraft(old => ({ ...old, [key]: value }));
+    const modifyRoute = (key, value) => setDraft(old => ({
+      ...old, [key]: value, preferredTrains: []
+    }));
+    const begin = profile => {
+      setDraft(profile ? { ...profile, preferredTrains: [...profile.preferredTrains], days: [...profile.days] }
+        : VRECommutes.blank(legacyRoute && legacyRoute.a, legacyRoute && legacyRoute.b));
+      setConfirmRemove(false);
+      setError("");
+    };
+    const save = () => {
+      if (!draft.name.trim()) { setError("Give this commute a name."); return; }
+      if (!draft.days.length) { setError("Select at least one weekday."); return; }
+      if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
+        setError("Choose stations served by a direct train."); return;
+      }
+      const updated = VRECommutes.upsert(record, draft, VRECore);
+      if (!updated || !onSave(updated)) { setError("Could not save commute preferences on this device."); return; }
+      setDraft(null);
+      setError("");
+    };
+    const remove = () => {
+      if (!confirmRemove) { setConfirmRemove(true); return; }
+      if (!onSave(VRECommutes.remove(record, draft.id, VRECore))) {
+        setError("Could not remove this commute."); return;
+      }
+      setDraft(null);
+      setConfirmRemove(false);
+    };
+    const field = (label, child) => h("label", { className: "fld" }, h("span", null, label), child);
+    const numeric = (key, label, max) => field(label, h("input", {
+      type: "number", min: 0, max, step: 1, value: draft[key],
+      onChange: e => change(key, e.target.value === "" ? -1 : Number(e.target.value))
+    }));
+    const selectStation = (key, label) => field(label, h("select", {
+      value: draft[key], onChange: e => modifyRoute(key, e.target.value)
+    }, stationOptions));
+    const timeLabel = minutes => {
+      const hour = Math.floor(minutes / 60), minute = minutes % 60;
+      return String(hour % 12 || 12) + ":" + String(minute).padStart(2, "0") + (hour < 12 ? " AM" : " PM");
+    };
+    if (record.unsupportedVersion) return h("div", { className: "card", style: { marginTop: 12, padding: 16 } },
+      h("strong", null, "Commute preferences need a newer app version."),
+      h("div", { className: "meta" }, "Existing preferences have been left untouched."));
+    if (!draft) return h("div", { className: "card", style: { marginTop: 12 } },
+      h("div", { className: "card-h" }, "Commute routines"),
+      h("div", { style: { padding: "8px 16px 14px" } },
+        h("div", { className: "meta", style: { marginBottom: 10 } },
+          "Save your usual routes, trains, and travel times. Daily alerts are coming in a later update."),
+        record.profiles.map(p => h("div", { key: p.id, className: "row", style: {
+          borderTop: "1px solid var(--border)", padding: "9px 0", alignItems: "center"
+        } },
+          h("div", { style: { minWidth: 0 } },
+            h("strong", null, p.name),
+            h("div", { className: "meta" }, names[p.from].name + " → " + names[p.to].name),
+            h("div", { className: "meta" }, p.preferredTrains.length
+              ? "Trains " + p.preferredTrains.join(", ") : "Select preferred trains")),
+          h("button", { className: "btn ghost", onClick: () => begin(p),
+            "aria-label": "Edit " + p.name }, "Edit")
+        )),
+        h("button", { className: "btn outline", onClick: () => begin(null),
+          style: { marginTop: 8 } }, "Add commute")
+      ));
+    const trains = VRECommutes.choices(VRECore, draft.from, draft.to);
+    const checkDay = (day, enabled) => change("days",
+      enabled ? [...new Set([...draft.days, day])].sort((a, b) => a - b) : draft.days.filter(d => d !== day));
+    const checkTrain = (num, enabled) => change("preferredTrains", enabled
+      ? [...new Set([...draft.preferredTrains, num])] : draft.preferredTrains.filter(t => t !== num));
+    const selectMode = field("How you get there", h("select", { value: draft.mode, onChange: e => change("mode", e.target.value) },
+      h("option", { value: "walk" }, "Walk"), h("option", { value: "drive" }, "Drive"),
+      h("option", { value: "other" }, "Other")));
+    return h("div", { className: "card", style: { marginTop: 12 } },
+      h("div", { className: "card-h" }, "Edit commute routine"),
+      h("div", { style: { padding: 16, display: "grid", gap: 12 } },
+        field("Name", h("input", { type: "text", maxLength: 48,
+          value: draft.name, onChange: e => change("name", e.target.value) })),
+        h("div", { className: "row", style: { gap: 8 } },
+          selectStation("from", "Board at"), selectStation("to", "Get off at")),
+        h("div", { className: "meta" }, "Preferred trains (select one or more)"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 170, overflowY: "auto" } },
+          trains.length ? trains.map(t => h("label", { key: t.num, className: "chip",
+            style: { display: "flex", alignItems: "center", gap: 6 } },
+            h("input", { type: "checkbox", checked: draft.preferredTrains.includes(t.num),
+              onChange: e => checkTrain(t.num, e.target.checked) }),
+            t.num + " · " + timeLabel(t.departureMinutes))) :
+            h("span", { className: "stale-note" }, "No direct trains for this route.")),
+        selectMode,
+        h("div", { className: "row", style: { gap: 8 } },
+          numeric("travelMinutes", "Travel (min)", 180),
+          numeric("platformMinutes", "To platform (min)", 60),
+          numeric("bufferMinutes", "Safety (min)", 60)),
+        field("Daily check-in time (Eastern)", h("input", {
+          type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
+        })),
+        h("div", { className: "meta" }, "Typical commuting days"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: 9 } },
+          days.map((label, day) => h("label", { key: day, className: "chip",
+            style: { display: "flex", alignItems: "center", gap: 5 } },
+            h("input", { type: "checkbox", checked: draft.days.includes(day),
+              onChange: e => checkDay(day, e.target.checked) }), label))),
+        h("div", { className: "meta" },
+          "Saved locally only. This version does not activate alarms, notifications, or background polling."),
+        error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
+        h("div", { className: "row", style: { gap: 8 } },
+          h("button", { className: "btn", onClick: save }, "Save commute"),
+          h("button", { className: "btn outline", onClick: () => { setDraft(null); setError(""); } }, "Cancel")),
+        record.profiles.some(p => p.id === draft.id) ? h("button", {
+          className: "btn ghost", style: { color: "var(--red)", alignSelf: "start" }, onClick: remove
+        }, confirmRemove ? "Confirm remove commute" : "Remove commute") : null
+      ));
+  }
+
   function CommuteCard({ from, to, auto, now, liveByTrip, onEdit, onFlip, onPickLive }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
@@ -1993,6 +2118,12 @@
       return a !== b && ALL_CODES.includes(a) && ALL_CODES.includes(b) ? { a, b } : null;
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
+    const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const saveCommutes = next => {
+      if (!VRECommutes.save(localStorage, next, VRECore)) return false;
+      setCommutes(next);
+      return true;
+    };
     const [editRoute, setEditRoute] = useState(false);
     const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
@@ -2370,6 +2501,8 @@
                     onCancel=${route ? (() => setEditRoute(false)) : null} />
                 </div>`}
           </div>`}
+
+        ${!myTrip && html`<${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${saveCommutes} />`}
 
         <div className="tabs" role="tablist">
           <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
