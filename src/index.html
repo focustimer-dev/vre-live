@@ -2276,6 +2276,7 @@
     const initial = sameRide ? activeTrip.dest : defaultDest;
     const [choice, setChoice] = useState(() => future.some(s => s.code === initial) ? initial : "");
     const [waiting, setWaiting] = useState(false);
+    const boardingNow = !!boardingStation && !activeTrip;
     const destination = future.find(s => s.code === choice);
     const waitStop = destination && destination.code !== train.stops.at(-1)?.code;
     const switching = !!activeTrip && !sameRide;
@@ -2306,8 +2307,11 @@
           </div>
           <button ref=${closeRef} className="btn ghost" onClick=${onClose} aria-label="Close destination picker"><${XIcon} /></button>
         </div>
-        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>${waiting ? "Where are you waiting?" : "Where will you get off?"}</div>
-        ${!activeTrip && html`<button className="btn ghost" type="button" aria-pressed=${waiting} onClick=${() => { setWaiting(!waiting); setChoice(""); }}>${waiting ? "I’m already on the train" : "I’m waiting for this train"}</button>`}
+        <div className="meta" style=${{ marginTop: 14, color: "var(--fg)", fontWeight: 600 }}>${waiting ? "Where are you waiting?" : boardingNow ? "You've boarded. Where will you get off?" : "Where will you get off?"}</div>
+        ${boardingNow && html`<div className="meta" style=${{ marginTop: 5 }}>
+          Choose your destination to start the arrival countdown.
+        </div>`}
+        ${!activeTrip && !boardingNow && html`<button className="btn ghost" type="button" aria-pressed=${waiting} onClick=${() => { setWaiting(!waiting); setChoice(""); }}>${waiting ? "I'm on the train · choose destination" : "I'm waiting for this train"}</button>`}
         ${switching && html`<div className="stale-note" style=${{ marginTop: 6 }}>You are tracking train ${String(activeTrip.tripId).split("-")[0]}. Switching stops its alerts.</div>`}
         <div className="stops" role="group" aria-label=${waiting ? "Boarding stations" : "Destination stations"}>
           ${future.length ? future.filter(s => !waiting || s.code !== train.stops.at(-1)?.code).map(s => html`
@@ -2320,9 +2324,9 @@
         </div>
         <div style=${{ marginTop: 12 }}>
           <button className="btn" disabled=${!destination || busy || (waiting && !waitStop)} onClick=${() => destination && (waiting ? onWait(destination.code) : onDest(destination.code))}>
-            ${waiting ? (destination ? "Track arrival at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start tracking"} · ${destination.name}` : "Choose a destination"}
+            ${waiting ? (destination ? "Wait for train at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start arrival countdown"} · ${destination.name}` : "Choose a destination"}
           </button>
-          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "The Android widget shows the arrival at your station." : "You choose when to end the ride."}</div>
+          <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "You'll see an arrival countdown while waiting; the estimate may be scheduled or live." : boardingNow ? "Your destination countdown starts once you select a stop." : "You choose when to end the ride."}</div>
         </div>
       </div>`;
   }
@@ -2728,14 +2732,10 @@
           </div>`}
 
         ${waitingFor && !myTrip && html`
-          <div className="card"><div className="card-h">Waiting at ${STATIONS[waitingFor.dest]?.name} · Train ${waitingFor.num}</div>
-            <div style=${{ padding: "0 10px 5px" }}>
-              <button className="btn ghost" onClick=${() => { setSelected(waitingFor.trip); setPicking(true); }}>I'm on the train</button>
-              <button className="btn ghost" onClick=${() => setWaitingFor(null)}>Stop waiting</button>
-              ${lockControl(false)}
-              ${lockError}
-            </div>
-          </div>`}
+          <${WaitingCard} waiting=${waitingFor} train=${liveByTrip[waitingFor.trip] || null} now=${now}
+            onBoard=${() => { setSelected(waitingFor.trip); setPicking(true); }}
+            onStop=${() => setWaitingFor(null)}
+            lockButton=${lockControl(false)} lockError=${lockError} />`}
         ${summary && html`<${SummaryCard} rec=${summary} onDismiss=${() => setSummary(null)} />`}
 
         ${myTrip && html`
@@ -2842,7 +2842,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
