@@ -59,6 +59,25 @@
     color:var(--muted); font:inherit; font-weight:600; font-size:var(--fs-2); padding:8px 0; cursor:pointer;
     transition:background .15s,color .15s}
   .tabs button.on{background:var(--fg); color:#0a0a0a}
+  .tabs button.pref-nav{flex:0 0 48px;display:inline-flex;align-items:center;justify-content:center;
+    padding:8px;min-width:44px}
+  .tabs button{min-width:0}
+  .preferences{display:grid;gap:12px}
+  .pref-list{padding:6px 8px 8px}
+  .pref-choice{width:100%;min-height:72px;display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:12px 10px;text-align:left;border:0;border-bottom:1px solid var(--border);
+    color:var(--fg);background:transparent;font:inherit;cursor:pointer;border-radius:10px}
+  .pref-choice:last-child{border-bottom:0}
+  .pref-choice strong{display:block;font-size:var(--fs-3);font-weight:650}
+  .pref-choice small{display:block;color:var(--muted);font-size:var(--fs-2);line-height:1.4;margin-top:2px}
+  .pref-choice:active{background:var(--card-2)}
+  .pref-arrow{font-size:26px;line-height:1;color:var(--muted)}
+  .pref-back{appearance:none;border:0;background:transparent;color:var(--muted);
+    cursor:pointer;font:inherit;font-size:var(--fs-2);font-weight:600;
+    padding:10px 2px;min-height:44px;text-align:left;width:max-content}
+  .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
+  .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
+  .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
     background:var(--fg); color:#0a0a0a; font-size:15px;
@@ -157,6 +176,9 @@
   .fld select{appearance:none; background:var(--bg); border:1px solid var(--border); border-radius:10px;
     color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; outline:none; width:100%}
   .fld select:focus{border-color:#52525b}
+  .fld input:not([type="checkbox"]){background:var(--bg); border:1px solid var(--border); border-radius:10px;
+    color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; width:100%; min-width:0}
+  .fld input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
   .srow:disabled{cursor:default}
   .train.ghost{cursor:pointer}
   .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--muted-2); font-size:var(--fs-1)}
@@ -848,6 +870,123 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
+<!-- ============= commute profile preferences (offline, no network) ============= -->
+<script id="vre-commutes">
+(function (g) {
+  "use strict";
+  // Pure, offline commute preferences. No alarms, permissions or network calls.
+  const KEY = "vre-live-commutes-v1";
+  const LEGACY_KEY = "vre-live-route";
+  const DAYS = [1, 2, 3, 4, 5]; // JS weekday numbers; Eastern service calendar in later PRs.
+  function choices(core, from, to) {
+    if (!core || !core.STATIONS || !core.STATIONS[from] || !core.STATIONS[to] || from === to) return [];
+    const found = new Map();
+    for (const trip of core.SCHEDULE.trips) {
+      const start = trip.stops.findIndex(s => s[0] === from);
+      const end = trip.stops.findIndex(s => s[0] === to);
+      if (start < 0 || end <= start) continue;
+      const candidate = { num: String(trip.num), tripId: trip.trip, line: trip.line,
+        departureMinutes: trip.stops[start][1] };
+      if (!found.has(candidate.num) || candidate.departureMinutes < found.get(candidate.num).departureMinutes)
+        found.set(candidate.num, candidate);
+    }
+    return [...found.values()].sort((a, b) => a.departureMinutes - b.departureMinutes || a.num.localeCompare(b.num));
+  }
+  const within = (value, max, fallback = 0) => {
+    const n = Number(value);
+    return Number.isInteger(n) && n >= 0 && n <= max ? n : fallback;
+  };
+  const validTime = value => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  function normalizeProfile(raw, core) {
+    if (!raw || typeof raw !== "object") return null;
+    const from = String(raw.from || ""), to = String(raw.to || "");
+    const trains = choices(core, from, to);
+    if (!trains.length) return null;
+    const allowed = new Set(trains.map(t => t.num));
+    const preferredTrains = [...new Set(Array.isArray(raw.preferredTrains) ? raw.preferredTrains.map(String) : [])]
+      .filter(num => allowed.has(num));
+    const days = [...new Set(Array.isArray(raw.days) ? raw.days.filter(n => Number.isInteger(n) && n >= 0 && n <= 6) : DAYS)]
+      .sort((a, b) => a - b);
+    const id = typeof raw.id === "string" && /^[a-zA-Z0-9_-]{1,72}$/.test(raw.id) ? raw.id : "";
+    if (!id) return null;
+    return {
+      id, name: typeof raw.name === "string" ? raw.name.trim().slice(0, 48) || "Commute" : "Commute",
+      from, to, preferredTrains,
+      mode: ["walk", "drive", "other"].includes(raw.mode) ? raw.mode : "other",
+      travelMinutes: within(raw.travelMinutes, 180),
+      platformMinutes: within(raw.platformMinutes, 60),
+      bufferMinutes: within(raw.bufferMinutes, 60),
+      checkIn: validTime(raw.checkIn) ? raw.checkIn : "06:45",
+      days
+    };
+  }
+  function normalizeRecord(raw, core) {
+    const profiles = [];
+    const ids = new Set();
+    for (const item of Array.isArray(raw && raw.profiles) ? raw.profiles : []) {
+      const p = normalizeProfile(item, core);
+      if (!p || ids.has(p.id)) continue;
+      ids.add(p.id);
+      profiles.push(p);
+    }
+    return { version: 1, profiles };
+  }
+  function migrateLegacy(route, core) {
+    if (!route || typeof route !== "object") return { version: 1, profiles: [] };
+    return normalizeRecord({ profiles: [
+      { id: "legacy-morning", name: "Morning commute", from: route.a, to: route.b,
+        checkIn: "06:45", mode: "other", days: DAYS, preferredTrains: [] },
+      { id: "legacy-return", name: "Return commute", from: route.b, to: route.a,
+        checkIn: "14:45", mode: "other", days: DAYS, preferredTrains: [] }
+    ] }, core);
+  }
+  function load(storage, core) {
+    try {
+      const existing = storage.getItem(KEY);
+      if (existing !== null) {
+        const obj = JSON.parse(existing);
+        if (obj && obj.version === 1 && Array.isArray(obj.profiles)) return normalizeRecord(obj, core);
+        // Unknown schema stays intact; do not overwrite with an older client.
+        return { version: 1, profiles: [], unsupportedVersion: true };
+      }
+      const legacy = storage.getItem(LEGACY_KEY);
+      if (!legacy) return { version: 1, profiles: [] };
+      const migrated = migrateLegacy(JSON.parse(legacy), core);
+      if (migrated.profiles.length) storage.setItem(KEY, JSON.stringify(migrated));
+      return migrated;
+    } catch (_) {
+      return { version: 1, profiles: [], storageError: true };
+    }
+  }
+  function save(storage, record, core) {
+    if (record && record.unsupportedVersion) return false;
+    try {
+      storage.setItem(KEY, JSON.stringify(normalizeRecord(record, core)));
+      return true;
+    } catch (_) { return false; }
+  }
+  function upsert(record, rawProfile, core) {
+    const profile = normalizeProfile(rawProfile, core);
+    if (!profile) return null;
+    const all = [...(record.profiles || [])];
+    const i = all.findIndex(p => p.id === profile.id);
+    if (i < 0) all.push(profile); else all[i] = profile;
+    return normalizeRecord({ profiles: all }, core);
+  }
+  function remove(record, id, core) {
+    return normalizeRecord({ profiles: (record.profiles || []).filter(p => p.id !== id) }, core);
+  }
+  function blank(from, to) {
+    return { id: "commute-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      name: "New commute", from: from || "01", to: to || "03", preferredTrains: [],
+      mode: "other", travelMinutes: 0, platformMinutes: 0, bufferMinutes: 5,
+      checkIn: "06:45", days: [...DAYS] };
+  }
+  g.VRECommutes = Object.freeze({ KEY, choices, normalizeProfile, normalizeRecord,
+    migrateLegacy, load, save, upsert, remove, blank });
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
 <!-- ============= app ============= -->
 <script id="vre-app">
 (function () {
@@ -1064,7 +1203,178 @@
       </div>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onEdit, onFlip, onPickLive }) {
+  /* Offline commute routines: editable preferences only, no notification or monitoring side effects. */
+  function CommuteProfiles({ record, legacyRoute, onSave }) {
+    const h = React.createElement;
+    const [draft, setDraft] = useState(null);
+    const [error, setError] = useState("");
+    const [confirmRemove, setConfirmRemove] = useState(false);
+    const names = VRECore.STATIONS;
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const stationOptions = Object.entries(names).map(([code, station]) =>
+      h("option", { key: code, value: code }, station.name));
+    const change = (key, value) => setDraft(old => ({ ...old, [key]: value }));
+    const modifyRoute = (key, value) => setDraft(old => ({
+      ...old, [key]: value, preferredTrains: []
+    }));
+    const begin = profile => {
+      setDraft(profile ? { ...profile, preferredTrains: [...profile.preferredTrains], days: [...profile.days] }
+        : VRECommutes.blank(legacyRoute && legacyRoute.a, legacyRoute && legacyRoute.b));
+      setConfirmRemove(false);
+      setError("");
+    };
+    const save = () => {
+      if (!draft.name.trim()) { setError("Give this commute a name."); return; }
+      if (!draft.days.length) { setError("Select at least one weekday."); return; }
+      if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
+        setError("Choose stations served by a direct train."); return;
+      }
+      const updated = VRECommutes.upsert(record, draft, VRECore);
+      if (!updated || !onSave(updated)) { setError("Could not save commute preferences on this device."); return; }
+      setDraft(null);
+      setError("");
+    };
+    const remove = () => {
+      if (!confirmRemove) { setConfirmRemove(true); return; }
+      if (!onSave(VRECommutes.remove(record, draft.id, VRECore))) {
+        setError("Could not remove this commute."); return;
+      }
+      setDraft(null);
+      setConfirmRemove(false);
+    };
+    const field = (label, child) => h("label", { className: "fld" }, h("span", null, label), child);
+    const numeric = (key, label, max) => field(label, h("input", {
+      type: "number", min: 0, max, step: 1, value: draft[key],
+      onChange: e => change(key, e.target.value === "" ? -1 : Number(e.target.value))
+    }));
+    const selectStation = (key, label) => field(label, h("select", {
+      value: draft[key], onChange: e => modifyRoute(key, e.target.value)
+    }, stationOptions));
+    const timeLabel = minutes => {
+      const hour = Math.floor(minutes / 60), minute = minutes % 60;
+      return String(hour % 12 || 12) + ":" + String(minute).padStart(2, "0") + (hour < 12 ? " AM" : " PM");
+    };
+    if (record.unsupportedVersion) return h("div", { className: "card", style: { marginTop: 12, padding: 16 } },
+      h("strong", null, "Commute preferences need a newer app version."),
+      h("div", { className: "meta" }, "Existing preferences have been left untouched."));
+    if (!draft) return h("div", { className: "card", style: { marginTop: 12 } },
+      h("div", { className: "card-h" }, "Commute routines"),
+      h("div", { style: { padding: "8px 16px 14px" } },
+        h("div", { className: "meta", style: { marginBottom: 10 } },
+          "Save your usual routes, trains, and travel times. Daily alerts are coming in a later update."),
+        record.profiles.map(p => h("div", { key: p.id, className: "row", style: {
+          borderTop: "1px solid var(--border)", padding: "9px 0", alignItems: "center"
+        } },
+          h("div", { style: { minWidth: 0 } },
+            h("strong", null, p.name),
+            h("div", { className: "meta" }, names[p.from].name + " → " + names[p.to].name),
+            h("div", { className: "meta" }, p.preferredTrains.length
+              ? "Trains " + p.preferredTrains.join(", ") : "Select preferred trains")),
+          h("button", { className: "btn ghost", onClick: () => begin(p),
+            "aria-label": "Edit " + p.name }, "Edit")
+        )),
+        h("button", { className: "btn outline", onClick: () => begin(null),
+          style: { marginTop: 8 } }, "Add commute")
+      ));
+    const trains = VRECommutes.choices(VRECore, draft.from, draft.to);
+    const checkDay = (day, enabled) => change("days",
+      enabled ? [...new Set([...draft.days, day])].sort((a, b) => a - b) : draft.days.filter(d => d !== day));
+    const checkTrain = (num, enabled) => change("preferredTrains", enabled
+      ? [...new Set([...draft.preferredTrains, num])] : draft.preferredTrains.filter(t => t !== num));
+    const selectMode = field("How you get there", h("select", { value: draft.mode, onChange: e => change("mode", e.target.value) },
+      h("option", { value: "walk" }, "Walk"), h("option", { value: "drive" }, "Drive"),
+      h("option", { value: "other" }, "Other")));
+    return h("div", { className: "card", style: { marginTop: 12 } },
+      h("div", { className: "card-h" }, "Edit commute routine"),
+      h("div", { style: { padding: 16, display: "grid", gap: 12 } },
+        field("Name", h("input", { type: "text", maxLength: 48,
+          value: draft.name, onChange: e => change("name", e.target.value) })),
+        h("div", { className: "row", style: { gap: 8 } },
+          selectStation("from", "Board at"), selectStation("to", "Get off at")),
+        h("div", { className: "meta" }, "Preferred trains (select one or more)"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, maxHeight: 170, overflowY: "auto" } },
+          trains.length ? trains.map(t => h("label", { key: t.num, className: "chip",
+            style: { display: "flex", alignItems: "center", gap: 6 } },
+            h("input", { type: "checkbox", checked: draft.preferredTrains.includes(t.num),
+              onChange: e => checkTrain(t.num, e.target.checked) }),
+            t.num + " · " + timeLabel(t.departureMinutes))) :
+            h("span", { className: "stale-note" }, "No direct trains for this route.")),
+        selectMode,
+        h("div", { className: "row", style: { gap: 8 } },
+          numeric("travelMinutes", "Travel (min)", 180),
+          numeric("platformMinutes", "To platform (min)", 60),
+          numeric("bufferMinutes", "Safety (min)", 60)),
+        field("Planned daily check-in (Eastern; not active yet)", h("input", {
+          type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
+        })),
+        h("div", { className: "meta" }, "Typical commuting days"),
+        h("div", { style: { display: "flex", flexWrap: "wrap", gap: 9 } },
+          days.map((label, day) => h("label", { key: day, className: "chip",
+            style: { display: "flex", alignItems: "center", gap: 5 } },
+            h("input", { type: "checkbox", checked: draft.days.includes(day),
+              onChange: e => checkDay(day, e.target.checked) }), label))),
+        h("div", { className: "meta" },
+          "Saved locally only. This version does not activate alarms, notifications, or background polling."),
+        error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
+        h("div", { className: "row", style: { gap: 8 } },
+          h("button", { className: "btn", onClick: save }, "Save commute"),
+          h("button", { className: "btn outline", onClick: () => { setDraft(null); setError(""); } }, "Cancel")),
+        record.profiles.some(p => p.id === draft.id) ? h("button", {
+          className: "btn ghost", style: { color: "var(--red)", alignSelf: "start" }, onClick: remove
+        }, confirmRemove ? "Confirm remove commute" : "Remove commute") : null
+      ));
+  }
+
+  /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes }) {
+    const open = name => onSection(name);
+    return html`
+      <section className="preferences" aria-label="Preferences">
+        ${!section ? html`
+          <div className="card">
+            <div className="card-h">Preferences</div>
+            <div className="pref-list">
+              <button className="pref-choice" type="button" onClick=${() => open("commute")}>
+                <span><strong>Commute</strong>
+                  <small>Home and destination stations · standard timetable</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+              <button className="pref-choice" type="button" onClick=${() => open("advanced")}>
+                <span><strong>Advanced Commute</strong>
+                  <small>Preferred trains, travel times, and planned alerts</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </div>`
+        : html`
+          <button className="pref-back" type="button" onClick=${() => onSection(null)}>
+            <span aria-hidden="true">‹</span> Preferences
+          </button>
+          ${section === "commute" ? html`
+            <div className="card">
+              <div className="card-h">Commute</div>
+              <p className="pref-description">
+                Choose your usual stations. The timetable automatically shows your morning direction
+                and the return trip in the afternoon. No alerts are enabled here.
+              </p>
+              <${RouteSetup} initial=${route}
+                onSave=${r => { onSaveRoute(r); onSection(null); }}
+                onCancel=${() => onSection(null)} />
+            </div>`
+          : html`
+            <div className="card">
+              <div className="card-h">Advanced Commute</div>
+              <p className="pref-description">
+                Save specific trains, travel times, and a future check-in schedule.
+                These settings do not enable notifications or background monitoring yet.
+              </p>
+            </div>
+            <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
+        `}
+      </section>`;
+  }
+
+  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
     const service = isServiceDay(new Date(now));
@@ -1076,8 +1386,6 @@
           <span style=${{ display: "flex", gap: 2 }}>
             <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onFlip}
               aria-label="Swap direction"><${FlipIcon} /></button>
-            <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onEdit}
-              aria-label="Edit commute"><${GearIcon} /></button>
           </span>
         </div>
         <div style=${{ padding: "4px 8px 8px" }}>
@@ -1876,7 +2184,13 @@
       return a !== b && ALL_CODES.includes(a) && ALL_CODES.includes(b) ? { a, b } : null;
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
-    const [editRoute, setEditRoute] = useState(false);
+    const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const saveCommutes = next => {
+      if (!VRECommutes.save(localStorage, next, VRECore)) return false;
+      setCommutes(next);
+      return true;
+    };
+    const [preferencesSection, setPreferencesSection] = useState(null);
     const [flipDir, setFlipDir] = useState(widgetRoute ? false : null); // null = auto by time of day
     const [boardSta, setBoardSta] = useState(() => {
       const requested = window.location.pathname === "/__vre_android__/app/index.html"
@@ -2197,6 +2511,21 @@
           </div>
         </div>
 
+        <nav className="tabs" role="tablist" aria-label="VRE Live navigation">
+          <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
+            onClick=${() => setTab("map")}>Map</button>
+          <button className=${tab === "sched" ? "on" : ""} role="tab" aria-selected=${tab === "sched"}
+            onClick=${() => setTab("sched")}>Schedule</button>
+          <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
+            onClick=${() => setTab("board")}>Board</button>
+          <button className=${"pref-nav " + (tab === "preferences" ? "on" : "")}
+            role="tab" aria-selected=${tab === "preferences"}
+            aria-label="Preferences" title="Preferences"
+            onClick=${() => { setPreferencesSection(null); setTab("preferences"); }}>
+            <${GearIcon} />
+          </button>
+        </nav>
+
         ${alerts.length > 0 && html`
           <div className="card fade" style=${{ marginBottom: 12, borderColor: "#713f12" }}>
             <div className="card-h" style=${{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 7 }}>
@@ -2232,38 +2561,38 @@
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
 
-        ${!myTrip && html`
+        ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
-            ${route && !editRoute
+            ${route
               ? (() => {
-                  // round trip: mornings show home -> destination, afternoons the return
+                  // Keep the existing default timetable and direction flip unchanged.
                   const autoReturn = new Date(now).getHours() >= 12;
                   const showReturn = flipDir === null ? autoReturn : flipDir;
                   return html`<${CommuteCard}
                     from=${showReturn ? route.b : route.a} to=${showReturn ? route.a : route.b}
-                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)} now=${now} liveByTrip=${liveByTrip}
-                    onEdit=${() => setEditRoute(true)}
+                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
+                    now=${now} liveByTrip=${liveByTrip}
                     onFlip=${() => setFlipDir(!showReturn)}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
               : html`<div className="card">
-                  <div className="card-h">${route ? "Edit commute" : "Set up your commute"}</div>
-                  <${RouteSetup} initial=${route}
-                    onSave=${r => { lsSet(ROUTE_KEY, r); setRoute(r); setEditRoute(false); setFlipDir(null); }}
-                    onCancel=${route ? (() => setEditRoute(false)) : null} />
+                  <div className="card-h">Set up your commute</div>
+                  <p className="pref-description">Save your usual stations to show your next departures here.</p>
+                  <div style=${{ padding: "0 16px 16px" }}>
+                    <button className="btn" onClick=${() => {
+                      setPreferencesSection("commute"); setTab("preferences");
+                    }}>Set up commute</button>
+                  </div>
                 </div>`}
           </div>`}
 
-        <div className="tabs" role="tablist">
-          <button className=${tab === "map" ? "on" : ""} role="tab" aria-selected=${tab === "map"}
-            onClick=${() => setTab("map")}>Map</button>
-          <button className=${tab === "sched" ? "on" : ""} role="tab" aria-selected=${tab === "sched"}
-            onClick=${() => setTab("sched")}>Schedule</button>
-          <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
-            onClick=${() => setTab("board")}>Board</button>
-        </div>
-
-        ${tab === "map" ? html`
+        ${tab === "preferences" ? html`
+          <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
+            route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
+            onSaveRoute=${r => {
+              lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
+            }} />`
+        : tab === "map" ? html`
           <div className="card">
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
@@ -2322,7 +2651,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, SummaryCard, Sparkline, Marey, BoardCard };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
