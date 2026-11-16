@@ -24,7 +24,7 @@ assert.equal((appScript.match(/<\$\{RouteSetup\}/g) || []).length, 1,
 assert.equal((appScript.match(/<\$\{CommuteProfiles\}/g) || []).length, 1,
   "advanced commute editor exists only within Preferences");
 assert.match(appScript, /No alerts are enabled here/, "basic commute does not promise alerts");
-assert.match(appScript, /does not enable notifications or background monitoring yet/,
+assert.match(appScript, /do not enable notifications or background monitoring yet/,
   "advanced commute does not promise live alerts");
 const coreContext = runInNewContext(script("vre-core") + "\n;globalThis");
 const prefContext = runInNewContext(script("vre-commutes") + "\n;globalThis");
