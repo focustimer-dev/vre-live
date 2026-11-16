@@ -9,6 +9,23 @@ const script = id => {
   assert.ok(hit, "missing inline runtime script " + id);
   return hit[1];
 };
+const appScript = script("vre-app");
+assert.doesNotThrow(() => new (await import("node:vm")).Script(appScript), "App JavaScript parses");
+assert.match(appScript, /function PreferencesPanel\(/, "Preferences panel exists");
+assert.match(appScript, /<\$\{PreferencesPanel\}/, "Preferences panel is routed");
+assert.match(appScript, /tab === "preferences"/, "Preferences is a distinct tab");
+assert.match(appScript, /setPreferencesSection\("commute"\); setTab\("preferences"\)/,
+  "Commute gear goes to simple preferences");
+assert.match(appScript, /<\$\{CommuteCard\}/, "existing live timetable remains");
+assert.match(appScript, /onFlip=\$\{\(\) => setFlipDir\(!showReturn\)\}/,
+  "manual timetable direction flip remains");
+assert.equal((appScript.match(/<\$\{RouteSetup\}/g) || []).length, 1,
+  "basic route editor exists only within Preferences");
+assert.equal((appScript.match(/<\$\{CommuteProfiles\}/g) || []).length, 1,
+  "advanced commute editor exists only within Preferences");
+assert.match(appScript, /No alerts are enabled here/, "basic commute does not promise alerts");
+assert.match(appScript, /does not enable notifications or background monitoring yet/,
+  "advanced commute does not promise live alerts");
 const coreContext = runInNewContext(script("vre-core") + "\n;globalThis");
 const prefContext = runInNewContext(script("vre-commutes") + "\n;globalThis");
 const core = coreContext.VRECore, prefs = prefContext.VRECommutes;
