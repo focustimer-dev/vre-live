@@ -16,6 +16,7 @@ Save commuter routines once, confirm intent daily, and only monitor a train afte
 - Existing `vre-live-route` is migrated once into two offline routines, one each direction, *without choosing trains, starting polling, guessing travel times, or changing the original route*. Editing the original round-trip card remains independent until the future UI consolidation.
 - Unknown future storage versions are never overwritten. Storage failures are reported without implying the save succeeded.
 - The profile editor works in PWA and Android Lab; it is **not** a live alert scheduler. No new HTTP requests, alarms, notifications or location access are introduced.
+- The bottom **Preferences** tab contains two paths: **Commute** edits the original home/destination round-trip that powers today's automatic timetable and flip control; **Advanced Commute** edits independent preferred-train and timing routines. The existing route card's gear opens Preferences → Commute. No advanced configuration alters current timetable behavior until later phases.
 
 **Gate A:** `npm run check` passes; Android Lab debug build packages and loads `vre-commutes.js`; existing schedule/map/widget and ride-monitor behavior remains unchanged.
 
