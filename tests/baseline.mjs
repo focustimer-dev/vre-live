@@ -20,5 +20,6 @@ assert.match(page, /ReactDOM\.createRoot/);
 assert.match(sw, /addEventListener\("push"/);
 assert.match(icon, /<svg/);
 assert.match(conf, /name = "vre-live"/);
-assert.match(conf, /crons = \["\* \* \* \* \*"\]/);
+assert.match(conf, /MON-FRI/);
+assert.match(conf, /TUE-SAT/);
 console.log("VRE Live recovered source integrity checks passed");

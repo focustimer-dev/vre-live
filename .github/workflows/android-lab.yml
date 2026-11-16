@@ -5,6 +5,10 @@ on:
     paths:
       - "android-lab/**"
       - "src/index.html"
+      - "src/worker.js"
+      - "tests/**"
+      - "wrangler.toml"
+      - "package.json"
       - ".github/workflows/android-lab.yml"
   push:
     branches: [main]
@@ -18,6 +22,17 @@ permissions:
   contents: read
 
 jobs:
+  service-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify holiday calendar and no-idle-network behavior
+        run: npm run check
+
   debug-apk:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

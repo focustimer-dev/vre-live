@@ -7,7 +7,9 @@ compatibility_date = "2026-08-01"
 workers_dev = true
 
 [triggers]
-crons = ["* * * * *"]
+# UTC windows spanning all scheduled VRE service hours across EDT/EST, including delayed rides.
+# Early Saturday UTC is Friday evening in Eastern time; no Sunday triggers.
+crons = ["* 8-23 * * MON-FRI", "* 0-3 * * TUE-SAT"]
 
 [[kv_namespaces]]
 binding = "RIDES"
