@@ -69,7 +69,9 @@ internal object CommuteCheckIns {
     private fun persistDaily(context: Context, daily: JSONObject) {
         prefs(context).edit().putString(DAY, daily.toString()).apply()
     }
-    fun state(context: Context): String = daily(context).put("type", "state").toString()
+    fun state(context: Context): String = daily(context)
+        .put("type", "state")
+        .put("notificationsAllowed", notificationsAllowed(context)).toString()
 
     private fun notificationsAllowed(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -325,12 +327,17 @@ internal object CommuteCheckIns {
         val state = daily(context)
         state.put("skippedDay", true)
         state.put("planned", JSONObject()).put("confirmed", JSONObject())
-        persistDaily(context, state)
         val manager = context.getSystemService(NotificationManager::class.java)
         val profiles = storedProfiles(context)
+        val skipped = JSONObject()
+        // Remember the whole-day decision for each profile so reactivating one
+        // trip never silently re-enables the afternoon or another saved commute.
         for (i in 0 until profiles.length()) {
-            manager?.cancel(notificationId(profiles.optJSONObject(i)?.optString("id").orEmpty()))
+            val id = profiles.optJSONObject(i)?.optString("id").orEmpty()
+            if (id.isNotEmpty()) { skipped.put(id, true); manager?.cancel(notificationId(id)) }
         }
+        state.put("skippedTrips", skipped)
+        persistDaily(context, state)
         cancelReminders(context)
         reschedule(context)
     }
