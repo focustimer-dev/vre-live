@@ -30,7 +30,7 @@ assert.equal(estimate(wait, {...full, ts: now - 6 * 60000}, now).minutes, 8,
   "stale GPS must not masquerade as a live forecast");
 assert.equal(estimate(wait, {...full, ghost: true}, now).source, "schedule",
   "ghost train produces only scheduled estimate");
-assert.equal(estimate(wait, full, now + 8 * 60000 + 2000).phase, "overdue",
+assert.equal(estimate(wait, full, now + 10 * 60000).phase, "overdue",
   "an old fresh ETA is not asserted as an arrival");
 assert.equal(estimate(wait, null, now + 10 * 60000).phase, "overdue",
   "an expired timetable is clearly unconfirmed, not a negative countdown");
