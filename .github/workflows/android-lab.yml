@@ -82,8 +82,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
-      - name: Build unsigned release APK
-        run: gradle -p android-lab :app:assembleRelease --no-daemon
+      - name: Build unsigned release APK with increasing version code
+        run: gradle -p android-lab :app:assembleRelease -PvreLabRunNumber=${{ github.run_number }} --no-daemon
       - name: Align, sign, and verify release APK
         shell: bash
         env:
@@ -103,7 +103,7 @@ jobs:
           printf '%s\n' "$KEYSTORE_PASSWORD" > "$temp/key-password.txt"
           tools="${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools/35.0.0"
           unsigned="android-lab/app/build/outputs/apk/release/app-release-unsigned.apk"
-          signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.11-signed.apk"
+          signed="android-lab/app/build/outputs/apk/release/VRE-Live-Lab-signed.apk"
           test -s "$unsigned"
           "$tools/zipalign" -p -f 4 "$unsigned" "$temp/aligned.apk"
           "$tools/apksigner" sign \
@@ -121,10 +121,20 @@ jobs:
             exit 1
           fi
           echo "Release certificate fingerprint matched."
+          # Reject accidental package changes and non-monotonic signed build numbers.
+          package="$("$tools/aapt" dump badging "$signed" | sed -n "s/^package: name='\\([^']*\\)'.*/\\1/p")"
+          actual_code="$("$tools/aapt" dump badging "$signed" | sed -n "s/^package: .*versionCode='\\([^']*\\)'.*/\\1/p")"
+          expected_code="$((100000 + GITHUB_RUN_NUMBER))"
+          if [[ "$package" != "work.samelling.vrelive.lab" || "$actual_code" != "$expected_code" ]]; then
+            echo "::error::Signed package identity/version mismatch: $package / $actual_code, expected $expected_code."
+            exit 1
+          fi
+          echo "Signed upgrade verified: $package · versionCode $actual_code."
+          echo "This signed APK supports data-preserving upgrades from prior Lab APKs with the same signing certificate."
       - name: Upload verified release-signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: vre-live-lab-0.1.11-signed-release-apk
-          path: android-lab/app/build/outputs/apk/release/VRE-Live-Lab-0.1.11-signed.apk
+          name: vre-live-lab-signed-${{ github.run_number }}
+          path: android-lab/app/build/outputs/apk/release/VRE-Live-Lab-signed.apk
           if-no-files-found: error
           retention-days: 14
