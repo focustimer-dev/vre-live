@@ -2271,7 +2271,7 @@
   }
 
   /* ---------------- bottom sheet: train details / destination picker ---------------- */
-  function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, onDest, onWait, onClose }) {
+  function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, error, onDest, onWait, onClose }) {
     const boardingIndex = train.stops.findIndex(s => s.code === boardingStation);
     const future = VRECore.remainingStops(train, now).filter(s =>
       train.stops.findIndex(stop => stop.code === s.code) > boardingIndex);
@@ -2329,6 +2329,7 @@
           <button className="btn" disabled=${!destination || busy || (waiting && !waitStop)} onClick=${() => destination && (waiting ? onWait(destination.code) : onDest(destination.code))}>
             ${waiting ? (destination ? "Wait for train at " + destination.name : "Choose your boarding station") : busy ? "Updating ride…" : destination ? `${switching ? "Switch train" : sameRide ? "Update destination" : "Start arrival countdown"} · ${destination.name}` : "Choose a destination"}
           </button>
+          ${error && html`<div className="stale-note" role="alert" style=${{ marginTop: 8 }}>${error}</div>`}
           <div className="meta" style=${{ marginTop: 7, fontSize: "var(--fs-1)" }}>${waiting ? "You'll see an arrival countdown while waiting; the estimate may be scheduled or live." : boardingNow ? "Your destination countdown starts once you select a stop." : "You choose when to end the ride."}</div>
         </div>
       </div>`;
@@ -2487,6 +2488,7 @@
     const myTrain = myTrip ? observedTrain || (myTrip.snapshot ? { ...myTrip.snapshot, signalLost: true }
       : ghostTrains.find(t => t.tripId === myTrip.tripId) || null) : null;
     const [rideBusy, setRideBusy] = useState(false);
+    const [rideStartError, setRideStartError] = useState(null);
     useEffect(() => {
       if (observedTrain) setMyTrip(m => m ? { ...m, snapshot: observedTrain } : m);
     }, [observedTrain]);
@@ -2566,7 +2568,12 @@
       setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false);
     };
     const startRide = async code => {
-      if (rideBusy || !selTrain || !VRECore.remainingStops(selTrain, now).some(s => s.code === code)) return;
+      if (rideBusy) return;
+      if (!selTrain || !VRECore.remainingStops(selTrain, Date.now()).some(s => s.code === code)) {
+        setRideStartError("That stop is no longer available for this train. Close and select the train again.");
+        return;
+      }
+      setRideStartError(null);
       const train = selTrain;
       const same = myTrip && (myTrip.tripId === train.tripId || myTrip.tripId === train.sourceTripId);
       if (same && myTrip.dest === code) { setSelected(null); setPicking(false); return; }
@@ -2588,6 +2595,8 @@
           setMyTrip(m => m && m.tripId === next.tripId && m.dest === code && m.boardedAt === next.boardedAt
             ? { ...m, push: !err, pushErr: err } : m);
         }
+      } catch (_) {
+        setRideStartError("Couldn't start arrival tracking. Try again.");
       } finally { setRideBusy(false); }
     };
 
@@ -2830,7 +2839,7 @@
 
         ${selTrain && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
-            activeTrip=${myTrip} busy=${rideBusy}
+            activeTrip=${myTrip} busy=${rideBusy} error=${rideStartError}
             boardingStation=${waitingFor?.trip === selTrain.tripId ? waitingFor.dest : null}
             defaultDest=${route ? ((flipDir === null ? new Date(now).getHours() >= 12 : flipDir) ? route.a : route.b) : null}
             devSamples=${devlog[selTrain.tripId]}
