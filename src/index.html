@@ -78,6 +78,15 @@
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
   .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .waiting-card{margin-bottom:12px}
+  .waiting-body{padding:14px 16px 16px}
+  .waiting-countdown{font-size:clamp(32px,11vw,46px);font-weight:800;letter-spacing:-.04em;
+    line-height:1.15;font-variant-numeric:tabular-nums;margin:2px 0 6px}
+  .waiting-source{margin-top:5px}
+  .waiting-unconfirmed{color:var(--amber)}
+  .waiting-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 5px}
+  .waiting-actions .btn{min-height:48px}
+  .waiting-card .btn.ghost{padding-left:0}
   .today-commute{margin-bottom:12px}
   .today-body{padding:10px 14px 12px}
   .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
@@ -2096,6 +2105,57 @@
               </g>`;
           })}
         </svg>
+      </div>`;
+  }
+
+  /* Countdown to the station where the commuter plans to board, not the destination. */
+  function waitingArrival(waiting, train, now) {
+    if (!waiting) return { phase: "unavailable", eta: null, minutes: null, source: "none" };
+    const stop = train?.stops?.find(s => s.code === waiting.dest);
+    const fresh = !!train && !train.ghost && !train.signalLost && Number.isFinite(train.ts) &&
+      now - train.ts >= -60000 && now - train.ts <= 5 * 60000;
+    const scheduled = Number.isFinite(waiting.scheduled) ? waiting.scheduled : null;
+    const liveEta = fresh && Number.isFinite(stop?.time) ? stop.time : null;
+    const eta = liveEta ?? scheduled ?? (Number.isFinite(stop?.time) ? stop.time : null);
+    const source = liveEta != null ? "live" : eta != null ? "schedule" : "none";
+    if (eta == null) return { phase: "unavailable", eta: null, minutes: null, source };
+    const phase = liveEta != null ? VRECore.rideStatus(train, waiting.dest, now).phase : null;
+    if (phase === "atStop") return { phase: "atStation", eta, minutes: 0, source };
+    if (phase === "passed") return { phase: "passed", eta, minutes: null, source };
+    const left = eta - now;
+    if (left < -90000) return { phase: "overdue", eta, minutes: null, source };
+    if (left <= 0) return { phase: "due", eta, minutes: 0, source };
+    return { phase: "approaching", eta, minutes: Math.max(1, Math.ceil(left / 60000)), source };
+  }
+
+  function WaitingCard({ waiting, train, now, onBoard, onStop, lockButton, lockError }) {
+    const arrival = waitingArrival(waiting, train, now);
+    const station = STATIONS[waiting.dest]?.name || "your station";
+    const number = arrival.phase === "approaching" ? arrival.minutes + " min" :
+      arrival.phase === "atStation" ? "At station" :
+      arrival.phase === "due" ? "Due now" :
+      arrival.phase === "passed" ? "Train passed" :
+      arrival.phase === "overdue" ? "Awaiting update" : "ETA unavailable";
+    const confidence = arrival.source === "live" ? "Live arrival estimate" :
+      arrival.source === "schedule" ? "Timetable estimate · live arrival unconfirmed" :
+      "No scheduled or live arrival time available";
+    return html`
+      <div className="card waiting-card" role="status" aria-live="polite" aria-atomic="false">
+        <div className="card-h">Waiting at ${station} · Train ${waiting.num}</div>
+        <div className="waiting-body">
+          <div className="waiting-countdown" aria-label=${"Estimated train arrival: " + number}>${number}</div>
+          <div className="meta">Train ${waiting.num} ${arrival.eta != null
+            ? "expected at " + fmtClock(arrival.eta) : "arrival not available"}</div>
+          <div className=${"meta waiting-source" + (arrival.source !== "live" ? " waiting-unconfirmed" : "")}>
+            ${confidence}
+          </div>
+          <div className="waiting-actions">
+            <button className="btn" onClick=${onBoard}>I've boarded · choose destination</button>
+            <button className="btn outline" onClick=${onStop}>Stop waiting</button>
+          </div>
+          ${lockButton}
+          ${lockError}
+        </div>
       </div>`;
   }
 
