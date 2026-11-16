@@ -28,6 +28,7 @@ assert.ok(app.includes('type: "sync", version: 1, profiles: next.profiles, promp
 assert.ok(app.includes('type: "sync", version: 1, profiles: commutes.profiles, prompt: false'),
   "app startup does not request notification permission");
 assert.ok(app.includes('Select at least one train before enabling check-ins.'), "opt-in needs selected train");
+assert.match(app, /Daily check-in notifications are available in the Android app/, "PWA makes local-only limitation explicit");
 assert.ok(app.includes('function TodayCommute('), "manual recovery/choice UI exists");
 assert.ok(app.includes('onAction("reactivate", p.id)'), "manual recovery from skip");
 assert.ok(app.includes('onAction("skipTrip", selected.id)'), "one-trip skip exists");
