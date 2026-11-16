@@ -79,6 +79,8 @@ const passed = plan(profile,"310",{[train.trip]:{
 assert.equal(passed.state,"departed","train past boarding stop is not still catchable");
 assert.equal(plan({...profile,travelMinutes:0,platformMinutes:0,bufferMinutes:0}).state,
   "needs-travel-time","no misleading prediction before travel time is set");
+assert.equal(plan({...profile,travelMinutes:0,platformMinutes:0,bufferMinutes:5}).state,
+  "needs-travel-time","default safety buffer without travel time is not a configured commute");
 assert.equal(plan(profile,"9999").state,"invalid-train");
 assert.equal(plan(profile,"310",{}, {}, time("2026-11-15T11:45:00Z")).state,
   "no-service","weekends do not show a leave countdown");
