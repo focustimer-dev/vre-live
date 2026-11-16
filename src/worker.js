@@ -403,7 +403,10 @@ var manifest_default = {
   for (let year = 2026; year <= 2040; year++) SCHEDULE.noService.push(...vreNoServiceDates(year));
   SCHEDULE.noService = [...new Set(SCHEDULE.noService)].sort();
   // VRE's published S-service dates; do not treat these as full closures.
-  SCHEDULE.reducedService = ["20261224", "20261229", "20261230", "20261231"];
+  SCHEDULE.reducedService = ["20260703", "20261224", "20261229", "20261230", "20261231"];
+  // S trains from VRE's May 4, 2026 reduced-service timetable.
+  SCHEDULE.sTrains = new Set(["302", "306", "310", "314", "301", "305", "309", "313",
+    "324", "328", "330", "334", "325", "329", "333", "335"]);
 
   function isServiceDay(d) {
     const dow = new Intl.DateTimeFormat("en-US", {
