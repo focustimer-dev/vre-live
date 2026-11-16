@@ -1066,7 +1066,7 @@
     const travel = Number(profile.travelMinutes), platform = Number(profile.platformMinutes),
       buffer = Number(profile.bufferMinutes);
     if (![travel, platform, buffer].every(n => Number.isInteger(n) && n >= 0) ||
-        travel + platform + buffer <= 0)
+        travel + platform <= 0)
       return { state: "needs-travel-time", scheduled };
     const lead = travel + platform + buffer;
     const live = liveByTrip?.[trip.trip] || null;
