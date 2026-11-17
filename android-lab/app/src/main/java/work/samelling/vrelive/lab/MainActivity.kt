@@ -220,10 +220,19 @@ class MainActivity : Activity() {
             "state" -> { /* state is returned below */ }
             "sync" -> {
                 if (!CommuteCheckIns.sync(this, message)) return
-                val enabled = message.optJSONArray("profiles")?.let { array ->
-                    (0 until array.length()).any { array.optJSONObject(it)?.optBoolean("checkInEnabled") == true }
-                } == true
-                if (enabled && message.optBoolean("prompt") && Build.VERSION.SDK_INT >= 33 &&
+                val settings = message.optJSONObject("alerts")
+                val enabled = CommuteCheckIns.enabled(this)
+                if (!enabled) {
+                    alertArmed = false
+                    alertPermissionReply = null
+                    lockKey = null
+                    getSystemService(NotificationManager::class.java)?.cancel(1)
+                    getSystemService(NotificationManager::class.java)?.cancel(lockNotification)
+                    stopService(Intent(this, RideMonitor::class.java))
+                }
+                if (enabled && (settings?.optBoolean("checkIns") == true ||
+                        settings?.optBoolean("arrival") == true) &&
+                    message.optBoolean("prompt") && Build.VERSION.SDK_INT >= 33 &&
                     checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 ) {
                     commutePromptPending = true
@@ -245,7 +254,8 @@ class MainActivity : Activity() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
         when (data) {
             "status" -> {
-                reply.postMessage(if (RideMonitor.activeKey != null) "armed" else "off")
+                reply.postMessage(if (!CommuteCheckIns.enabled(this)) "blocked"
+                    else if (RideMonitor.activeKey != null) "armed" else "off")
                 return
             }
             "cancel" -> {
@@ -256,6 +266,10 @@ class MainActivity : Activity() {
                 return
             }
             "arm" -> {
+                if (!CommuteCheckIns.enabled(this)) {
+                    reply.postMessage("blocked")
+                    return
+                }
                 if (alertPermissionReply != null) return
                 if (Build.VERSION.SDK_INT >= 33 &&
                     checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -285,6 +299,10 @@ class MainActivity : Activity() {
     }
 
     private fun completeAlertOptIn(reply: JavaScriptReplyProxy) {
+        if (!CommuteCheckIns.enabled(this)) {
+            reply.postMessage("blocked")
+            return
+        }
         val manager = getSystemService(NotificationManager::class.java)
         manager?.createNotificationChannel(
             NotificationChannel(alertChannel, "Ride arrival alerts", NotificationManager.IMPORTANCE_HIGH).apply { enableVibration(true) }
@@ -313,6 +331,10 @@ class MainActivity : Activity() {
     }
 
     private fun handleLockCard(action: String, reply: JavaScriptReplyProxy) {
+        if (action == "show" && !CommuteCheckIns.enabled(this)) {
+            reply.postMessage("blocked")
+            return
+        }
         if (action == "hide") {
             lockKey = null
             lockReply = null
