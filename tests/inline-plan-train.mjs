@@ -75,7 +75,7 @@ assert.match(card, /Plan train <\$\{Chevron\} open=\$\{showDetails\} \/>/,
 assert.doesNotMatch(card, /More options|Fewer options|onChangePlan|onOtherPlans/,
   "no duplicate more-options or secondary full-page planner button");
 assert.match(card, /setSelectedTrain\(r.num\)/, "train selection is separate from confirmation");
-assert.match(card, /disabled=\$\{!selectedRow\} onClick=\$\{confirm\}>Confirm train/,
+assert.match(card, /disabled=\$\{!selectedRow \|\| !minutesValid\} onClick=\$\{confirm\}>Confirm train/,
   "confirmation is explicit and requires a selected train");
 assert.match(card, /const n = travelOverride \?\? candidateProfile\?\.travelMinutes/,
   "Advanced travel minutes win over fallback");
@@ -85,6 +85,39 @@ assert.match(card, /id="commute-plan-minutes"/, "travel time is an editable nume
 assert.ok(card.indexOf('id="commute-plan-minutes"') >
   card.indexOf('className="commute-extra-label"'),
   "travel time appears after train and other options");
+const travelIndex = card.indexOf('className="commute-plan-travel"');
+const confirmIndex = card.indexOf('>Confirm train</button>');
+const chartIndex = card.indexOf('Time-space chart');
+assert.ok(travelIndex > 0 && travelIndex < confirmIndex && confirmIndex < chartIndex,
+  "time to station is above Confirm train, and optional time-space chart is the last action");
+assert.match(card, /className="commute-plan-travel-stepper"/,
+  "travel-time control is one compact stepper, not a floating browser form field");
+assert.match(card, /aria-label="Decrease travel time by one minute"/);
+assert.match(card, /aria-label="Increase travel time by one minute"/);
+assert.match(card, /onClick=\$\{\(\) => adjustMinutes\(-1\)\}/);
+assert.match(card, /onClick=\$\{\(\) => adjustMinutes\(1\)\}/);
+assert.match(card, /const minutesValid = \/\^\\d\{1,3\}\$\//,
+  "editable field rejects empty or malformed numeric drafts");
+assert.match(card, /enteredMinutes >= 1 && enteredMinutes <= 180/,
+  "travel time has a bounded valid range");
+assert.match(card, /aria-invalid=\$\{!minutesValid\}/,
+  "screen readers know when manual travel-time input is invalid");
+assert.match(card, /onBlur=\$\{restoreMinutes\}/,
+  "invalid partial typing restores the last valid value on blur");
+assert.match(card, /setMinutesDraft\(String\(normalized\)\)/,
+  "saved Advanced travel time and 10-minute fallback sync into the displayed control");
+assert.match(card, /setMinutesDraft\(String\(next\)\)/,
+  "stepper updates editable text and confirmed numeric state together");
+assert.match(card, /disabled=\$\{!selectedRow \|\| !minutesValid\}/,
+  "invalid minute values prevent confirmation");
+assert.match(card, /aria-expanded=\$\{showMarey\}/,
+  "time-space chart disclosure remains keyboard- and touch-accessible");
+assert.match(css, /\.commute-plan-step\{[^}]*width:48px;height:48px;/s,
+  "each minus/plus stepper button has a 48px minimum Android hit area");
+assert.match(css, /\.commute-plan-travel-value input:focus-visible\{outline:2px solid var\(--focus\)/,
+  "numeric input has a visible theme-aware keyboard focus ring");
+assert.doesNotMatch(css, /\.commute-plan-travel-input\{/,
+  "the obsolete unthemed-looking number box styles are removed");
 assert.match(card, /\.filter\(\(\) => !nextAdvanced \|\| nextAdvanced.today \|\| !!planned\)/,
   "tomorrow's saved trains must not be planned as if today were service day");
 assert.match(app, /nextScheduled\(\s*commutes.profiles, commuteDay, now, VRECore, VRELeaveBy\)/,
