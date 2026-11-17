@@ -393,8 +393,20 @@
   .sched-filters{flex-wrap:wrap}
   .eta-hero>.row{flex-wrap:wrap}
   .switch::before{content:"";position:absolute;inset:-9px 0}
-  button:focus-visible,select:focus-visible,.train:focus-visible{
+  button:focus-visible,select:focus-visible{
     outline:2px solid var(--focus);outline-offset:3px}
+  /* An SVG group's bounding box is rectangular even when its train badge is
+     circular. Show the focus state on the badge's halo rather than that box. */
+  .sysmap .train:focus,.sysmap .train:focus-visible,
+  .sysmap .your-train-focus:focus,.sysmap .your-train-focus:focus-visible{
+    outline:none}
+  .sysmap .train:focus .halo,.sysmap .train:focus-visible .halo{
+    opacity:1;stroke:var(--focus);stroke-width:2.8}
+  /* The selected ride has a rectangular callout; focus its actual visible
+     callout rather than the full invisible SVG group. */
+  .sysmap .your-train-focus:focus > rect,
+  .sysmap .your-train-focus:focus-visible > rect{
+    stroke:var(--focus);stroke-width:3}
   .map-legend{display:flex;flex-wrap:wrap;gap:7px 16px;padding:0 16px 12px;
     color:var(--muted);font-size:var(--fs-2);line-height:1.4}
   .map-legend span{display:inline-flex;align-items:center;gap:7px}
@@ -436,7 +448,7 @@
   .journey-foot{font-size:12px;color:var(--muted);padding:0 10px 12px}
   @media(max-width:350px){.journey-head{gap:6px;padding-left:4px;padding-right:4px}.journey-title{gap:7px}.journey-title strong{font-size:21px}.journey-views button{padding:0 7px}.journey-icon{width:29px}}
   @media(prefers-reduced-motion:reduce){.journey-map.focused{animation:none}.journey-map .train{transition:none}}
-  .your-train-focus{cursor:pointer}.your-train-focus:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+  .your-train-focus{cursor:pointer}
 
   /* Every actionable surface and metadata label is theme-driven, including sheets,
      map interactions and the accessible two-choice appearance picker. */
@@ -460,6 +472,62 @@
   .theme-swatch.nord{background:#ECEFF4;color:#2E3440;box-shadow:inset 0 0 0 6px #D8DEE9}
   .theme-selected{margin-left:auto;font-size:var(--fs-2);font-weight:800;color:var(--fg)}
   .theme-hint{margin:0 14px 16px;font-size:var(--fs-2);color:var(--muted)}
+.ride-eta{position:relative;padding:13px 14px 10px;text-align:center}
+  .ride-status{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;
+    gap:6px;min-height:28px;padding-left:42px}
+  .ride-status .badge{font-size:var(--fs-1)}
+  .ride-eta .eta-big{margin:3px 0 1px;font-size:clamp(34px,11vw,50px)}
+  .ride-eta .eta-sub{line-height:1.3}
+  .ride-eta .prog{margin:11px 3px 2px}
+  .ride-eta .prog-lbls{margin:5px 3px 0}
+  .ride-notifications{position:absolute;left:7px;top:5px;z-index:5;
+    display:flex;align-items:center;gap:2px;max-width:calc(100% - 14px);
+    min-height:44px;border-radius:13px}
+  .ride-notifications.expanded{padding-right:4px;background:var(--sheet-bg);
+    box-shadow:0 5px 18px var(--card-shadow);backdrop-filter:blur(10px)}
+  .ride-control{appearance:none;border:0;background:transparent;color:var(--muted-2);
+    border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+    flex:none;min-width:44px;min-height:44px;padding:8px;cursor:pointer;
+    transition:color .15s,background .15s}
+  .ride-control:active{background:var(--surface-hover)}
+  .ride-control.on{color:var(--green);background:var(--surface-hover)}
+  .ride-control:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
+  .ride-control.alert-toggle{min-width:70px;font-size:var(--fs-1);font-weight:750;
+    padding:8px 6px}
+  .ride-control.alert-toggle.on{color:var(--green)}
+  .ride-state-dot{width:5px;height:5px;border-radius:50%;background:currentColor;margin-left:5px}
+  .ride-notifications .icon-btn{appearance:none;border:0;background:transparent;
+    border-radius:10px;min-width:44px;min-height:44px;width:44px;height:44px;
+    color:var(--muted-2);box-shadow:none}
+  .ride-notifications .icon-btn.on{color:var(--green);background:var(--surface-hover)}
+  .ride-notifications .icon-btn:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
+  .ride-stop-button{appearance:none;display:inline-flex;justify-content:center;
+    align-items:center;flex-wrap:wrap;gap:4px;min-height:44px;max-width:100%;
+    padding:4px 6px;border:0;background:transparent;color:var(--muted);
+    font:inherit;font-size:var(--fs-2);cursor:pointer;border-radius:8px}
+  .ride-stop-button strong{color:var(--fg);font-weight:750;
+    text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
+  .ride-stop-button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .ride-stop-button:active{background:var(--surface-hover)}
+  .ride-quick-actions{display:flex;align-items:center;justify-content:flex-end;
+    gap:4px;margin-top:3px;min-height:44px}
+  .ride-quick-actions .ride-control{color:var(--fg)}
+  .ride-quick-actions .ride-exit{color:var(--red)}
+  .ride-sparse{padding:15px 15px 10px}
+  .ride-sparse .eta-sub{margin:8px 0}
+  .switch-trains-list{max-height:46vh;min-height:0;overflow-y:auto;margin:12px -6px 0}
+  .switch-train-option{appearance:none;width:100%;display:flex;align-items:center;
+    justify-content:space-between;gap:10px;min-height:60px;padding:11px 10px;
+    background:transparent;color:var(--fg);border:0;
+    border-bottom:1px solid var(--line-separator);text-align:left;font:inherit;cursor:pointer}
+  .switch-train-option:active{background:var(--surface-hover)}
+  .switch-train-option:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+  .switch-train-option strong{display:block;font-size:var(--fs-3)}
+  .switch-train-option small{display:block;font-size:var(--fs-2);color:var(--muted)}
+  .switch-train-option .switch-time{font-size:var(--fs-2);font-weight:700;white-space:nowrap}
+  .switch-sheet .switch-actions{display:flex;gap:8px;margin-top:12px}
+  .switch-sheet .switch-actions .btn{min-height:44px}
+  @media (prefers-reduced-motion:reduce){.ride-control{transition:none}}
 </style>
 </head>
 <body>
@@ -2415,7 +2483,7 @@
              onClick=${() => onPick(g.tripId)} tabIndex="0" role="button"
              aria-pressed=${sel || mine}
              aria-label=${`Train ${g.num}, scheduled position, not reporting`}
-             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(g.tripId); }}>
+             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(g.tripId); } }}>
             <g className="pop">
               <circle cx="0" cy="0" r="31" fill="transparent"/>
               ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4"/>`}
@@ -2443,7 +2511,7 @@
                onClick=${() => onPick(t.tripId)} tabIndex="0" role="button"
                aria-pressed=${sel || mine}
                aria-label=${`Train ${t.num}, ${t.lineName}, ${up ? "toward DC" : "outbound"}${projected ? ", projected position" : ""}`}
-               onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(t.tripId); }}>
+               onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(t.tripId); } }}>
               <g className="pop">
                 ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4" opacity="0.95"/>`}
                 ${projected && !mine && html`
@@ -2733,23 +2801,60 @@
       <path d="M11 18.5h2"/>
     </svg>`;
 
-  function EtaBanner({ train, dest, notify, pushActive, pushErr, wake, now, onNotify, onWake, onChange, onLeave, lockButton, lockError }) {
-    const [showSet, setShowSet] = useState(false);
+const ExitTrainIcon = () => html`
+    <svg width="27" height="27" viewBox="0 0 28 28" fill="none"
+      aria-hidden="true" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.9" y="3.2" width="7.5" height="21.5" rx="2.3" strokeWidth="1.7"/>
+      <path d="M4.2 7.4h2.9M4.2 11h2.9" strokeWidth="1.5"/>
+      <circle cx="17.5" cy="5.6" r="2.8" fill="currentColor" stroke="none"/>
+      <path d="M16.6 10l-4 4.2 4.6 3.1 2.5-4.3m-3.1-3 4 2.2 3.1 3.9"
+        strokeWidth="2.7"/>
+      <path d="M17.2 17.3l5.1 6.5m-5.1-6.5-4.4 7.1M12.6 14.2l-2.2 3"
+        strokeWidth="2.7"/>
+    </svg>`;
+  const ReverseTrainIcon = () => html`
+    <svg width="25" height="25" viewBox="0 0 24 24" fill="none"
+      aria-hidden="true" stroke="currentColor" strokeWidth="2.1"
+      strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 8.1h13l-3.4-3.4M18 8.1l-3.4 3.4"/>
+      <path d="M19 15.9H6l3.4 3.4M6 15.9l3.4-3.4"/>
+    </svg>`;
+  function RideQuickActions({ onSwitchTrain, onLeave }) {
+    return html`
+      <div className="ride-quick-actions" role="group" aria-label="Ride actions">
+        <button type="button" className="ride-control" onClick=${onSwitchTrain}
+          aria-label="Change train" title="Change train">
+          <${ReverseTrainIcon} />
+        </button>
+        <button type="button" className="ride-control ride-exit"
+          onClick=${() => onLeave(true)}
+          aria-label="I'm off the train" title="I'm off the train">
+          <${ExitTrainIcon} />
+        </button>
+      </div>`;
+  }
+
+  function EtaBanner({ train, dest, notify, pushActive, pushErr, wake, now, onNotify, onWake,
+    onChange, onSwitchTrain, onLeave, lockButton, lockActive, lockError }) {
+    const [showTools, setShowTools] = useState(false);
     const stop = train && train.stops.find(s => s.code === dest);
-    if (!train) return html`
-      <div className="card fade"><div className="eta-hero">
+if (!train) return html`
+      <div className="card fade"><div className="eta-hero ride-sparse">
         <div className="eta-sub">Your train is no longer reporting.</div>
-        ${lockButton && html`<div className="ride-bar">${lockButton}</div>`}
+        ${lockActive && lockButton}
         ${lockError}
-        <div style=${{ marginTop: 12 }}><button className="btn outline" onClick=${() => onLeave(true)}>I'm off the train</button></div>
+        <${RideQuickActions} onSwitchTrain=${onSwitchTrain} onLeave=${onLeave} />
       </div></div>`;
     if (!stop) return html`
-      <div className="card fade"><div className="eta-hero">
+      <div className="card fade"><div className="eta-hero ride-sparse">
         <div className="eta-sub">No prediction available for <b>${STATIONS[dest].name}</b> right now.</div>
-        ${lockButton && html`<div className="ride-bar">${lockButton}</div>`}
+        <button className="ride-stop-button" type="button" onClick=${onChange}
+          aria-label="Change destination stop">Change stop <${Chevron} /></button>
+        ${lockActive && lockButton}
         ${lockError}
-        <div className="ride-actions"><button className="btn outline" onClick=${onChange}>Change stop</button><button className="btn" onClick=${() => onLeave(true)}>I'm off the train</button></div>
+        <${RideQuickActions} onSwitchTrain=${onSwitchTrain} onLeave=${onLeave} />
       </div></div>`;
+
 
     const mins = Math.round((stop.time - now) / 60000);
     const state = VRECore.rideStatus(train, dest, now);
@@ -2770,17 +2875,45 @@
     const idxNext = train.stops.findIndex(s => s.time > now);
     const doneCount = idxNext < 0 ? train.stops.length : idxNext;
 
-    return html`
+return html`
       <div className="card fade">
-        <div className="eta-hero">
-          <div className="row" style=${{ justifyContent: "center", gap: 8 }}>
+        <div className="eta-hero ride-eta">
+          <div className=${"ride-notifications" + (showTools ? " expanded" : "")}
+            role="group" aria-label="Ride notification controls">
+            <button type="button" className=${"ride-control ride-bell" + (notify ? " on" : "")}
+              aria-label="Show notification options" title="Notification options"
+              aria-expanded=${showTools} onClick=${() => setShowTools(!showTools)}>
+              <${BellIcon} size=${19} />
+            </button>
+            ${showTools && html`
+              <button type="button" className=${"ride-control alert-toggle" + (notify ? " on" : "")}
+                aria-label=${notify ? "Turn off arrival alerts" : "Turn on arrival alerts"}
+                title=${notify ? "Arrival alerts on" : "Arrival alerts off"}
+                aria-pressed=${notify} onClick=${onNotify}>
+                Alerts ${notify ? "on" : "off"}
+                ${notify && html`<span className="ride-state-dot" aria-hidden="true"></span>`}
+              </button>`}
+            ${canWake && (showTools || wake) && html`
+              <button type="button" className=${"ride-control" + (wake ? " on" : "")}
+                aria-label="Keep screen on" aria-pressed=${wake}
+                title=${wake ? "Screen stays on" : "Keep screen on"}
+                onClick=${onWake}><${ScreenIcon} size=${19} /></button>`}
+            ${(showTools || lockActive) && lockButton}
+          </div>
+          <div className="ride-status">
             <span className=${"badge line-" + train.line}>${train.lineName}</span>
             <span className=${"badge " + statusClass}>${statusText}</span>
           </div>
           <div className=${"eta-big" + (seen ? " hero-stale" : "")}>${hero || html`<span><span key=${mins} className="tick">${mins}</span><small>m</small></span>`}</div>
-          <div className="eta-sub">
-            ${scheduledOnly ? "Scheduled at " : arrived ? "Stopped at " : phase === "passed" ? "Your stop was " : "Destination: "} <b>${stop.name}</b>
-            ${arrived && !scheduledOnly ? "" : html`<span> · <b>${fmtClock(stop.time)}</b></span>`} · Train ${train.num}
+<div className="eta-sub">
+            <button type="button" className="ride-stop-button" onClick=${onChange}
+              aria-label=${"Change destination stop from " + stop.name} title="Change stop">
+              <span>${scheduledOnly ? "Scheduled at" : arrived ? "Stopped at" : phase === "passed" ? "Your stop was" : "Destination:"}</span>
+              <strong>${stop.name}</strong>
+              ${arrived && !scheduledOnly ? "" : html`<span>· ${fmtClock(stop.time)}</span>`}
+              <span>· Train ${train.num}</span>
+              <${Chevron} />
+            </button>
           </div>
           ${train.schedDev > 60000 && html`
             <div className="eta-sub" style=${{ fontSize: "var(--fs-1)", color: "var(--muted-2)", marginTop: 3 }}>
@@ -2804,31 +2937,60 @@
           </div>
           ${(notify || androidRideAlert) && !pushActive && pushErr && html`
             <div className="stale-note" style=${{ marginTop: 8 }}>${androidRideAlert ? pushErr : "Background alerts: " + pushErr}</div>`}
-          <div className="ride-bar">
-            <button className=${"icon-btn" + (notify ? " on glow" : "")} aria-label=${androidRideAlert ? "Alert me for this ride" : "Arrival alerts"}
-              aria-pressed=${notify}
-              title=${androidRideAlert ? "Monitor this ride and alert near your stop" : notify ? (pushActive ? "Alerts on — works with app closed" : "Alerts on") : "Enable arrival alerts"}
-              onClick=${onNotify}><${BellIcon} size=${16} /></button>
-            ${canWake && html`
-              <button className=${"icon-btn" + (wake ? " on" : "")} aria-label="Keep screen on"
-                aria-pressed=${wake} title=${wake ? "Screen stays on" : "Keep screen on"}
-                onClick=${onWake}><${ScreenIcon} size=${16} /></button>`}
-            ${lockButton}
-            <span style=${{ flex: 1 }}></span>
-            <button className=${"icon-btn" + (showSet ? " on" : "")} aria-label="Trip options"
-              aria-expanded=${showSet} onClick=${() => setShowSet(!showSet)}><${GearIcon} /></button>
-          </div>
-          ${lockError}
-          <div className="ride-actions">
-            <button className="btn outline" onClick=${onChange}>Change stop</button>
-            <button className="btn" onClick=${() => onLeave(true)}>I'm off the train</button>
-          </div>
-          ${showSet && html`
-            <div className="fade">
-              <div className="row" style=${{ marginTop: 10, gap: 8 }}>
-                <button className="btn ghost" style=${{ color: "var(--red)" }} onClick=${() => onLeave(false)}>Stop tracking</button>
-              </div>
-            </div>`}
+${lockError}
+          <${RideQuickActions} onSwitchTrain=${onSwitchTrain} onLeave=${onLeave} />
+        </div>
+      </div>`;
+  }
+
+  function SwitchTrainSheet({ rows, currentTrain, now, onPick, onBrowse, onClose }) {
+    const closeRef = useRef(null);
+    useEffect(() => {
+      const previous = document.activeElement;
+      const dismiss = () => { closeRef.current?.click(); return true; };
+      window.vreDismissSheet = dismiss;
+      closeRef.current?.focus();
+      return () => {
+        if (window.vreDismissSheet === dismiss) delete window.vreDismissSheet;
+        if (previous?.isConnected) previous.focus();
+      };
+    }, []);
+    const eligible = rows.filter(r => r.status !== "none" && r.status !== "done"
+      && r.trip !== currentTrain?.tripId && r.num !== currentTrain?.num);
+    const sameDirection = eligible.filter(r => r.dir === currentTrain?.dir);
+    const selected = (sameDirection.length ? sameDirection : eligible).slice(0, 10);
+    return html`
+      <div className="sheet switch-sheet" role="dialog" aria-modal="true"
+        aria-label="Change train" onKeyDown=${e => { if (e.key === "Escape") onClose(); }}>
+        <div className="grab" aria-hidden="true"></div>
+        <div className="row">
+          <div><div className="tnum">Change train</div>
+            <div className="meta">Select a different train, then choose where to get off.</div></div>
+          <button ref=${closeRef} type="button" className="btn ghost"
+            onClick=${onClose} aria-label="Close train picker"><${XIcon} /></button>
+        </div>
+        <div className="switch-trains-list" role="group" aria-label="Other trains">
+          ${selected.length ? selected.map(r => {
+            const stop = (r.live?.stops || VRECore.schedStopsMs(r, now))
+              .find(st => st.time >= now - 60000);
+            const when = stop?.time ?? r.first;
+            const confidence = r.status === "live" && !staleMin(r.live, now)
+              ? "Live" : "Timetable";
+            return html`
+              <button key=${r.trip} type="button" className="switch-train-option"
+                onClick=${() => onPick(r.trip)} aria-label=${"Switch to train " + r.num}>
+                <span><strong>Train ${r.num} · ${r.line === "M" ? "Manassas" : "Fredericksburg"}</strong>
+                  <small>${r.dir === 1 ? "Toward DC" : "Outbound"} · ${confidence}
+                    ${stop ? " · " + stop.name : ""}</small></span>
+                <span className="switch-time">${fmtClock(when)} <${Chevron} /></span>
+              </button>`;
+          }) : html`<div className="meta" style=${{ padding: 12 }}>
+            No other trains are available in the timetable right now.
+          </div>`}
+        </div>
+        <div className="switch-actions">
+          <button className="btn outline" type="button" onClick=${onBrowse}>Full schedule</button>
+          <button className="btn ghost" type="button" onClick=${onClose}>Cancel</button>
         </div>
       </div>`;
   }
@@ -2916,6 +3078,7 @@
     const [tab, setTab] = useState(() =>
       window.location.pathname === "/__vre_android__/app/index.html" && new URLSearchParams(window.location.search).has("board") ? "board" : "map");
     const [selected, setSelected] = useState(null);  // tripId shown in sheet
+    const [switchTrainOpen, setSwitchTrainOpen] = useState(false);
     const [picking, setPicking] = useState(false);
     const [devlog, setDevlog] = useState(() => lsGet(DEV_KEY, {}));
     const widgetRoute = useMemo(() => {
@@ -3161,7 +3324,7 @@
         };
         lsSet(RIDE_KEY, [...lsGet(RIDE_KEY, []), rec].slice(-100));
       }
-      setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false);
+      setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false); setSwitchTrainOpen(false);
     };
     const startRide = async code => {
       if (rideBusy) return;
@@ -3397,7 +3560,9 @@
               pushActive=${!!myTrip.push} pushErr=${myTrip.pushErr || null} wake=${!!myTrip.wake} now=${now}
               onNotify=${toggleNotify} onWake=${toggleWake}
               onChange=${() => { if (myTrain) { setSelected(myTrain.tripId); setPicking(true); } }}
-              onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
+              onSwitchTrain=${() => { setSelected(null); setSwitchTrainOpen(true); }}
+              onLeave=${finishRide} lockButton=${lockControl(true)}
+              lockActive=${lockState === "on"} lockError=${lockError} />
           </div>`}
 
         ${planProfile !== null && todayCard}
@@ -3482,6 +3647,16 @@
               ? `refresh in ${Math.ceil((MIN_FETCH_GAP - (now - lastFetch.current)) / 1000)}s`
               : "refresh now"}</button>
         </div>
+
+${switchTrainOpen && myTrip && html`
+          <${SwitchTrainSheet} rows=${schedRows} currentTrain=${myTrain} now=${now}
+            onPick=${tripId => {
+              setSwitchTrainOpen(false); setSelected(tripId); setPicking(false);
+            }}
+            onBrowse=${() => {
+              setSwitchTrainOpen(false); setSelected(null); setTab("sched");
+            }}
+            onClose=${() => setSwitchTrainOpen(false)} />`}
 
         ${selTrain && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
