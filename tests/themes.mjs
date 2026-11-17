@@ -113,9 +113,10 @@ assert.match(app,/const LINE_COLOR = \{ F: "var\(--line-F\)", M: "var\(--line-M\
 assert.doesNotMatch(app,/#[0-9a-f]{6}\b/i, "map, badges and inline styles must be tokenized");
 
 const assets = read("android-lab/web/build-assets.mjs");
-assert.match(assets,/\["vre-theme", "vre-core"/);
-assert.match(assets,/id === "vre-theme" \? '<script src="vre-theme\.js"><\/script>'/,
-  "Android must package theme bootstrap instead of violating CSP");
+assert.ok(assets.includes("const bootstrapStart ="), "theme bootstrap must be extracted");
+assert.ok(assets.includes('writeFile(join(output, "vre-theme.js"), bootstrapCode)'));
+assert.ok(assets.includes('["vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"]'),
+  "the established source module order is preserved");
 assert.match(assets,/if \(\/<script\(\?!/,"inline script CSP gate remains mandatory");
 const native = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/VreTheme.kt");
 const main = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/MainActivity.kt");
