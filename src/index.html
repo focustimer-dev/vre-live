@@ -2738,6 +2738,143 @@
     return positions;
   }
 
+  // A: Follow Lens. The active ride supplies the lens; never pretend that
+  // position is verified when using schedule-only or stale telemetry.
+  function followLensStops(train, destination, now) {
+    const stops = (train?.stops || []).filter(stop => STATIONS[stop.code]);
+    if (!stops.length) return { stops: [], nextIndex: -1, destination };
+    const next = VRECore.remainingStops(train, now)[0];
+    const idx = next ? stops.findIndex(s => s.code === next.code) : stops.length - 1;
+    const nextIndex = Math.max(0, idx);
+    const start = Math.max(0, Math.min(nextIndex - 1, stops.length - 4));
+    return { stops: stops.slice(start, start + 4),
+      start, nextIndex, destination };
+  }
+  function FollowLens({ train, ride, now, fresh, positionLabel, onPick }) {
+    const view = followLensStops(train, ride?.dest, now);
+    const next = VRECore.remainingStops(train, now)[0];
+    const line = LINE_COLOR[train.line];
+    const yFor = i => 40 + i * 65;
+    const activeLocal = Math.max(0, Math.min(view.stops.length - 1,
+      view.nextIndex - view.start));
+    const activeY = yFor(activeLocal) - (activeLocal > 0 ? 22 : 0);
+    return html`<div className="follow-lens">
+      <div className="lens-eyebrow">
+        <span>${fresh ? "Live train position" : positionLabel}</span>
+        <span className="lens-service">Train ${train.num}</span>
+      </div>
+      <svg className="lens-svg" viewBox="0 0 390 284" role="img"
+        aria-label=${`Following train ${train.num}. ${fresh ? "Live position" : "Position unconfirmed"}. ${next ? "Next station "+(STATIONS[next.code]?.name || next.code) : "Next station unavailable"}.`}>
+        <path d="M86 25 V244" fill="none" stroke=${line} strokeWidth="5"
+          strokeLinecap="round" opacity=".24"/>
+        <path d=${`M86 25 V${Math.max(25,activeY)}`} fill="none"
+          stroke=${line} strokeWidth="5" strokeLinecap="round" opacity=".95"/>
+        ${view.stops.map((stop, i) => {
+          const y = yFor(i);
+          const current = i === activeLocal;
+          const destination = stop.code === ride?.dest;
+          return html`<g key=${stop.code}>
+            <circle cx="86" cy=${y} r=${current || destination ? 7 : 5}
+              fill="var(--map-ink)" stroke=${current || destination ? "var(--map-highlight)" : line}
+              strokeWidth=${current || destination ? "3" : "2"}/>
+            <text x="110" y=${y+5} className=${"lens-stop" + (current || destination ? " emphasis" : "")}>
+              ${STATIONS[stop.code].name}</text>
+            ${destination && html`<text x="370" y=${y+5}
+              textAnchor="end" className="lens-destination">YOUR STOP</text>`}
+          </g>`;
+        })}
+        <g role="button" tabIndex="0"
+          aria-label=${`Train ${train.num}. Open ride details.`}
+          onClick=${() => onPick(train.tripId)}
+          onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault(); onPick(train.tripId);
+          } }}>
+          <circle cx="86" cy=${activeY} r="24" fill="transparent"/>
+          <circle cx="86" cy=${activeY} r="15" fill=${line}
+            stroke="var(--map-ink)" strokeWidth="3"
+            strokeDasharray=${fresh ? null : "3 3"}/>
+          <path d="M81 ${activeY+3}l5,-6 l5,6" fill="none"
+            stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round"/>
+        </g>
+      </svg>
+      ${ride?.dest && STATIONS[ride.dest] && !view.stops.some(stop => stop.code === ride.dest) &&
+        html`<div className="lens-arrival">Your stop <strong>${STATIONS[ride.dest].name}</strong></div>`}
+    </div>`;
+  }
+
+  // B: Branch Atlas. Its compact geometry deliberately discards geographic
+  // distance while retaining real station topology, train identity and status.
+  const ATLAS_MAJOR = new Set(["01","04","06","09","0C","SP","0F","12"]);
+  function atlasY(y) { return 30 + (y - 40) * (365 / 608); }
+  function atlasPath(codes) {
+    return codes.map((c,i) => `${i ? "L" : "M"}${STATIONS[c].x},${atlasY(STATIONS[c].y)}`).join(" ");
+  }
+  function atlasTrainMarkers(items) {
+    const groups = { F: [], M: [] };
+    for (const train of items) {
+      if (groups[train.line]) groups[train.line].push(train);
+    }
+    return Object.values(groups).flatMap(group => {
+      group.sort((a,b) => a.y-b.y);
+      let last = -30;
+      const markers = group.map(t => {
+        const y = Math.max(30, atlasY(t.y), last + 31);
+        last = y;
+        return { ...t, markerX: t.line === "M" ? 40 : 350, markerY: y };
+      });
+      const overflow = Math.max(0, last - 421);
+      return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
+    });
+  }
+  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, onPick }) {
+    const all = new Map();
+    for (const t of [...(ghosts || []), ...(trains || [])]) all.set(t.tripId,t);
+    const markers = atlasTrainMarkers([...all.values()]);
+    return html`<div className="branch-atlas">
+      <svg className="atlas-svg" viewBox="0 0 390 445" role="img"
+        aria-label="Compact VRE system atlas showing Fredericksburg and Manassas lines and selectable train positions">
+        <path d=${atlasPath(LINE_F)} fill="none" stroke=${LINE_COLOR.F}
+          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+        <path d=${atlasPath(LINE_M)} fill="none" stroke=${LINE_COLOR.M}
+          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+        ${Object.entries(STATIONS).map(([code,station]) => {
+          const major = ATLAS_MAJOR.has(code) || code === ride?.dest;
+          const side = LINE_M.indexOf(code) > 3 ? -1 : 1;
+          const y = atlasY(station.y);
+          return html`<g key=${code}>
+            <circle cx=${station.x} cy=${y} r=${major ? 5.2 : 3.1}
+              fill="var(--map-ink)" stroke=${side < 0 ? LINE_COLOR.M : LINE_COLOR.F}
+              strokeWidth="2"/>
+            ${major && html`<text x=${station.x + side * 12} y=${y+4}
+              textAnchor=${side<0?"end":"start"}
+              className=${"atlas-label" + (code===ride?.dest?" destination":"")}>
+              ${station.name}</text>`}
+          </g>`;
+        })}
+        ${markers.map(t => {
+          const selectedTrain = t.tripId===selected || t.tripId===myTripId;
+          const color = LINE_COLOR[t.line] || "var(--muted)";
+          return html`<g key=${t.tripId} role="button" tabIndex="0"
+            className=${"atlas-train" + (selectedTrain?" sel":"")}
+            aria-pressed=${selectedTrain}
+            aria-label=${`Train ${t.num}, ${t.ghost ? "timetable estimate" : "reported train"}. Select train.`}
+            onClick=${()=>onPick(t.tripId)}
+            onKeyDown=${e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();onPick(t.tripId);} }}>
+            <path d=${`M${t.x},${atlasY(t.y)} L${t.markerX},${t.markerY}`}
+              stroke=${color} strokeWidth="1.4" fill="none" opacity=".50"/>
+            <circle cx=${t.markerX} cy=${t.markerY} r="22" fill="transparent"/>
+            <circle className="atlas-halo" cx=${t.markerX} cy=${t.markerY} r="16"
+              fill="var(--map-ink)" stroke=${selectedTrain?"var(--map-highlight)":color}
+              strokeWidth=${selectedTrain?3:2} strokeDasharray=${t.ghost?"3 3":null}/>
+            <text x=${t.markerX} y=${t.markerY+4} textAnchor="middle"
+              className="atlas-train-num" fill=${color}>${t.num}</text>
+          </g>`;
+        })}
+      </svg>
+      <div className="atlas-caption">Schematic view · Distances not to scale</div>
+    </div>`;
+  }
+
   function Map({ trains, ghosts, selected, myTripId, myTrain: rideTrain, ride, now, onPick }) {
     const [overviewTrip, setOverviewTrip] = useState(null);
     const overview = !!myTripId && overviewTrip === myTripId;
