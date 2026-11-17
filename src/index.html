@@ -44,7 +44,10 @@
      Keep small text AA readable: cobalt is NOT a body-text color. */
   :root, :root[data-theme="electric-stars"] {
     color-scheme: dark;
-    --bg:#011629; --card:#0C426D; --card-2:#372B68; --nav:#372B68;
+    --bg:#011629; --bg-glow:rgba(58,116,219,.10);
+    --card:#0C426D; --card-2:#372B68; --card-elevated:#273659;
+    --card-glow:rgba(190,116,205,.13); --card-glint:rgba(246,184,251,.52);
+    --card-shadow:rgba(0,12,26,.18); --nav:#372B68;
     --border:rgba(246,184,251,.32); --border-soft:rgba(246,184,251,.19);
     --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB; --meta-on-bg:#BE74CD;
     --red:#FFADB8; --blue:#A3C8FF; --green:#BAF6DA; --amber:#FFE09A;
@@ -63,7 +66,10 @@
   }
   :root[data-theme="nord-light"] {
     color-scheme: light;
-    --bg:#ECEFF4; --card:#FFFFFF; --card-2:#E5E9F0; --nav:#D8DEE9;
+    --bg:#ECEFF4; --bg-glow:rgba(94,129,172,.09);
+    --card:#FFFFFF; --card-2:#E5E9F0; --card-elevated:#FAFCFF;
+    --card-glow:rgba(94,129,172,.06); --card-glint:rgba(76,86,106,.28);
+    --card-shadow:rgba(46,52,64,.08); --nav:#D8DEE9;
     --border:#BAC5D1; --border-soft:rgba(76,86,106,.18);
     --fg:#2E3440; --muted:#434C5E; --muted-2:#4C566A; --meta-ink:#434C5E; --meta-on-bg:#4C566A;
     --red:#9D3044; --blue:#365F90; --green:#236A4C; --amber:#8A551A;
@@ -81,7 +87,9 @@
   html,body{margin:0; padding:0; background:var(--bg); color:var(--fg);
     font-family:-apple-system,"Segoe UI",Inter,Roboto,system-ui,sans-serif;
     font-size:15px; line-height:1.45; min-height:100%;}
-  body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    background:radial-gradient(ellipse at 80% 0%,var(--bg-glow),transparent 47%),var(--bg);
+    background-attachment:fixed}
   #root{max-width:480px; margin:0 auto; padding:14px 14px 130px}
   .hdr{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px}
   .hdr h1{font-size:var(--fs-4); font-weight:700; margin:0; letter-spacing:-.02em; display:flex; gap:9px; align-items:center}
@@ -91,7 +99,8 @@
   .dot.stale{background:var(--amber); animation:none}
   .dot.dead{background:var(--red); animation:none}
   @keyframes pulse{0%{box-shadow:0 0 0 0 var(--pulse)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
-  .card{background:linear-gradient(180deg,var(--card-2),var(--card)); border:1px solid var(--border);
+  .card{background:radial-gradient(ellipse at 4% 0%,var(--card-glow),transparent 65%),
+    linear-gradient(165deg,var(--card-elevated),var(--card)); border:1px solid var(--border);
     border-radius:var(--radius); overflow:hidden}
   .card+.card{margin-top:12px}
   .card-h{padding:13px 16px 0; font-size:var(--fs-2); font-weight:600; color:var(--muted);
@@ -194,6 +203,26 @@
   .today-train:focus-visible,.today-plan:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   .today-footnote{padding-top:10px}
   .today-back{padding-left:0}
+
+  /* One glanceable commute instruction. Expanded details are intentionally optional. */
+  .commute-focus{border-color:var(--card-glint);box-shadow:0 7px 24px var(--card-shadow)}
+  .commute-focus-content{padding:20px 20px 16px}
+  .commute-focus-label{font-size:var(--fs-2);font-weight:750;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--meta-ink)}
+  .commute-focus-headline{margin:8px 0 4px;font-size:clamp(30px,9vw,42px);
+    font-weight:800;letter-spacing:-.04em;line-height:1.12;color:var(--fg)}
+  .commute-focus-headline.empty{font-size:clamp(22px,6vw,30px)}
+  .commute-focus-train{font-size:clamp(17px,4.8vw,20px);font-weight:700;color:var(--fg)}
+  .commute-focus-route{margin-top:6px;font-size:var(--fs-3);color:var(--muted)}
+  .commute-focus-warning{margin-top:10px;font-size:var(--fs-2);color:var(--amber)}
+  .commute-focus-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:18px}
+  .commute-focus-actions .btn{width:auto;min-height:46px;padding:10px 15px}
+  .commute-focus-actions .commute-options{font-size:var(--fs-2);color:var(--fg)}
+  .commute-extra{border-top:1px solid var(--line-separator);margin-top:16px;padding-top:10px}
+  .commute-extra-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .commute-extra-actions .btn{min-height:44px}
+  .commute-extra-label{margin:12px 8px 2px;font-size:var(--fs-2);
+    font-weight:700;color:var(--muted)}
 
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
@@ -1668,6 +1697,25 @@
       </div>`;
   }
 
+  /* One primary recommendation for the home card; never mix yesterday's plans into today. */
+  function primaryPlannedCommute(profiles, day, now, liveByTrip, samples, overrides) {
+    if (!profiles.length || !isServiceDay(new Date(now))) return null;
+    const dateKey = VRECore.serviceDateKey(now);
+    const todayState = day?.date === dateKey ? day : null;
+    const planned = todayState?.planned || {};
+    const skipped = todayState?.skippedTrips || {};
+    const upcoming = profiles.map(p => {
+      const train = planned[p.id];
+      if (!train || skipped[p.id]) return null;
+      const forecast = VRELeaveBy.calculate({
+        ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+      }, train, VRECore, liveByTrip, samples, now);
+      return { profile: p, train, forecast };
+    }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
+      .sort((a, b) => (a.forecast.leaveBy ?? Infinity) - (b.forecast.leaveBy ?? Infinity));
+    return upcoming.length ? { ...upcoming[0], otherCount: upcoming.length - 1 } : null;
+  }
+
   /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
   function TodayCommute({ profiles, day, selectedId, onSelect, onAction, now, liveByTrip, samples, overrides, onTravelChange }) {
     if (!profiles.length) return null;
@@ -1693,50 +1741,7 @@
     };
     // No active plan: keep the main screen focused on next departures.
     // Full multi-profile choices only open after a direct "Plan train" action.
-    if (selectedId === null) {
-      const upcoming = profiles.map(p => {
-        const train = planned[p.id];
-        if (!train || skipped[p.id]) return null;
-        const forecast = VRELeaveBy.calculate({
-          ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
-        }, train, VRECore, liveByTrip, samples, now);
-        return { profile: p, train, forecast };
-      }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
-        .sort((a, b) => (a.forecast.leaveBy ?? Infinity) - (b.forecast.leaveBy ?? Infinity));
-      if (!upcoming.length) return null;
-      const next = upcoming[0], p = next.profile, f = next.forecast;
-      const clock = ms => new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
-      }).format(new Date(ms));
-      return html`
-        <div className="card today-compact" aria-label="Upcoming planned commute">
-          <div className="card-h">Planned commute · Train ${next.train}</div>
-          <div className="today-compact-body">
-            <div className="today-compact-top">
-              <div>
-                <div className="meta">${p.name} · ${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
-                <div className="today-compact-time">${f.state === "needs-travel-time"
-                  ? "Travel time needed" : f.state === "leave-now"
-                    ? "Leave now" : "Leave by " + clock(f.leaveBy)}</div>
-                ${f.state !== "needs-travel-time" && html`
-                  <div className="meta">Train at ${clock(f.scheduled)} · ${f.remaining > 0
-                    ? f.remaining + " min until leave time" : "departure approaching"}</div>`}
-              </div>
-              <button className="btn ghost today-plan-edit" onClick=${() => onSelect(p.id)}>
-                Change train
-              </button>
-            </div>
-            ${f.confidence === "delay-unconfirmed" && html`
-              <div className="meta">Delay unconfirmed — keeping your scheduled leave time.</div>`}
-            <${DailyTravelControl} profile=${p} override=${overrides[p.id]}
-              onChange=${value => onTravelChange(p.id, value)} />
-            ${upcoming.length > 1 && html`
-              <button className="btn ghost" onClick=${() => onSelect("")}>
-                View ${upcoming.length - 1} other planned commute(s)
-              </button>`}
-          </div>
-        </div>`;
-    }
+    if (selectedId === null) return null;
     return html`
       <div className="card today-commute">
         <div className="card-h">Today's commute</div>
@@ -1995,49 +2000,99 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive, onPlan }) {
+  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive,
+      onPlan, planned, onChangePlan, onOtherPlans, onTravelChange, travelOverride }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
     const service = isServiceDay(new Date(now));
+    const [showDetails, setShowDetails] = useState(false);
     const [showMarey, setShowMarey] = useState(() => lsGet("vre-live-marey", false));
+    const f = planned?.forecast;
+    const clock = ms => new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
+    }).format(new Date(ms));
+    const visibleRows = planned ? rows : rows.slice(1);
     return html`
-      <div className="card">
-        <div className="card-h row" style=${{ paddingRight: 10 }}>
-          <span>Next to ${STATIONS[to].name}${auto ? "" : " · flipped"}</span>
-          <span style=${{ display: "flex", gap: 4, alignItems: "center" }}>
-            ${onPlan && html`<button className="btn ghost commute-plan-trigger"
-              onClick=${onPlan}>Plan train</button>`}
-            <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onFlip}
-              aria-label="Swap direction"><${FlipIcon} /></button>
-          </span>
-        </div>
-        <div style=${{ padding: "4px 8px 8px" }}>
-          ${rows.length ? rows.map(r => html`
-            <button key=${r.trip} className="srow" aria-label=${`Choose train ${r.num}`}
-              style=${r.live ? null : { cursor: "default" }}
-              onClick=${() => onPickLive(r.trip)}>
-              <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
-              <span className="mid">
-                <span className="l1">${fmtClock(r.dep)} <span style=${{ color: "var(--muted-2)" }}>from</span> ${STATIONS[from].name}</span>
-                <span className="l2">arrives ${STATIONS[to].name} ${fmtClock(r.arr)}</span>
-              </span>
-              <span className="right">
-                <span className=${"badge " + (r.live ? (r.ts && now - r.ts > 5 * 60000 ? "dim" : r.dev >= 120000 ? "late" : "ok") : "dim")}
-                  style=${r.ts && now - r.ts > 5 * 60000 ? { fontStyle: "italic" } : null}>
-                  ${r.live && !(r.ts && now - r.ts > 5 * 60000) ? html`<span className="livedot"></span>` : null}
-                  ${fmtWhen(r.dep, now)}</span>
-                ${r.live && r.dev >= 120000 && html`<span className="badge late">+${Math.round(r.dev / 60000)}m</span>`}
-              </span>
-            </button>`)
-          : html`<div className="empty" style=${{ padding: "18px 16px" }}>
-              ${service ? "No more trains today on this route." : "No VRE service today."}</div>`}
-          ${rows.length > 0 && html`
-            <div className="marey-wrap">
-              <button className="marey-toggle" onClick=${() => { lsSet("vre-live-marey", !showMarey); setShowMarey(!showMarey); }}
-                aria-expanded=${showMarey}>
-                Time-space chart <${Chevron} open=${showMarey} /></button>
-              ${showMarey && html`
-                <${Marey} from=${from} to=${to} deps=${rows} liveByTrip=${liveByTrip} now=${now} />`}
+      <div className="card commute-focus" aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
+        <div className="commute-focus-content">
+          <div className="commute-focus-label">
+            ${planned ? "YOUR NEXT COMMUTE" : "NEXT TO " + STATIONS[to].name}
+          </div>
+          ${planned ? html`
+            <div className="commute-focus-headline" role="status">
+              ${f.state === "needs-travel-time" ? "Set travel time"
+                : f.state === "leave-now" ? "Leave now" : "Leave by " + clock(f.leaveBy)}
+            </div>
+            <div className="commute-focus-train">Train ${planned.train} · ${clock(f.scheduled)}</div>
+            <div className="commute-focus-route">
+              ${STATIONS[planned.profile.from].name} → ${STATIONS[planned.profile.to].name}
+            </div>
+            ${f.confidence === "delay-unconfirmed" && html`
+              <div className="commute-focus-warning" role="status">
+                Delay unconfirmed; using scheduled departure.
+              </div>`}
+          ` : rows.length ? html`
+            <div className="commute-focus-headline">${fmtClock(rows[0].dep)}</div>
+            <div className="commute-focus-train">Train ${rows[0].num} · ${fmtWhen(rows[0].dep, now)}</div>
+            <div className="commute-focus-route">${STATIONS[from].name} → ${STATIONS[to].name}</div>
+            ${rows[0].live && rows[0].dev >= 120000 && html`
+              <div className="commute-focus-warning">Running +${Math.round(rows[0].dev / 60000)}m late</div>`}
+          ` : html`
+            <div className="commute-focus-headline empty">
+              ${service ? "No more trains today on this route." : "No VRE service today."}
+            </div>`}
+          <div className="commute-focus-actions">
+            ${planned ? html`<button type="button" className="btn"
+              onClick=${() => onChangePlan(planned.profile.id)}>Change train</button>`
+              : onPlan && html`<button type="button" className="btn"
+                onClick=${onPlan}>Plan train</button>`}
+            <button type="button" className="btn ghost commute-options"
+              aria-expanded=${showDetails} onClick=${() => setShowDetails(!showDetails)}>
+              ${showDetails ? "Fewer options" : "More options"}
+              <${Chevron} open=${showDetails} />
+            </button>
+          </div>
+          ${showDetails && html`
+            <div className="commute-extra">
+              <div className="commute-extra-actions">
+                <button type="button" className="btn ghost" onClick=${onFlip}>
+                  Swap direction
+                </button>
+                ${planned && planned.otherCount > 0 && html`
+                  <button type="button" className="btn ghost" onClick=${onOtherPlans}>
+                    Other planned trips (${planned.otherCount})
+                  </button>`}
+              </div>
+              ${planned && html`
+                <${DailyTravelControl} profile=${planned.profile} override=${travelOverride}
+                  onChange=${value => onTravelChange(planned.profile.id, value)} />`}
+              ${visibleRows.length > 0 && html`
+                <div className="commute-extra-label">
+                  ${planned ? "Other departures" : "Later departures"}
+                </div>
+                ${visibleRows.map(r => html`
+                  <button key=${r.trip} className="srow" aria-label=${`Choose train ${r.num}`}
+                    onClick=${() => onPickLive(r.trip)}>
+                    <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
+                    <span className="mid">
+                      <span className="l1">${fmtClock(r.dep)} from ${STATIONS[from].name}</span>
+                      <span className="l2">Arrives ${STATIONS[to].name} ${fmtClock(r.arr)}</span>
+                    </span>
+                    <span className="right">
+                      <span className=${"badge " + (r.live ? "ok" : "dim")}>${fmtWhen(r.dep, now)}</span>
+                    </span>
+                  </button>`)}
+              `}
+              ${rows.length > 0 && html`
+                <div className="marey-wrap">
+                  <button className="marey-toggle" aria-expanded=${showMarey}
+                    onClick=${() => { lsSet("vre-live-marey", !showMarey); setShowMarey(!showMarey); }}>
+                    Time-space chart <${Chevron} open=${showMarey} />
+                  </button>
+                  ${showMarey && html`
+                    <${Marey} from=${from} to=${to} deps=${rows}
+                      liveByTrip=${liveByTrip} now=${now} />`}
+                </div>`}
             </div>`}
         </div>
       </div>`;
@@ -3277,9 +3332,13 @@
     // line-color theming while riding: tint the accent to your line
     const accent = myTrip && myTrain ? { "--accent": LINE_COLOR[myTrain.line] } : null;
 
-    const todayCard = !myTrip && tab !== "preferences" &&
+    const plannedProfiles = commutes.profiles.filter(p => p.preferredTrains.length > 0);
+    const primaryPlan = !myTrip && typeof window.VreCommutePrefs !== "undefined"
+      ? primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel)
+      : null;
+    const todayCard = !myTrip && tab !== "preferences" && planProfile !== null &&
       typeof window.VreCommutePrefs !== "undefined" ? html`
-        <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+        <${TodayCommute} profiles=${plannedProfiles}
           day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
           now=${now} liveByTrip=${liveByTrip} samples=${devlog}
           overrides=${todayTravel} onTravelChange=${saveTravelOverride}
@@ -3343,7 +3402,7 @@
 
         ${planProfile !== null && todayCard}
 
-        ${!myTrip && tab !== "preferences" && html`
+        ${!myTrip && tab !== "preferences" && planProfile === null && html`
           <div style=${{ marginBottom: 12 }}>
             ${route
               ? (() => {
@@ -3357,6 +3416,10 @@
                     onFlip=${() => setFlipDir(!showReturn)}
                     onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
                       ? () => setPlanProfile("") : null}
+                    planned=${primaryPlan} onChangePlan=${setPlanProfile}
+                    onOtherPlans=${() => setPlanProfile("")}
+                    onTravelChange=${saveTravelOverride}
+                    travelOverride=${primaryPlan ? todayTravel[primaryPlan.profile.id] : null}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
               : html`<div className="card">
@@ -3370,7 +3433,6 @@
                 </div>`}
           </div>`}
 
-        ${planProfile === null && todayCard}
 
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
