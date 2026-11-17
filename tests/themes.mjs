@@ -120,13 +120,38 @@ for (const key of required) {
   assert.ok(a[key] && b[key], "missing token " + key + " from one theme");
 }
 assert.equal(a.bg.toUpperCase(), "#011629");
-assert.equal(a.card.toUpperCase(), "#0C426D");
-assert.equal(a["card-2"].toUpperCase(), "#372B68");
+assert.equal(a.card.toUpperCase(), "#102D49");
+assert.equal(a["card-2"].toUpperCase(), "#193952");
 assert.equal(a.accent.toUpperCase(), "#3A74DB");
-assert.equal(a["accent-outline"].toUpperCase(), "#BE74CD");
-assert.equal(a.fg.toUpperCase(), "#F6B8FB");
+assert.equal(a["accent-outline"].toUpperCase(), "#D4A0DF");
+assert.equal(a.fg.toUpperCase(), "#E4EAF2");
 assert.equal(b.bg.toUpperCase(), "#ECEFF4");
 assert.equal(b.fg.toUpperCase(), "#2E3440");
+
+// Electric Stars / Night Signal: original palette is available for specific roles,
+// but neutral high-contrast typography replaces the all-lilac foreground.
+const nightRoles = {
+  "night-midnight": "#011629", "night-petrol": "#0C426D",
+  "night-plum": "#372B68", "night-cobalt": "#3A74DB",
+  "night-orchid": "#BE74CD", "night-lilac": "#F6B8FB",
+  "night-display": "#F3F5FA", "night-ink": "#E4EAF2",
+  "night-orchid-readable": "#D4A0DF",
+};
+for (const [role,hex] of Object.entries(nightRoles)) {
+  assert.equal(a[role].toUpperCase(), hex, "Night Signal role " + role + " changed");
+}
+for (const [token,expected] of Object.entries({
+  card:"#102D49", nav:"#0C2742", "tab-surface":"#0C2742",
+  "card-elevated":"#0C2742", "selected-bg":"#372B68",
+  "selected-fg":"#E4EAF2", "action-bg":"#F6B8FB", "action-fg":"#011629",
+  "map-label-major":"#E4EAF2", "map-highlight":"#F6B8FB"
+})) assert.equal(a[token].toUpperCase(), expected, "role-specific surface " + token);
+for (const [token,expected] of Object.entries({
+  card:"#FFFFFF", "card-2":"#E5E9F0", nav:"#D8DEE9",
+  accent:"#365F90", "selected-bg":"#2E3440", "selected-fg":"#ECEFF4",
+  "action-bg":"#2E3440", "action-fg":"#ECEFF4"
+})) assert.equal(b[token].toUpperCase(), expected, "Nord Light must not change: "+token);
+
 
 function luminance(hex) {
   const cs = hex.slice(1).match(/.{2}/g).map(x => parseInt(x,16) / 255)
@@ -147,11 +172,39 @@ for (const [theme,palette] of [["Electric Stars",a],["Nord Light",b]]) {
     assert.ok(ratio>=4.5,`${theme} ${fore} on ${back} only ${ratio.toFixed(2)}:1 (requires WCAG AA 4.5)`);
   }
 }
+for (const [foreground,background] of [
+  ["night-display","card"], ["night-ink","card-elevated"],
+  ["night-orchid-readable","card"],["night-lilac","card"],
+  ["muted","card-elevated"],["selected-fg","selected-bg"]
+]) {
+  assert.ok(contrast(a[foreground],a[background]) >= 4.5,
+    "Night Signal " + foreground + " must meet AA on " + background);
+}
 assert.ok(contrast(a.accent,a.bg)<4.5, "Cobalt must stay a large-text / graphical accent");
 assert.match(css,/\.btn\{[\s\S]*?background:var\(--action-bg\); color:var\(--action-fg\)/);
 assert.match(css,/\.sheet\{[\s\S]*?background:var\(--sheet-bg\)/);
 assert.match(css,/\.tabs button\.on\{background:var\(--selected-bg\); color:var\(--selected-fg\)/);
 assert.match(css,/\.badge\.line-F\{color:var\(--line-F\)/);
+
+// Night-specific selectors protect Nord, and keep exactly one special featured card.
+assert.match(css, /:root\[data-theme="electric-stars"\] \.card\{\s*background:var\(--card\);/,
+  "ordinary Night Signal cards must be flat");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.commute-focus\{\s*background:linear-gradient\(/,
+  "only the featured commute uses a deliberate gradient");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.system-map-card\{\s*background:var\(--card\);border:0;/,
+  "map is a quiet flat primary surface");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.tabs button\.on\{[^}]*var\(--night-plum\)/s,
+  "rare plum elevation belongs to selected navigation");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.commute-focus-actions \.commute-options\{[^}]*var\(--action-bg\)/s,
+  "collapsed Plan train is the sole highlighted action");
+assert.match(css, /\.commute-options\[aria-expanded="true"\]\{[^}]*background:var\(--card-2\)/s,
+  "expanded Plan train steps back while Confirm train becomes primary");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.commute-plan-confirm\{[^}]*var\(--action-bg\)/s,
+  "expanded confirmation inherits the lilac primary treatment");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.sheet\{[^}]*backdrop-filter:none/s,
+  "night dialogs are opaque material, not decorative glass");
+assert.match(html, /className="card system-map-card"/,
+  "system map exposes a specific semantic class for theme-scoped treatment");
 const outsidePalettes = css.replace(/:root, :root\[data-theme="electric-stars"\]\s*\{[\s\S]*?\n  \}/, "")
   .replace(/:root\[data-theme="nord-light"\]\s*\{[\s\S]*?\n  \}/, "")
   .replace(/\.theme-swatch\.electric\{[^}]*\}/, "")
@@ -193,6 +246,18 @@ assert.ok(assets.includes('writeFile(join(output, "vre-theme.js"), bootstrapCode
 assert.ok(assets.includes('["vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"]'),
   "the established source module order is preserved");
 assert.match(assets,/if \(\/<script\(\?!/,"inline script CSP gate remains mandatory");
+const nativeColors = read("android-lab/app/src/main/res/values/colors.xml");
+for (const [name,hex] of Object.entries({
+  vre_electric_bg:"#011629",vre_electric_card:"#102D49",
+  vre_electric_nav:"#0C2742",vre_electric_fg:"#E4EAF2",
+  vre_electric_muted:"#B8C9DC",vre_electric_cobalt:"#3A74DB",
+  vre_electric_line_f:"#FF9BA7",vre_electric_line_m:"#A6CBFF",
+  vre_nord_bg:"#ECEFF4",vre_nord_card:"#FFFFFF",
+  vre_nord_fg:"#2E3440",vre_nord_nav:"#D8DEE9"
+})) {
+  assert.ok(nativeColors.includes('<color name="'+name+'">'+hex+'</color>'),
+    "native widget and error UI parity for " + name);
+}
 const native = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/VreTheme.kt");
 const main = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/MainActivity.kt");
 const widgets = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/DeparturesWidget.kt");
