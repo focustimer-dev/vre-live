@@ -3284,6 +3284,49 @@ const ExitTrainIcon = () => html`
   function EtaBanner({ train, dest, notify, pushActive, pushErr, wake, now, onNotify, onWake,
     onChange, onSwitchTrain, onLeave, lockButton, lockActive, lockError }) {
     const [showTools, setShowTools] = useState(false);
+    const [popupAnchor, setPopupAnchor] = useState({ left: 12, top: 100 });
+    const [snackbar, setSnackbar] = useState("");
+    const bellRef = useRef(null), popupRef = useRef(null);
+    const previousControls = useRef({ notify, wake, lockActive });
+    useEffect(() => {
+      const old = previousControls.current;
+      if (old.notify !== notify) setSnackbar(notify ? "Arrival alerts enabled" : "Arrival alerts disabled");
+      else if (old.wake !== wake) setSnackbar(wake ? "Keep-screen-awake selected" : "Keep-screen-awake off");
+      else if (old.lockActive !== lockActive)
+        setSnackbar(lockActive ? "Lock-screen card enabled" : "Lock-screen card disabled");
+      previousControls.current = { notify, wake, lockActive };
+    }, [notify, wake, lockActive]);
+    useEffect(() => {
+      if (!snackbar) return;
+      const timer = setTimeout(() => setSnackbar(""), 2800);
+      return () => clearTimeout(timer);
+    }, [snackbar]);
+    useEffect(() => {
+      if (!showTools) return;
+      const closeOutside = e => {
+        if (!bellRef.current?.contains(e.target) && !popupRef.current?.contains(e.target))
+          setShowTools(false);
+      };
+      const closeEscape = e => {
+        if (e.key === "Escape") { setShowTools(false); bellRef.current?.focus(); }
+      };
+      document.addEventListener("pointerdown", closeOutside);
+      document.addEventListener("keydown", closeEscape);
+      return () => {
+        document.removeEventListener("pointerdown", closeOutside);
+        document.removeEventListener("keydown", closeEscape);
+      };
+    }, [showTools]);
+    const toggleTools = () => {
+      if (!showTools && bellRef.current) {
+        const rect = bellRef.current.getBoundingClientRect();
+        setPopupAnchor({
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280)),
+          top: Math.max(8, Math.min(rect.bottom + 5, window.innerHeight - 305))
+        });
+      }
+      setShowTools(!showTools);
+    };
     const stop = train && train.stops.find(s => s.code === dest);
 if (!train) return html`
       <div className="card fade"><div className="eta-hero ride-sparse">
