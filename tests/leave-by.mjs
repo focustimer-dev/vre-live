@@ -14,8 +14,8 @@ const { VRELeaveBy } = runInNewContext(script("vre-leave-by") + "\n;globalThis")
 const app = script("vre-app"), build = read("android-lab/web/build-assets.mjs");
 assert.doesNotThrow(() => new Script(app));
 assert.doesNotThrow(() => new Script(script("vre-leave-by")));
-assert.match(build, /"vre-core", "vre-commutes", "vre-leave-by", "vre-app"/,
-  "Android packages the departure calculator");
+assert.match(build, /"vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"/,
+  "Android packages both global alert settings and departure calculator");
 assert.match(build, /defer src="vre-leave-by.js"/, "Android loads the calculator before app");
 assert.doesNotMatch(script("vre-leave-by"),
   /fetch\(|postMessage\(|AlarmManager|serviceWorker|setInterval\(|setTimeout\(/,

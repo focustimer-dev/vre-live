@@ -78,6 +78,21 @@
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
   .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .global-alert-body{padding:6px 14px 16px}
+  .global-alert-row{display:flex;align-items:center;justify-content:space-between;
+    gap:14px;padding:14px 2px;min-height:65px;border-bottom:1px solid var(--border)}
+  .global-alert-copy{min-width:0;flex:1}
+  .global-alert-copy strong{display:block;font-size:var(--fs-3)}
+  .global-alert-copy small{display:block;color:var(--muted);font-size:var(--fs-2);
+    margin-top:4px;line-height:1.4}
+  .global-alert-row input[type="checkbox"]{width:22px;height:22px;flex:none;accent-color:var(--fg)}
+  .global-alert-row input:disabled{opacity:.4}
+  .global-alert-lead{padding:12px 2px}
+  .global-alert-section{font-size:var(--fs-2);font-weight:700;color:var(--muted);
+    margin:16px 2px 0}
+  .global-alert-migrate{display:grid;gap:9px;padding:14px 0}
+  .global-alert-migrate .btn{min-height:44px}
+
   .waiting-card{margin-bottom:12px}
   .waiting-body{padding:14px 16px 16px}
   .waiting-countdown{font-size:clamp(32px,11vw,46px);font-weight:800;letter-spacing:-.04em;
@@ -1037,6 +1052,63 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
+<!-- ============= global notification preferences (offline) ============= -->
+<script id="vre-alerts">
+(function (g) {
+  "use strict";
+  const KEY = "vre-live-alerts-v1";
+  const ID = /^[A-Za-z0-9_-]{1,72}$/;
+  const DEFAULTS = Object.freeze({
+    version: 1, enabled: false, checkIns: false, arrival: true, leaveNow: false,
+    leadMinutes: 15, sound: false, vibration: false, scopeIds: null, legacyTimes: false
+  });
+  function normalize(raw) {
+    const value = raw && typeof raw === "object" ? raw : {};
+    const lead = Number(value.leadMinutes);
+    const scopeIds = Array.isArray(value.scopeIds)
+      ? [...new Set(value.scopeIds.filter(id => typeof id === "string" && ID.test(id)))] : null;
+    return {
+      version: 1, enabled: value.enabled === true, checkIns: value.checkIns === true,
+      arrival: value.arrival !== false, leaveNow: false, // No server-backed leave alerts yet.
+      leadMinutes: Number.isInteger(lead) && lead >= 5 && lead <= 90 ? lead : 15,
+      sound: value.sound === true, vibration: value.vibration === true,
+      scopeIds, legacyTimes: value.legacyTimes === true && scopeIds !== null
+    };
+  }
+  function migrate(profiles) {
+    const opted = (profiles || []).filter(p => p.checkInEnabled === true).map(p => p.id)
+      .filter(id => typeof id === "string" && ID.test(id));
+    if (!opted.length) return { ...DEFAULTS };
+    // Migrate only explicit historical opt-ins. Do not register new profiles until
+    // the user explicitly switches from legacy times to the global smart schedule.
+    return normalize({
+      enabled: true, checkIns: true, arrival: false, scopeIds: opted,
+      legacyTimes: true, leadMinutes: 15
+    });
+  }
+  function load(storage, profiles) {
+    try {
+      const saved = storage.getItem(KEY);
+      if (saved === null) return migrate(profiles);
+      const obj = JSON.parse(saved);
+      if (!obj || obj.version !== 1) return { ...DEFAULTS, unsupportedVersion: true };
+      return normalize(obj);
+    } catch (_) { return { ...DEFAULTS, storageError: true }; }
+  }
+  function save(storage, record) {
+    if (record.unsupportedVersion) return false;
+    try {
+      storage.setItem(KEY, JSON.stringify(normalize(record)));
+      return true;
+    } catch (_) { return false; }
+  }
+  function useSmartSchedule(record) {
+    return normalize({ ...record, legacyTimes: false, scopeIds: null });
+  }
+  g.VREAlerts = Object.freeze({ KEY, DEFAULTS, normalize, migrate, load, save, useSmartSchedule });
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
 <!-- ============= commute departure calculation (offline) ============= -->
 <script id="vre-leave-by">
 (function (g) {
@@ -1365,9 +1437,6 @@
     const save = () => {
       if (!draft.name.trim()) { setError("Give this commute a name."); return; }
       if (!draft.days.length) { setError("Select at least one weekday."); return; }
-      if (draft.checkInEnabled && !draft.preferredTrains.length) {
-        setError("Select at least one train before enabling check-ins."); return;
-      }
       if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
         setError("Choose stations served by a direct train."); return;
       }
@@ -1446,16 +1515,6 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        typeof window.VreCommutePrefs !== "undefined"
-          ? field("Daily check-in notifications", h("span", { style: {
-              display: "flex", alignItems: "center", gap: 10
-            } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
-              onChange: e => change("checkInEnabled", e.target.checked) }),
-              h("span", null, "Ask if I'm taking the train on my commute days")))
-          : h("div", { className: "meta" }, "Daily check-in notifications are available in the Android app."),
-        field("Check-in time (Eastern)", h("input", {
-          type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
-        })),
         h("div", { className: "meta" }, "Typical commuting days"),
         h("div", { style: { display: "flex", flexWrap: "wrap", gap: 9 } },
           days.map((label, day) => h("label", { key: day, className: "chip",
@@ -1463,7 +1522,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Android check-ins are optional. Selecting a train shows a leave-by estimate while the app is open; automatic departure alerts and background monitoring aren't enabled yet."),
+          "Notification choices are in Preferences → Check-ins & Alerts. Leave-by estimates show after you choose a train; background departure alerts aren't active yet."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1673,8 +1732,77 @@
       </div>`;
   }
 
+  /* One app-wide notification policy; Android channels still respect system overrides. */
+  function GlobalAlertSettings({ settings, onSave, osAllowed }) {
+    const nativeCheckIns = typeof window.VreCommutePrefs !== "undefined";
+    const update = (key, value) => {
+      if (settings.unsupportedVersion) return;
+      const proposed = VREAlerts.normalize({ ...settings, [key]: value });
+      onSave(key === "checkIns" && value ? VREAlerts.useSmartSchedule(proposed) : proposed);
+    };
+    const control = (label, detail, checked, onChange, disabled = false) => html`
+      <label className="global-alert-row">
+        <span className="global-alert-copy"><strong>${label}</strong><small>${detail}</small></span>
+        <input type="checkbox" checked=${checked} disabled=${disabled}
+          onChange=${e => onChange(e.target.checked)} />
+      </label>`;
+    return html`
+      <div className="card">
+        <div className="card-h">Check-ins & Alerts</div>
+        <div className="global-alert-body">
+          ${settings.unsupportedVersion ? html`
+            <div className="stale-note">These settings require a newer version. Existing settings were preserved.</div>`
+          : html`
+            ${control("Notifications", "Master control for check-ins, commute alerts, and arrival alerts",
+              settings.enabled, value => update("enabled", value))}
+            ${typeof window.VreCommutePrefs !== "undefined" && osAllowed === false && html`
+              <div className="stale-note">Android notifications are disabled. Allow them in system settings to receive alerts.</div>`}
+            ${control("Ask if I'm taking the train", "One check-in before your usual leave time",
+              settings.checkIns, value => update("checkIns", value),
+              !settings.enabled || !nativeCheckIns)}
+            ${!nativeCheckIns && html`<div className="meta">
+              Daily check-in notifications are scheduled by the Android app.
+            </div>`}
+            ${settings.enabled && settings.checkIns && html`
+              <label className="fld global-alert-lead">
+                <span>Ask before I need to leave</span>
+                <select value=${settings.leadMinutes}
+                  onChange=${e => update("leadMinutes", Number(e.target.value))}>
+                  ${[5, 10, 15, 20, 30, 45, 60].map(n =>
+                    html`<option key=${n} value=${n}>${n} minutes</option>`)}
+                </select>
+              </label>`}
+            ${settings.legacyTimes && settings.enabled && settings.checkIns && html`
+              <div className="global-alert-migrate">
+                <div className="meta">Your previously enabled check-ins still use their original times and selected commutes.</div>
+                <button className="btn outline" onClick=${() => onSave(VREAlerts.useSmartSchedule(settings))}>
+                  Use automatic check-in timing for all commutes
+                </button>
+              </div>`}
+            ${control("Arrival alerts when riding", "New rides start with the in-ride bell on. You can turn it off for one ride.",
+              settings.arrival, value => update("arrival", value), !settings.enabled)}
+            ${control("Leave-now notifications", "Requires the upcoming event-driven monitoring release",
+              false, () => {}, true)}
+            <div className="global-alert-section">Commute notification style</div>
+            ${nativeCheckIns ? html`
+              ${control("Sound", "Play a notification sound on commute check-ins",
+                settings.sound, value => update("sound", value), !settings.enabled)}
+              ${control("Vibration", "Vibrate for commute check-ins (off by default)",
+                settings.vibration, value => update("vibration", value), !settings.enabled)}`
+            : html`<div className="meta">
+              Android manages commute sound and vibration; browser notifications follow your browser settings.
+            </div>`}
+            <div className="meta">
+              Changes save on this device. Android's notification-channel settings can override sound and vibration.
+              In-app notification choices never start GTFS polling on their own.
+            </div>
+          `}
+        </div>
+      </div>`;
+  }
+
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
-  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes }) {
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed }) {
     const open = name => onSection(name);
     return html`
       <section className="preferences" aria-label="Preferences">
@@ -1689,7 +1817,12 @@
               </button>
               <button className="pref-choice" type="button" onClick=${() => open("advanced")}>
                 <span><strong>Advanced Commute</strong>
-                  <small>Preferred trains, travel times, and planned alerts</small>
+                  <small>Preferred trains, travel time, safety buffer, and commuting days</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+              <button className="pref-choice" type="button" onClick=${() => open("alerts")}>
+                <span><strong>Check-ins & Alerts</strong>
+                  <small>App notifications, commute check-ins, sound and vibration</small>
                 </span><span className="pref-arrow" aria-hidden="true">›</span>
               </button>
             </div>
@@ -1709,12 +1842,15 @@
                 onSave=${r => { onSaveRoute(r); onSection(null); }}
                 onCancel=${() => onSection(null)} />
             </div>`
+          : section === "alerts" ? html`
+            <${GlobalAlertSettings} settings=${alertPrefs} onSave=${onSaveAlerts}
+              osAllowed=${osAllowed} />`
           : html`
             <div className="card">
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
-                Choose preferred trains and optional local daily check-ins.
-                Leave-by estimates appear after you pick a train. Automatic background departure alerts aren't active yet.
+                Choose preferred trains and travel times. Check-in and notification settings
+                are under Check-ins & Alerts. Automatic background departure alerts aren't active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
@@ -2591,6 +2727,19 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [alertPrefs, setAlertPrefs] = useState(() =>
+      VREAlerts.load(localStorage, VRECommutes.load(localStorage, VRECore).profiles));
+    const saveAlertPrefs = settings => {
+      if (!VREAlerts.save(localStorage, settings)) return false;
+      const clean = VREAlerts.normalize(settings);
+      setAlertPrefs(clean);
+      const prompt = clean.enabled && (!alertPrefs.enabled ||
+        (clean.checkIns && !alertPrefs.checkIns) ||
+        (clean.arrival && !alertPrefs.arrival));
+      nativeCommute({ type: "sync", version: 1, profiles: commutes.profiles,
+        alerts: clean, prompt });
+      return true;
+    };
     const [travelOverrides, setTravelOverrides] = useState(() => lsGet("vre-leave-day-overrides-v1", null));
     const todayKey = VRECore.serviceDateKey(now);
     const todayTravel = travelOverrides?.date === todayKey ? travelOverrides.values || {} : {};
@@ -2614,7 +2763,8 @@
     const saveCommutes = next => {
       if (!VRECommutes.save(localStorage, next, VRECore)) return false;
       setCommutes(next);
-      nativeCommute({ type: "sync", version: 1, profiles: next.profiles, prompt: true });
+      nativeCommute({ type: "sync", version: 1, profiles: next.profiles,
+        alerts: alertPrefs, prompt: false });
       return true;
     };
     useEffect(() => {
@@ -2625,8 +2775,8 @@
         if (data && data.type === "state") setCommuteDay(data);
       };
       // No alerts are enabled by a one-time legacy migration.
-      if (!commutes.unsupportedVersion) nativeCommute({
-        type: "sync", version: 1, profiles: commutes.profiles, prompt: false
+      if (!commutes.unsupportedVersion && !alertPrefs.unsupportedVersion) nativeCommute({
+        type: "sync", version: 1, profiles: commutes.profiles, alerts: alertPrefs, prompt: false
       });
       else nativeCommute({ type: "state" });
       return () => { bridge.onmessage = null; };
@@ -2829,9 +2979,14 @@
         androidRideAlert?.postMessage("cancel");
         alertSent.current = false;
         if (myTrip && myTrip.push) await pushUnsubscribe();
+        const defaultArrival = alertPrefs.enabled && alertPrefs.arrival;
         const next = {
           ...(same ? myTrip : {}), tripId: train.tripId, dest: code,
-          notify: same && !androidRideAlert ? !!myTrip.notify : false, push: false, pushErr: null,
+          notify: !androidRideAlert && (same ? !!myTrip.notify : defaultArrival &&
+            canNotify && Notification.permission === "granted"),
+          autoArmRequested: !!(androidRideAlert && alertPrefs.enabled &&
+            (same ? !!myTrip.notify || !!myTrip.autoArmRequested : defaultArrival)),
+          push: false, pushErr: null,
           n5: false, n0: false,
           boardedAt: same ? myTrip.boardedAt : Date.now(),
           from: same ? myTrip.from : waitingFor?.trip === train.tripId ? waitingFor.dest : null, snapshot: train,
@@ -2855,7 +3010,8 @@
         const title = state.phase === "atStop" ? "At your stop" : state.phase === "passed" ? "Stop passed"
           : state.phase === "waiting" || state.phase === "scheduledPast" ? "Awaiting update" : m <= 0 ? "Due" : m + " min";
         document.title = `${title} · ${myStop.name} — VRE Live`;
-        if (myTrip.notify && !myTrip.push && state.fresh && ["enroute", "due", "atStop"].includes(state.phase)) {
+        if (alertPrefs.enabled && myTrip.notify && !myTrip.push && state.fresh &&
+            ["enroute", "due", "atStop"].includes(state.phase)) {
           const left = myStop.time - now;
           const lead = alertLead(myTrain, myTrip.dest); // longer gaps warn earlier
           if (androidRideAlert) {
@@ -2873,7 +3029,7 @@
     }, [now]);
 
     useEffect(() => {
-      if (!androidRideAlert || !myTrip) return;
+      if (!androidRideAlert || !myTrip || !alertPrefs.enabled) return;
       const sync = () => {
         androidRideAlert.onmessage = ({ data }) => {
           setMyTrip(current => current ? { ...current, notify: data === "armed", push: false,
@@ -2885,6 +3041,26 @@
       document.addEventListener("visibilitychange", sync);
       return () => document.removeEventListener("visibilitychange", sync);
     }, [myTrip?.tripId, myTrip?.dest]);
+    // Widget snapshot is posted in the earlier effect; only then arm native
+    // background arrival monitoring for an explicitly started ride.
+    useEffect(() => {
+      if (!androidRideAlert || !myTrip?.autoArmRequested) return;
+      const ride = myTrip;
+      androidRideAlert.postMessage("arm");
+      setMyTrip(current => current && current.boardedAt === ride.boardedAt &&
+          current.tripId === ride.tripId && current.dest === ride.dest
+        ? { ...current, autoArmRequested: false } : current);
+    }, [myTrip?.boardedAt, myTrip?.dest, myTrip?.autoArmRequested]);
+
+    useEffect(() => {
+      if (alertPrefs.enabled) return;
+      androidRideAlert?.postMessage("cancel");
+      if (myTrip?.push) pushUnsubscribe();
+      setMyTrip(current => current && (current.notify || current.autoArmRequested || current.push)
+        ? { ...current, notify: false, autoArmRequested: false, push: false, pushErr: null }
+        : current);
+    }, [alertPrefs.enabled]);
+
     const servicePaused = !activeRide && !automaticServiceWindow(now);
     const age = fetchedAt ? now - fetchedAt : null;
     const health = !fetchedAt ? "dead" : error || age > REFRESH_MS + 60000 ? "stale" : "live";
@@ -2893,6 +3069,11 @@
     const pick = id => { setSelected(id === selected ? null : id); setPicking(false); };
     const toggleNotify = async () => {
       if (!myTrip) return;
+      if (!alertPrefs.enabled) {
+        setMyTrip({ ...myTrip, notify: false,
+          pushErr: "Turn on Notifications in Preferences → Check-ins & Alerts first" });
+        return;
+      }
       if (androidRideAlert) {
         if (myTrip.notify) {
           androidRideAlert.postMessage("cancel");
@@ -3050,6 +3231,8 @@
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
             route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
+            alertPrefs=${alertPrefs} onSaveAlerts=${saveAlertPrefs}
+            osAllowed=${commuteDay?.notificationsAllowed}
             onSaveRoute=${r => {
               lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
             }} />`
@@ -3112,7 +3295,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, GlobalAlertSettings, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
