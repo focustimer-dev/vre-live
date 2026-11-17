@@ -1069,7 +1069,7 @@
       ? [...new Set(value.scopeIds.filter(id => typeof id === "string" && ID.test(id)))] : null;
     return {
       version: 1, enabled: value.enabled === true, checkIns: value.checkIns === true,
-      arrival: value.arrival !== false, leaveNow: false, // No server-backed leave alerts yet.
+      arrival: value.arrival !== false, leaveNow: value.leaveNow === true,
       leadMinutes: Number.isInteger(lead) && lead >= 5 && lead <= 90 ? lead : 15,
       sound: value.sound === true, vibration: value.vibration === true,
       scopeIds, legacyTimes: value.legacyTimes === true && scopeIds !== null
@@ -1735,6 +1735,20 @@
   /* One app-wide notification policy; Android channels still respect system overrides. */
   function GlobalAlertSettings({ settings, onSave, osAllowed }) {
     const nativeCheckIns = typeof window.VreCommutePrefs !== "undefined";
+    const [pairState, setPairState] = useState({ paired: false, ready: false });
+    useEffect(() => {
+      const bridge = window.VrePushPair;
+      if (!bridge) return;
+      bridge.onmessage = event => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (typeof payload.paired === "boolean")
+            setPairState({ paired: payload.paired, ready: true });
+        } catch (_) {}
+      };
+      bridge.postMessage("status");
+      return () => { bridge.onmessage = null; };
+    }, []);
     const update = (key, value) => {
       if (settings.unsupportedVersion) return;
       const proposed = VREAlerts.normalize({ ...settings, [key]: value });
@@ -1781,8 +1795,18 @@
               </div>`}
             ${control("Arrival alerts when riding", "New rides start with the in-ride bell on. You can turn it off for one ride.",
               settings.arrival, value => update("arrival", value), !settings.enabled)}
-            ${control("Leave-now notifications", "Requires the upcoming event-driven monitoring release",
-              false, () => {}, true)}
+            ${nativeCheckIns && html`
+              <div className="global-alert-migrate">
+                <strong>Event-driven leave-now alerts</strong>
+                <div className="meta">Connect this phone once to receive leave-now notices for trains you explicitly select.</div>
+                <button className="btn outline" disabled=${!settings.enabled}
+                  onClick=${() => window.VrePushPair?.postMessage("pair")}>
+                  ${pairState.paired ? "Phone paired" : "Pair this phone"}
+                </button>
+              </div>`}
+            ${control("Leave-now notifications", "Only for confirmed trains, using the shared Cloudflare monitor",
+              !!settings.leaveNow, value => update("leaveNow", value),
+              !settings.enabled || !pairState.paired || !nativeCheckIns)}
             <div className="global-alert-section">Commute notification style</div>
             ${nativeCheckIns ? html`
               ${control("Sound", "Play a notification sound on commute check-ins",
