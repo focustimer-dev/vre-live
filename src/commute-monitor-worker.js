@@ -134,7 +134,12 @@ export class CommuteMonitorCoordinator {
       if(existing){
         if(existing.tripId!==watch.tripId||existing.from!==watch.from||
            existing.to!==watch.to) return fail("watch ID already in use",409);
-        return respond({ok:true,alreadyActive:true,watchId,expires:existing.expires});
+        // Mobile FCM tokens rotate. Updating the token or a one-day travel
+        // adjustment must not require a second subscription or extra polling.
+        watches[key]={...watch,created:existing.created,
+          attempts:existing.attempts,nextRetry:existing.nextRetry};
+        await this.save(watches);
+        return respond({ok:true,alreadyActive:true,watchId,expires:watch.expires});
       }
       if(Object.keys(watches).length>=MAX_WATCHES) return fail("monitor capacity reached",429);
       if(Object.values(watches).filter(w=>w.ownerId===ownerId).length>=MAX_PER_OWNER)
