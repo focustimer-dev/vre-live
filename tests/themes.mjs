@@ -225,25 +225,21 @@ assert.match(app,/window\.VreTheme\?\.postMessage\(selected\)/);
 assert.match(app,/const LINE_COLOR = \{ F: "var\(--line-F\)", M: "var\(--line-M\)" \}/);
 assert.doesNotMatch(app,/#[0-9a-f]{6}\b/i, "map, badges and inline styles must be tokenized");
 
-// SVG train marker focus must follow marker geometry, not draw a WebView
-// bounding-box rectangle like the amber box visible around train 321.
+// Both adaptive SVGs must retain shape-based focus and selected states.
 assert.doesNotMatch(css, /select:focus-visible,\.train:focus-visible/,
-  "train markers no longer inherit the generic rectangular form focus");
-assert.match(css, /\.sysmap \.train:focus[^}]*outline:none/s,
-  "SVG marker browser outlines are suppressed");
-assert.match(css, /\.sysmap \.train:focus \.halo[^}]*stroke:var\(--focus\)/s,
-  "focus remains visible through a circular semantic-color halo");
-assert.match(css, /\.sysmap \.your-train-focus:focus > rect[^}]*stroke:var\(--focus\)/s,
-  "active train callout receives its own shape-matched focus stroke");
-assert.match(app, /className=\$\{"train ghost" \+ \(sel \|\| mine \? " sel" : ""\)\}/,
-  "ghost selection highlighting remains available");
-assert.match(app, /className=\$\{"train" \+ \(sel \|\| mine \? " sel" : ""\)\}/,
-  "live selection highlighting remains available");
-assert.match(app, /e\.preventDefault\(\); onPick\(g\.tripId\)/,
-  "scheduled train markers remain keyboard-operable");
-assert.match(app, /e\.preventDefault\(\); onPick\(t\.tripId\)/,
-  "live train markers remain keyboard-operable");
-
+  "train SVG controls must not inherit the browser's box focus ring");
+assert.match(css, /\.atlas-train:focus-visible \.atlas-halo/,
+  "compact atlas train markers retain circular focus");
+assert.match(css, /\.follow-lens svg \[role=button\]:focus-visible/,
+  "the active-ride lens retains a visible keyboard focus state");
+assert.match(app, /className=\$\{"atlas-train" \+ \(selectedTrain\?" sel":""\)\}/,
+  "selected trains stay visibly marked in the branch atlas");
+assert.match(app, /onClick=\$\{\(\)=>onPick\(t\.tripId\)\}/,
+  "atlas train markers remain selectable");
+assert.match(app, /e\.preventDefault\(\);onPick\(t\.tripId\)/,
+  "atlas train markers remain keyboard operable");
+assert.match(app, /strokeDasharray=\$\{t\.ghost\?"3 3":null\}/,
+  "schedule-only train markers stay visibly distinguishable");
 const assets = read("android-lab/web/build-assets.mjs");
 assert.ok(assets.includes("const bootstrapStart ="), "theme bootstrap must be extracted");
 assert.ok(assets.includes('writeFile(join(output, "vre-theme.js"), bootstrapCode)'));
