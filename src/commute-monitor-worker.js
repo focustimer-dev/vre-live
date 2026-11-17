@@ -158,12 +158,13 @@ export class CommuteMonitorCoordinator {
       // An atomic transaction prevents reusing a code during concurrent pairing
       // requests and prevents issuing a credential without saving its digest.
       const issued=await this.ctx.storage.transaction(async txn=>{
-        if(await txn.get("usedPairingCodeHash")===codeHash) return false;
+        const used=await txn.get("usedPairingCodes")||[];
+        if(used.includes(codeHash)) return false;
         const devices=await txn.get("devices")||{};
         if(Object.keys(devices).length>=20) return false;
         devices[deviceId]={hash:tokenHash,fcmToken:body.fcmToken,created:now};
         await txn.put("devices",devices);
-        await txn.put("usedPairingCodeHash",codeHash);
+        await txn.put("usedPairingCodes",[...used,codeHash].slice(-100));
         return true;
       });
       if(!issued) return fail("pairing code already used or device limit reached",409);
