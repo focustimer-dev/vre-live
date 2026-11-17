@@ -128,7 +128,9 @@ class DeparturesWidget : AppWidgetProvider() {
                 renderRoute(context, manager, id, timetable, station, destination)
                 continue
             }
-            val views = RemoteViews(context.packageName, R.layout.departures_widget)
+            val views = RemoteViews(context.packageName,
+                if (VreTheme.isNord(context)) R.layout.departures_widget_nord
+                else R.layout.departures_widget)
             views.setTextViewText(R.id.widget_station, timetable.stations.getString(station))
             views.setTextViewText(R.id.widget_times, timetable.departures(station))
             val board = Intent(context, MainActivity::class.java)
@@ -153,15 +155,16 @@ class DeparturesWidget : AppWidgetProvider() {
         val (from, to) = timetable.direction(a, b)
         val ride = timetable.ride(cache)
         val rows = if (ride == null) timetable.route(from, to, cache) else listOf(ride.second)
-        val views = RemoteViews(context.packageName, R.layout.route_widget)
+        val views = RemoteViews(context.packageName,
+            if (VreTheme.isNord(context)) R.layout.route_widget_nord else R.layout.route_widget)
         val title = if (ride == null) "${timetable.stations.getString(from)} → ${timetable.stations.getString(to)}"
             else ride.first
         views.setTextViewText(R.id.widget_station, title)
-        views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let { styled(it, true) } ?: "No more departures today")
+        views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let { styled(context, it, true) } ?: "No more departures today")
         val width = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
         val second = rows.getOrNull(1)
         views.setViewVisibility(R.id.route_second, if (width >= 240 && second != null) View.VISIBLE else View.GONE)
-        if (second != null) views.setTextViewText(R.id.route_second, styled(second, false))
+        if (second != null) views.setTextViewText(R.id.route_second, styled(context, second, false))
         val intent = Intent(context, MainActivity::class.java)
         if (ride == null) intent.setAction("work.samelling.vrelive.lab.OPEN_BOARD").putExtra("station", from).putExtra("destination", to)
         views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(
@@ -170,17 +173,13 @@ class DeparturesWidget : AppWidgetProvider() {
         manager.updateAppWidget(id, views)
     }
 
-    private fun styled(row: Timetable.Row, primary: Boolean): CharSequence {
+    private fun styled(context: Context, row: Timetable.Row, primary: Boolean): CharSequence {
         if (row.time.isEmpty()) return row.status
         val headline = "${row.time}  ${row.train}"
         return SpannableString("$headline\n${row.status}").apply {
             setSpan(RelativeSizeSpan(if (primary) 1.36f else 1.22f), 0, row.time.length, 0)
             if (primary) setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, row.time.length, 0)
-            val color = when (row.line) {
-                "F" -> Color.rgb(255, 127, 127)
-                "M" -> Color.rgb(133, 184, 255)
-                else -> Color.WHITE
-            }
+            val color = VreTheme.line(context, row.line)
             setSpan(ForegroundColorSpan(color), headline.length - row.train.length, headline.length, 0)
         }
     }
@@ -206,6 +205,7 @@ class DeparturesWidget : AppWidgetProvider() {
 
 class DeparturesSetup : Activity() {
     override fun onCreate(state: Bundle?) {
+        if (VreTheme.isNord(this)) setTheme(R.style.Theme_VRELiveLab_NordLight)
         super.onCreate(state)
         setResult(RESULT_CANCELED)
         val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
@@ -217,7 +217,7 @@ class DeparturesSetup : Activity() {
         val stations = Timetable(this).stations
         val codes = stations.keys().asSequence().sortedBy { stations.getString(it) }.toList()
         fun choose(title: String, options: List<String>, onSelected: (String) -> Unit) {
-            android.app.AlertDialog.Builder(this).setTitle(title)
+            android.app.AlertDialog.Builder(VreTheme.dialogContext(this)).setTitle(title)
                 .setItems(options.map { stations.getString(it) }.toTypedArray()) { _, index ->
                     onSelected(options[index])
                 }

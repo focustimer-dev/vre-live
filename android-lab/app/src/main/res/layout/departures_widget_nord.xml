@@ -1,0 +1,14 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:orientation="vertical"
+    android:paddingStart="12dp" android:paddingEnd="12dp"
+    android:paddingTop="5dp" android:paddingBottom="5dp" android:background="@color/vre_nord_card">
+    <TextView android:id="@+id/widget_station" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="VRE departures"
+        android:textColor="@color/vre_nord_fg" android:textSize="16sp" android:textStyle="bold"
+        android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/widget_times" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:text="Scheduled departures" android:textColor="@color/vre_nord_muted"
+        android:textSize="13sp" android:maxLines="3" android:ellipsize="end" />
+</LinearLayout>

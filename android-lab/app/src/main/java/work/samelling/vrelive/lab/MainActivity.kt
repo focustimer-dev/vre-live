@@ -64,10 +64,10 @@ class MainActivity : Activity() {
     private val lockTimetable by lazy { Timetable(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        if (VreTheme.isNord(this)) setTheme(R.style.Theme_VRELiveLab_NordLight)
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.rgb(9, 9, 11)
-        window.navigationBarColor = Color.rgb(9, 9, 11)
         setContentView(R.layout.activity_main)
+        VreTheme.apply(this)
         val root = findViewById<FrameLayout>(R.id.root)
         if (Build.VERSION.SDK_INT >= 35) {
             root.setOnApplyWindowInsetsListener { view, insets ->
@@ -99,7 +99,7 @@ class MainActivity : Activity() {
 
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, false)
-        webView.setBackgroundColor(Color.rgb(9, 9, 11))
+        webView.setBackgroundColor(VreTheme.background(this))
         val assets = WebViewAssetLoader.Builder()
             .setDomain(host)
             .addPathHandler(assetPath, WebViewAssetLoader.AssetsPathHandler(this))
@@ -149,6 +149,17 @@ class MainActivity : Activity() {
                 if (isMainFrame && isPreviewOrigin(origin) &&
                     Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
                 ) handleCommutePrefs(message.data.orEmpty(), reply)
+            }
+            WebViewCompat.addWebMessageListener(webView, "VreTheme", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, _ ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) {
+                    if (VreTheme.save(this, message.data.orEmpty())) {
+                        VreTheme.apply(this)
+                        VreTheme.refreshWidgets(this)
+                    }
+                }
             }
             WebViewCompat.addWebMessageListener(webView, "VrePushPair", setOf("https://$host")) {
                     view, message, origin, isMainFrame, reply ->
@@ -280,7 +291,7 @@ class MainActivity : Activity() {
             return
         }
         if (action == "unpair") {
-            AlertDialog.Builder(this)
+            AlertDialog.Builder(VreTheme.dialogContext(this))
                 .setTitle("Unpair this phone?")
                 .setMessage("Leave-now notifications will stop. Pairing again requires a new one-time code.")
                 .setNegativeButton("Keep paired", null)
@@ -300,13 +311,13 @@ class MainActivity : Activity() {
             reply.postMessage(JSONObject().put("paired",true).toString())
             return
         }
-        val field=EditText(this).apply {
+        val field=EditText(VreTheme.dialogContext(this)).apply {
             hint="Paste one-time pairing code"
             inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             isSingleLine=true
             setPadding(32,26,32,26)
         }
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(VreTheme.dialogContext(this))
             .setTitle("Pair this phone")
             .setMessage("Paste your one-time Cloudflare pairing code. It won't be saved.")
             .setView(field)

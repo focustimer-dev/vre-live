@@ -3,7 +3,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#09090B">
+    android:background="@color/vre_electric_bg">
     <WebView
         android:id="@+id/trainWebView"
         android:layout_width="match_parent"
@@ -15,22 +15,24 @@
         android:orientation="vertical"
         android:gravity="center"
         android:padding="32dp"
-        android:background="#09090B"
+        android:background="@color/vre_electric_bg"
         android:visibility="gone">
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:id="@+id/errorTitle"
             android:text="VRE Live is unavailable"
             android:textSize="20sp"
             android:textStyle="bold"
-            android:textColor="#FAFAFA"/>
+            android:textColor="@color/vre_electric_fg"/>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
+            android:id="@+id/errorDetail"
             android:text="Check your connection, then retry. Train information may be unavailable."
             android:gravity="center"
-            android:textColor="#A1A1AA"/>
+            android:textColor="@color/vre_electric_muted"/>
         <Button
             android:id="@+id/retry"
             android:layout_width="wrap_content"

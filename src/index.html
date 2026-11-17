@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VRE Live</title>
-<meta name="theme-color" content="#09090b">
+<meta name="theme-color" content="#011629">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2309090b'/%3E%3Crect x='16' y='8' width='32' height='38' rx='8' fill='%23fafafa'/%3E%3Crect x='21' y='15' width='22' height='11' rx='3' fill='%2309090b'/%3E%3Ccircle cx='24.5' cy='36' r='3.2' fill='%2309090b'/%3E%3Ccircle cx='39.5' cy='36' r='3.2' fill='%2309090b'/%3E%3Cpath d='M24 47L18 56M40 47L46 56' stroke='%23fafafa' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -15,14 +15,67 @@
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script id="vre-theme">
+(function (root) {
+  "use strict";
+  const KEY = "vre-live-theme-v1";
+  const THEMES = ["electric-stars", "nord-light"];
+  const valid = name => THEMES.includes(name) ? name : "electric-stars";
+  let stored = null;
+  try { stored = window.localStorage.getItem(KEY); } catch (_) {}
+  const initial = valid(stored);
+  root.setAttribute("data-theme", initial);
+  function choose(value) {
+    const theme = valid(value);
+    root.setAttribute("data-theme", theme);
+    try { window.localStorage.setItem(KEY, theme); } catch (_) {}
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "nord-light" ? "#ECEFF4" : "#011629");
+    return theme;
+  }
+  // Apply the restored theme to both the page and browser/system chrome before first paint.
+  choose(initial);
+  window.VRETheme = Object.freeze({ KEY, THEMES, initial, choose });
+})(document.documentElement);
+</script>
 <style>
-  :root{
-    --bg:#09090b; --card:#101013; --card-2:#17171b; --border:#26262b;
-    --fg:#fafafa; --muted:#a1a1aa; --muted-2:#92929d;
-    --red:#ef4444; --blue:#60a5fa; --green:#22c55e; --amber:#f59e0b;
+  /* Stable semantic tokens; Electric Stars is dark-first for new installs.
+     Surfaces ~60% abyss / ~30% petrol+plum, with cobalt/orchid/lilac accents.
+     Keep small text AA readable: cobalt is NOT a body-text color. */
+  :root, :root[data-theme="electric-stars"] {
+    color-scheme: dark;
+    --bg:#011629; --card:#0C426D; --card-2:#372B68; --nav:#372B68;
+    --border:rgba(246,184,251,.32); --border-soft:rgba(246,184,251,.19);
+    --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB; --meta-on-bg:#BE74CD;
+    --red:#FFADB8; --blue:#A3C8FF; --green:#BAF6DA; --amber:#FFE09A;
+    --accent:#3A74DB; --action-bg:#F6B8FB; --action-fg:#011629;
+    --action-border:#3A74DB; --selected-bg:#F6B8FB; --selected-fg:#011629;
+    --sheet-bg:rgba(12,66,109,.96); --surface-hover:rgba(246,184,251,.09);
+    --banner-bg:rgba(255,224,154,.10); --danger-bg:rgba(255,173,184,.12);
+    --map-label-major:#F6B8FB; --map-ink:#011629; --map-highlight:#F6B8FB;
+    --map-stroke:#F6B8FB; --line-F:#FF9BA7; --line-M:#A6CBFF;
+    --line-ink:#011629; --line-separator:rgba(246,184,251,.22);
+    --accent-outline:#BE74CD; --ring:rgba(246,184,251,.8);
+    --tab-surface:#372B68; --focus:#F6B8FB; --pulse:rgba(186,246,218,.45);
     --radius:16px;
     /* type scale: micro / secondary / row / subhead / title / hero */
     --fs-1:11px; --fs-2:13px; --fs-3:14.5px; --fs-4:19px; --fs-5:24px; --fs-hero:52px;
+  }
+  :root[data-theme="nord-light"] {
+    color-scheme: light;
+    --bg:#ECEFF4; --card:#FFFFFF; --card-2:#E5E9F0; --nav:#D8DEE9;
+    --border:#BAC5D1; --border-soft:rgba(76,86,106,.18);
+    --fg:#2E3440; --muted:#434C5E; --muted-2:#4C566A; --meta-ink:#434C5E; --meta-on-bg:#4C566A;
+    --red:#9D3044; --blue:#365F90; --green:#236A4C; --amber:#8A551A;
+    --accent:#365F90; --action-bg:#2E3440; --action-fg:#ECEFF4;
+    --action-border:#365F90; --selected-bg:#2E3440; --selected-fg:#ECEFF4;
+    --sheet-bg:rgba(236,239,244,.97); --surface-hover:rgba(76,86,106,.07);
+    --banner-bg:rgba(138,85,26,.08); --danger-bg:rgba(157,48,68,.08);
+    --map-label-major:#2E3440; --map-ink:#FFFFFF; --map-highlight:#2E3440;
+    --map-stroke:#2E3440; --line-F:#B74652; --line-M:#4574A4;
+    --line-ink:#FFFFFF; --line-separator:rgba(76,86,106,.18);
+    --accent-outline:#5E81AC; --ring:rgba(54,95,144,.72);
+    --tab-surface:#D8DEE9; --focus:#365F90; --pulse:rgba(35,106,76,.28);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--fg);
@@ -32,12 +85,12 @@
   #root{max-width:480px; margin:0 auto; padding:14px 14px 130px}
   .hdr{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px}
   .hdr h1{font-size:var(--fs-4); font-weight:700; margin:0; letter-spacing:-.02em; display:flex; gap:9px; align-items:center}
-  .hdr .sub{font-size:var(--fs-1); color:var(--muted); text-align:right}
+  .hdr .sub{font-size:var(--fs-1); color:var(--meta-on-bg); text-align:right}
   .dot{width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block;
-    box-shadow:0 0 0 0 rgba(34,197,94,.55); animation:pulse 2.4s infinite}
+    box-shadow:0 0 0 0 var(--pulse); animation:pulse 2.4s infinite}
   .dot.stale{background:var(--amber); animation:none}
   .dot.dead{background:var(--red); animation:none}
-  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 var(--pulse)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
   .card{background:linear-gradient(180deg,var(--card-2),var(--card)); border:1px solid var(--border);
     border-radius:var(--radius); overflow:hidden}
   .card+.card{margin-top:12px}
@@ -47,18 +100,18 @@
   svg{display:block; user-select:none}
   svg.sysmap{width:100%; height:auto}
   .st-label{font-size:10.5px; fill:var(--muted); font-weight:500}
-  .st-label.major{fill:#d4d4d8; font-weight:600}
+  .st-label.major{fill:var(--map-label-major); font-weight:600}
   .train{cursor:pointer; transition:transform .95s linear, opacity .4s; will-change:transform}
   .train text{text-rendering:geometricPrecision}
   .train .halo{opacity:0; transition:opacity .2s}
   .train.sel .halo{opacity:1; animation:ring 1.8s infinite}
   @keyframes ring{0%{r:16}50%{r:19}100%{r:16}}
-  .tabs{display:flex; gap:4px; background:var(--card); border:1px solid var(--border);
+  .tabs{display:flex; gap:4px; background:var(--tab-surface); border:1px solid var(--border);
     border-radius:13px; padding:4px; margin:0 0 12px}
   .tabs button{flex:1; appearance:none; border:0; border-radius:10px; background:transparent;
     color:var(--muted); font:inherit; font-weight:600; font-size:var(--fs-2); padding:8px 0; cursor:pointer;
     transition:background .15s,color .15s}
-  .tabs button.on{background:var(--fg); color:#0a0a0a}
+  .tabs button.on{background:var(--selected-bg); color:var(--selected-fg)}
   .tabs button.pref-nav{flex:0 0 48px;display:inline-flex;align-items:center;justify-content:center;
     padding:8px;min-width:44px}
   .tabs button{min-width:0}
@@ -77,7 +130,7 @@
     padding:10px 2px;min-height:44px;text-align:left;width:max-content}
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
-  .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   .global-alert-body{padding:6px 14px 16px}
   .global-alert-row{display:flex;align-items:center;justify-content:space-between;
     gap:14px;padding:14px 2px;min-height:65px;border-bottom:1px solid var(--border)}
@@ -85,7 +138,7 @@
   .global-alert-copy strong{display:block;font-size:var(--fs-3)}
   .global-alert-copy small{display:block;color:var(--muted);font-size:var(--fs-2);
     margin-top:4px;line-height:1.4}
-  .global-alert-row input[type="checkbox"]{width:22px;height:22px;flex:none;accent-color:var(--fg)}
+  .global-alert-row input[type="checkbox"]{width:22px;height:22px;flex:none;accent-color:var(--accent)}
   .global-alert-row input:disabled{opacity:.4}
   .global-alert-lead{padding:12px 2px}
   .global-alert-section{font-size:var(--fs-2);font-weight:700;color:var(--muted);
@@ -138,20 +191,20 @@
   .today-train{width:100%;min-height:54px;border:0;border-top:1px solid var(--border);
     background:transparent;color:var(--fg);font:inherit;font-weight:600;display:flex;
     align-items:center;justify-content:space-between;cursor:pointer;text-align:left}
-  .today-train:focus-visible,.today-plan:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .today-train:focus-visible,.today-plan:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
   .today-footnote{padding-top:10px}
   .today-back{padding-left:0}
 
   .btn{appearance:none; border:0; border-radius:12px; font:inherit; font-weight:600; cursor:pointer;
     padding:12px 16px; width:100%; transition:transform .06s ease, opacity .15s;
-    background:var(--fg); color:#0a0a0a; font-size:15px;
+    background:var(--action-bg); color:var(--action-fg); border:1px solid var(--action-border); font-size:15px;
     display:inline-flex; align-items:center; justify-content:center; gap:8px}
   .btn:active{transform:scale(.98)}
   .btn:disabled{opacity:.45; cursor:default}
   .btn.outline{background:transparent; color:var(--fg); border:1px solid var(--border)}
   .btn.ghost{background:transparent; color:var(--muted); padding:8px 12px; width:auto; font-size:var(--fs-2)}
   .sheet{position:fixed; left:50%; transform:translateX(-50%); bottom:0; width:100%; max-width:480px;
-    background:rgba(16,16,19,.92); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    background:var(--sheet-bg); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
     border:1px solid var(--border); border-bottom:0; border-radius:20px 20px 0 0;
     padding:10px 18px calc(18px + env(safe-area-inset-bottom)); z-index:30;
     animation:up .32s cubic-bezier(.26,1.2,.44,1)}
@@ -160,10 +213,10 @@
   .row{display:flex; align-items:center; justify-content:space-between; gap:10px}
   .badge{display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1); font-weight:600;
     padding:3px 9px; border-radius:999px; border:1px solid var(--border); color:var(--muted); white-space:nowrap}
-  .badge.line-F{color:#fca5a5; border-color:#7f1d1d; background:rgba(239,68,68,.08)}
-  .badge.line-M{color:#93c5fd; border-color:#1e3a8a; background:rgba(96,165,250,.08)}
-  .badge.ok{color:#86efac; border-color:#14532d; background:rgba(34,197,94,.08)}
-  .badge.late{color:#fcd34d; border-color:#713f12; background:rgba(245,158,11,.09)}
+  .badge.line-F{color:var(--line-F); border-color:var(--line-F); background:var(--surface-hover)}
+  .badge.line-M{color:var(--line-M); border-color:var(--line-M); background:var(--surface-hover)}
+  .badge.ok{color:var(--green); border-color:var(--green); background:var(--surface-hover)}
+  .badge.late{color:var(--amber); border-color:var(--amber); background:var(--banner-bg)}
   .badge.dim{opacity:.55}
   .livedot{width:6px; height:6px; border-radius:50%; background:var(--green); display:inline-block;
     animation:pulse 2.4s infinite}
@@ -175,7 +228,7 @@
     background:transparent; border:0; border-radius:11px; padding:11px 12px; font:inherit; color:var(--fg); font-weight:500}
   .stop-btn{cursor:pointer}
   .stop-btn:hover,.stop-btn:active{background:var(--card-2)}
-  .stop-row{border-bottom:1px solid rgba(38,38,43,.6)}
+  .stop-row{border-bottom:1px solid var(--line-separator)}
   .stop-row:last-child{border-bottom:0}
   .t{color:var(--muted); font-variant-numeric:tabular-nums; font-size:var(--fs-2); display:inline-flex; align-items:center; gap:8px}
   .t .min{color:var(--fg); font-weight:700; min-width:36px; text-align:right}
@@ -212,20 +265,20 @@
   .switch::after{content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%;
     background:var(--muted); transition:transform .18s, background .18s}
   .switch.on{background:var(--accent, var(--green))}
-  .switch.on::after{transform:translateX(18px); background:#052e16}
+  .switch.on::after{transform:translateX(18px); background:var(--action-fg)}
   .sched{padding:6px 8px 10px}
   .sched-filters{display:flex; gap:6px; padding:10px 8px 6px}
   .chip{appearance:none; border:1px solid var(--border); background:transparent; color:var(--muted);
     font:inherit; font-size:var(--fs-1); font-weight:600; border-radius:999px; padding:5px 12px; cursor:pointer}
-  .chip.on{background:var(--fg); color:#0a0a0a; border-color:var(--fg)}
-  .srow{width:100%; appearance:none; background:transparent; border:0; border-bottom:1px solid rgba(38,38,43,.6);
+  .chip.on{background:var(--selected-bg); color:var(--selected-fg); border-color:var(--selected-bg)}
+  .srow{width:100%; appearance:none; background:transparent; border:0; border-bottom:1px solid var(--line-separator);
     display:flex; align-items:center; gap:12px; padding:12px 10px; font:inherit; color:var(--fg);
     cursor:pointer; text-align:left; border-radius:0}
-  .srow:hover{background:rgba(250,250,250,.025)}
+  .srow:hover{background:var(--surface-hover)}
   .srow:last-child{border-bottom:0}
   .srow.done{opacity:.42}
   .srow .numchip{flex:none; width:42px; height:27px; border-radius:8px; display:grid; place-items:center;
-    font-size:var(--fs-2); font-weight:800; color:#0b0b0d}
+    font-size:var(--fs-2); font-weight:800; color:var(--line-ink)}
   .srow .mid{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
   .srow .mid .l1{display:block; font-weight:600; font-size:var(--fs-3); line-height:1.25;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -234,20 +287,20 @@
   .srow .right{flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:4px}
   .sexp{padding:2px 8px 10px 59px; animation:fade .25s}
   .sexp .stop-row{padding:6px 4px; font-size:13px}
-  .banner{margin:10px 8px 2px; border:1px solid var(--border); background:rgba(245,158,11,.06);
-    color:#fcd34d; border-radius:11px; padding:9px 13px; font-size:var(--fs-2)}
+  .banner{margin:10px 8px 2px; border:1px solid var(--border); background:var(--banner-bg);
+    color:var(--amber); border-radius:11px; padding:9px 13px; font-size:var(--fs-2)}
   .fld{display:flex; flex-direction:column; gap:5px; flex:1; font-size:var(--fs-1); color:var(--muted); font-weight:600}
   .fld select{appearance:none; background:var(--bg); border:1px solid var(--border); border-radius:10px;
     color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; outline:none; width:100%}
-  .fld select:focus{border-color:#52525b}
+  .fld select:focus{border-color:var(--focus)}
   .fld input:not([type="checkbox"]){background:var(--bg); border:1px solid var(--border); border-radius:10px;
     color:var(--fg); font:inherit; font-size:var(--fs-2); padding:9px 10px; width:100%; min-width:0}
-  .fld input:focus-visible{outline:2px solid var(--fg); outline-offset:2px}
+  .fld input:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
   .srow:disabled{cursor:default}
   .train.ghost{cursor:pointer}
-  .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--muted-2); font-size:var(--fs-1)}
+  .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--meta-on-bg); font-size:var(--fs-1)}
   .empty{padding:34px 20px; text-align:center; color:var(--muted); font-size:var(--fs-2)}
-  .err{margin-top:12px; border:1px solid #7f1d1d; background:rgba(239,68,68,.07); color:#fca5a5;
+  .err{margin-top:12px; border:1px solid var(--red); background:var(--danger-bg); color:var(--red);
     border-radius:12px; padding:11px 14px; font-size:var(--fs-2)}
   .fade{animation:fade .3s ease}
   @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -258,13 +311,13 @@
     font-size:var(--fs-1); font-weight:700; color:var(--muted-2); text-transform:uppercase; letter-spacing:.08em}
   .nowline{display:flex; align-items:center; gap:10px; margin:10px 8px; color:var(--green);
     font-size:var(--fs-1); font-weight:700; font-variant-numeric:tabular-nums}
-  .nowline::before,.nowline::after{content:""; flex:1; border-top:1px dashed rgba(34,197,94,.45)}
-  .earlier-toggle{width:100%; appearance:none; background:transparent; border:0; border-top:1px solid rgba(38,38,43,.6);
+  .nowline::before,.nowline::after{content:""; flex:1; border-top:1px dashed var(--green)}
+  .earlier-toggle{width:100%; appearance:none; background:transparent; border:0; border-top:1px solid var(--line-separator);
     color:var(--muted-2); font:inherit; font-size:var(--fs-2); font-weight:600; padding:12px 10px 8px;
     cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px}
   .earlier-toggle:hover{color:var(--muted)}
   /* marey mini-chart */
-  .marey-wrap{border-top:1px solid rgba(38,38,43,.6); margin:4px 8px 0; padding:0 2px 6px}
+  .marey-wrap{border-top:1px solid var(--line-separator); margin:4px 8px 0; padding:0 2px 6px}
   .marey-toggle{width:100%; appearance:none; background:transparent; border:0; color:var(--muted-2);
     font:inherit; font-size:var(--fs-1); font-weight:700; text-transform:uppercase; letter-spacing:.08em;
     padding:10px 2px 8px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px}
@@ -280,9 +333,9 @@
   /* departure board */
   .brow{width:100%; appearance:none; background:transparent; border:0; text-align:left; font:inherit;
     color:var(--fg); display:flex; align-items:center; gap:12px; padding:13px 10px;
-    border-bottom:1px solid rgba(38,38,43,.6); cursor:default}
+    border-bottom:1px solid var(--line-separator); cursor:default}
   .brow.live{cursor:pointer}
-  .brow.live:hover{background:rgba(250,250,250,.025)}
+  .brow.live:hover{background:var(--surface-hover)}
   .brow:last-child{border-bottom:0}
   .brow .bmid{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
   .brow .bhead{font-size:var(--fs-3); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -312,7 +365,7 @@
   .eta-hero>.row{flex-wrap:wrap}
   .switch::before{content:"";position:absolute;inset:-9px 0}
   button:focus-visible,select:focus-visible,.train:focus-visible{
-    outline:2px solid var(--fg);outline-offset:3px}
+    outline:2px solid var(--focus);outline-offset:3px}
   .map-legend{display:flex;flex-wrap:wrap;gap:7px 16px;padding:0 16px 12px;
     color:var(--muted);font-size:var(--fs-2);line-height:1.4}
   .map-legend span{display:inline-flex;align-items:center;gap:7px}
@@ -342,8 +395,8 @@
   .journey-icon{width:38px;height:46px;flex-shrink:0;color:var(--accent)}
   .journey-views{display:flex;gap:3px;background:var(--bg);padding:3px;border-radius:12px}
   .journey-views button{font:inherit;font-size:12px;font-weight:600;border:0;background:transparent;color:var(--muted);border-radius:9px;min-height:44px;padding:0 10px;cursor:pointer}
-  .journey-views button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
-  .journey-views button:focus-visible,.journey-next:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+  .journey-views button[aria-pressed="true"]{background:var(--selected-bg);color:var(--selected-fg)}
+  .journey-views button:focus-visible,.journey-next:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
   .journey-map{overflow:hidden;position:relative}
   .journey-map.focused{animation:journey-reveal .7s cubic-bezier(.16,1,.3,1)}
   @keyframes journey-reveal{from{clip-path:inset(4% 0 4% 0 round 16px)}to{clip-path:inset(0 round 0)}}
@@ -354,7 +407,30 @@
   .journey-foot{font-size:12px;color:var(--muted);padding:0 10px 12px}
   @media(max-width:350px){.journey-head{gap:6px;padding-left:4px;padding-right:4px}.journey-title{gap:7px}.journey-title strong{font-size:21px}.journey-views button{padding:0 7px}.journey-icon{width:29px}}
   @media(prefers-reduced-motion:reduce){.journey-map.focused{animation:none}.journey-map .train{transition:none}}
-  .your-train-focus{cursor:pointer}.your-train-focus:focus-visible{outline:2px solid var(--fg);outline-offset:4px}
+  .your-train-focus{cursor:pointer}.your-train-focus:focus-visible{outline:2px solid var(--focus);outline-offset:4px}
+
+  /* Every actionable surface and metadata label is theme-driven, including sheets,
+     map interactions and the accessible two-choice appearance picker. */
+  .card-h,.sect,.global-alert-section{color:var(--meta-ink)}
+  .btn:focus-visible,.tabs button:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .btn.outline{border-color:var(--accent-outline)}
+  .switch.on{background:var(--accent)}
+  .stops,.map-wrap,.sched{color:var(--fg)}
+  .theme-choices{padding:8px 14px 16px;display:grid;gap:10px}
+  .theme-option{appearance:none;width:100%;min-height:68px;display:flex;gap:12px;
+    align-items:center;text-align:left;padding:12px;border:2px solid var(--border);
+    background:var(--card);border-radius:12px;color:var(--fg);font:inherit;cursor:pointer}
+  .theme-option[aria-pressed="true"]{border-color:var(--focus);box-shadow:0 0 0 1px var(--focus)}
+  .theme-option:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+  .theme-option:active{background:var(--card-2)}
+  .theme-option strong{font-size:var(--fs-3);display:block}
+  .theme-option small{font-size:var(--fs-2);color:var(--muted);display:block;margin-top:3px}
+  .theme-swatch{width:38px;height:38px;flex:none;border-radius:10px;display:grid;place-items:center;
+    border:1px solid var(--border-soft);font-size:20px;font-weight:800}
+  .theme-swatch.electric{background:#011629;color:#F6B8FB;box-shadow:inset 0 0 0 6px #0C426D}
+  .theme-swatch.nord{background:#ECEFF4;color:#2E3440;box-shadow:inset 0 0 0 6px #D8DEE9}
+  .theme-selected{margin-left:auto;font-size:var(--fs-2);font-weight:800;color:var(--fg)}
+  .theme-hint{margin:0 14px 16px;font-size:var(--fs-2);color:var(--muted)}
 </style>
 </head>
 <body>
@@ -1226,7 +1302,7 @@
   }
   const REFRESH_MS = 180000;          // 3 minutes
   const MIN_FETCH_GAP = 65000;        // never hit the proxy/feeds faster than this
-  const LINE_COLOR = { F: "#ef4444", M: "#60a5fa" };
+  const LINE_COLOR = { F: "var(--line-F)", M: "var(--line-M)" };
   function isCurrentRide(ride, now = Date.now()) {
     const started = Number(ride && ride.boardedAt);
     // The ride timestamp is taken at tap time while the screen clock ticks once per
@@ -1832,8 +1908,31 @@
       </div>`;
   }
 
+  function AppearanceSettings({ theme, onThemeChange }) {
+    const choices = [
+      { id: "electric-stars", name: "Electric Stars", detail: "Midnight Abyss · Petrol Navy · Orchid Mesh", symbol: "✦", swatch: "electric" },
+      { id: "nord-light", name: "Nord Light", detail: "Snow Storm · Polar Night · Frost", symbol: "◈", swatch: "nord" }
+    ];
+    return html`
+      <div className="card">
+        <div className="card-h">Appearance</div>
+        <p className="pref-description">Choose colors for maps, cards, controls and home-screen widgets. Saved on this device.</p>
+        <div className="theme-choices" role="group" aria-label="Color theme">
+          ${choices.map(choice => html`
+            <button key=${choice.id} type="button" className="theme-option"
+              aria-pressed=${theme === choice.id}
+              onClick=${() => onThemeChange(choice.id)}>
+              <span aria-hidden="true" className=${"theme-swatch " + choice.swatch}>${choice.symbol}</span>
+              <span><strong>${choice.name}</strong><small>${choice.detail}</small></span>
+              ${theme === choice.id && html`<span className="theme-selected">Selected</span>`}
+            </button>`)}
+        </div>
+        <p className="theme-hint">Cobalt accents are for borders, progress and large text, never small body copy.</p>
+      </div>`;
+  }
+
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
-  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed }) {
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed, theme, onThemeChange }) {
     const open = name => onSection(name);
     return html`
       <section className="preferences" aria-label="Preferences">
@@ -1856,6 +1955,11 @@
                   <small>App notifications, commute check-ins, sound and vibration</small>
                 </span><span className="pref-arrow" aria-hidden="true">›</span>
               </button>
+              <button className="pref-choice" type="button" onClick=${() => open("appearance")}>
+                <span><strong>Appearance</strong>
+                  <small>Electric Stars dark · Nord Light</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
             </div>
           </div>`
         : html`
@@ -1876,6 +1980,8 @@
           : section === "alerts" ? html`
             <${GlobalAlertSettings} settings=${alertPrefs} onSave=${onSaveAlerts}
               osAllowed=${osAllowed} />`
+          : section === "appearance" ? html`
+            <${AppearanceSettings} theme=${theme} onThemeChange=${onThemeChange} />`
           : html`
             <div className="card">
               <div className="card-h">Advanced Commute</div>
@@ -2181,9 +2287,9 @@
         <div className="journey-title">
           <svg className="journey-icon" viewBox="0 0 38 46" fill="none" aria-hidden="true">
             <rect x="5" y="2" width="28" height="34" rx="9" fill="currentColor"/>
-            <path d="M10 12h18v10H10z" fill="#09090b"/><path d="M19 12v10" stroke="currentColor" strokeWidth="2"/>
+            <path d="M10 12h18v10H10z" fill="var(--map-ink)"/><path d="M19 12v10" stroke="currentColor" strokeWidth="2"/>
             <path d="M10 43l5-7m13 7l-5-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-            <circle cx="12" cy="29" r="2" fill="#09090b"/><circle cx="26" cy="29" r="2" fill="#09090b"/>
+            <circle cx="12" cy="29" r="2" fill="var(--map-ink)"/><circle cx="26" cy="29" r="2" fill="var(--map-ink)"/>
           </svg>
           <div><strong>Train ${activeTrain.num}</strong><small>${activeTrain.dir === 1 ? "Toward DC" : "Outbound"} · Your ride</small></div>
         </div>
@@ -2199,17 +2305,17 @@
         ${ride && html`
           <g aria-hidden="true" style=${{pointerEvents:"none"}}>
             <path d=${ride.pathD} fill="none" stroke=${ride.color} strokeWidth="11" strokeLinejoin="round" strokeLinecap="round" opacity="0.16"/>
-            <path className="ridepath" d=${ride.pathD} fill="none" stroke="#fafafa" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
+            <path className="ridepath" d=${ride.pathD} fill="none" stroke="var(--map-highlight)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
           </g>`}
         ${anchors.filter(t => t.tripId !== myTripId).map(t => {
           const p = positions[t.tripId];
           const active = t.tripId === myTripId, highlighted = active || t.tripId === selected;
           return html`<g key=${"leader-" + t.tripId} className=${active ? "train-leader active" : "train-leader"}
             aria-hidden="true" style=${{ pointerEvents: "none" }}>
-            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="#09090b" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
-            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "#fafafa" : LINE_COLOR[t.line]}
+            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="var(--map-ink)" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
+            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "var(--map-highlight)" : LINE_COLOR[t.line]}
               strokeWidth=${active ? 3.4 : highlighted ? 2.4 : 1.1} strokeLinecap="round" opacity=${highlighted ? 1 : 0.55}/>
-            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="#09090b" stroke="#fafafa" strokeWidth="2.3"/>`}
+            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="var(--map-ink)" stroke="var(--map-highlight)" strokeWidth="2.3"/>`}
             <circle cx=${t.x} cy=${t.y} r=${active ? 3.3 : 2.7} fill=${LINE_COLOR[t.line]}/>
           </g>`;
         })}
@@ -2223,12 +2329,12 @@
               ${isDest && html`
                 <circle className="destring" cx=${s.x} cy=${s.y} r="10.5" fill="none"
                   stroke=${ride.color} strokeWidth="2" opacity="0.9"/>`}
-              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="#0b0b0d"
-                stroke=${isDest ? "#fafafa" : trunk ? "#e4e4e7" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
+              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="var(--map-ink)"
+                stroke=${isDest ? "var(--map-highlight)" : trunk ? "var(--map-label-major)" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
                 strokeWidth=${trunk || isDest ? 2.4 : 2}/>
               <text x=${s.x + side * (isDest ? 16 : 13)} y=${s.y + 3.5}
                 textAnchor=${side < 0 ? "end" : "start"}
-                style=${isDest ? { fill: "#fafafa", fontWeight: 700 } : null}
+                style=${isDest ? { fill: "var(--map-highlight)", fontWeight: 700 } : null}
                 className=${"st-label" + (trunk || code === "SP" || code === "12" || isDest ? " major" : "")}>${s.name}</text>
             </g>`;
         })}
@@ -2238,13 +2344,13 @@
             onClick=${() => onPick(activeTrain.tripId)}
             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(activeTrain.tripId); } }}>
             <rect x=${focus.card.x} y=${focus.card.y} width=${focus.card.w} height=${focus.card.h} rx="12" fill=${LINE_COLOR[activeTrain.line]}/>
-            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="#09090b">${activeTrain.num}</text>
+            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="var(--map-ink)">${activeTrain.num}</text>
             <path d=${activeTrain.dir === 1 ? `M${focus.card.x+80},${focus.card.y+32} l6,-8 l6,8` : `M${focus.card.x+80},${focus.card.y+24} l6,8 l6,-8`}
-              fill="none" stroke="#09090b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="#09090b" stroke="#09090b" strokeWidth="5"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="#fafafa" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
+              fill="none" stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="var(--map-ink)" stroke="var(--map-ink)" strokeWidth="5"/>
+            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="var(--map-highlight)" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
             <path d=${activeTrain.dir === 1 ? `M${activeTrain.x-4},${activeTrain.y+2} l4,-5 l4,5` : `M${activeTrain.x-4},${activeTrain.y-2} l4,5 l4,-5`}
-              fill="none" stroke="#09090b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              fill="none" stroke="var(--map-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </g>`}
         ${(ghosts || []).filter(g => g.tripId !== myTripId).map(g => {
           const sel = g.tripId === selected, mine = g.tripId === myTripId;
@@ -2257,9 +2363,9 @@
              onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(g.tripId); }}>
             <g className="pop">
               <circle cx="0" cy="0" r="31" fill="transparent"/>
-              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="#fafafa" strokeWidth="1.4"/>`}
+              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4"/>`}
               <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${LINE_COLOR[g.line]} strokeWidth="1.5"/>
-              <circle cx="0" cy="0" r="13" fill="#0b0b0d" stroke=${LINE_COLOR[g.line]}
+              <circle cx="0" cy="0" r="13" fill="var(--map-ink)" stroke=${LINE_COLOR[g.line]}
                 strokeWidth="1.6" strokeDasharray="3 2.6" opacity="0.8"/>
               <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="700"
                 fill=${LINE_COLOR[g.line]}>${g.num}</text>
@@ -2284,7 +2390,7 @@
                aria-label=${`Train ${t.num}, ${t.lineName}, ${up ? "toward DC" : "outbound"}${projected ? ", projected position" : ""}`}
                onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(t.tripId); }}>
               <g className="pop">
-                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="#fafafa" strokeWidth="1.4" opacity="0.95"/>`}
+                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4" opacity="0.95"/>`}
                 ${projected && !mine && html`
                   <circle cx="0" cy="0" r="17" fill="none" stroke=${c} strokeWidth="1.3"
                     strokeDasharray="3 3" opacity="0.85"/>`}
@@ -2294,8 +2400,8 @@
                   fill="none" stroke=${c} strokeWidth="2.4" strokeLinecap="round"/>
                 <path d=${`M-4.5 ${s * 23} Q0 ${s * 27.5} 4.5 ${s * 23}`}
                   fill="none" stroke=${c} strokeWidth="2" strokeLinecap="round" opacity="0.45"/>
-                <circle cx="0" cy="0" r="13" fill=${c} stroke="#0b0b0d" strokeWidth="2"/>
-                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="#0b0b0d">${t.num}</text>
+                <circle cx="0" cy="0" r="13" fill=${c} stroke="var(--map-ink)" strokeWidth="2"/>
+                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="var(--map-ink)">${t.num}</text>
               </g>
             </g>`;
         })}
@@ -2382,10 +2488,10 @@
           <span style=${{ flex: 1 }}></span>
           <button className=${"chip" + (lineF === "all" ? " on" : "")} onClick=${() => setLineF("all")}>All</button>
           <button className=${"chip" + (lineF === "F" ? " on" : "")}
-            style=${lineF === "F" ? { background: LINE_COLOR.F, borderColor: LINE_COLOR.F, color: "#0b0b0d" } : { color: "#fca5a5" }}
+            style=${lineF === "F" ? { background: LINE_COLOR.F, borderColor: LINE_COLOR.F, color: "var(--map-ink)" } : { color: "var(--line-F)" }}
             onClick=${() => setLineF("F")}>FBG</button>
           <button className=${"chip" + (lineF === "M" ? " on" : "")}
-            style=${lineF === "M" ? { background: LINE_COLOR.M, borderColor: LINE_COLOR.M, color: "#0b0b0d" } : { color: "#93c5fd" }}
+            style=${lineF === "M" ? { background: LINE_COLOR.M, borderColor: LINE_COLOR.M, color: "var(--map-ink)" } : { color: "var(--line-M)" }}
             onClick=${() => setLineF("M")}>MSS</button>
         </div>
         ${!service && html`<div className="banner">No VRE service today (weekday-only schedule shown).</div>`}
@@ -2468,9 +2574,9 @@
               <g key=${c}>
                 <line x1=${L} y1=${Y(i)} x2=${W - R} y2=${Y(i)} stroke="var(--border)" strokeWidth="0.7"/>
                 <circle cx=${L} cy=${Y(i)} r=${ends ? 2.6 : 1.5}
-                  fill=${ends ? "#d4d4d8" : "var(--muted-2)"}/>
+                  fill=${ends ? "var(--map-label-major)" : "var(--muted-2)"}/>
                 <text x=${L - 7} y=${Y(i) + 3} fontSize=${ends ? 8.5 : 7} textAnchor="end"
-                  fill=${ends ? "#d4d4d8" : "var(--muted-2)"} fontWeight=${ends ? 600 : 400}>
+                  fill=${ends ? "var(--map-label-major)" : "var(--muted-2)"} fontWeight=${ends ? 600 : 400}>
                   ${ends ? gutterName(STATIONS[c].name) : ""}</text>
               </g>`;
           })}
@@ -2506,7 +2612,7 @@
                 <text x=${Math.max(L + 2, Math.min(pts[0][0] + 3, W - 24))} y=${Math.max(T + 8, pts[0][1] - 3.5)}
                   fontSize="8" fill=${c} fontWeight="700">${dep.num}</text>
                 ${dep.live && dot && html`
-                  <circle cx=${dot[0]} cy=${dot[1]} r="3.4" fill=${c} stroke="#0b0b0d" strokeWidth="1.2"/>`}
+                  <circle cx=${dot[0]} cy=${dot[1]} r="3.4" fill=${c} stroke="var(--map-ink)" strokeWidth="1.2"/>`}
               </g>`;
           })}
         </svg>
@@ -2740,6 +2846,13 @@
 
   /* ---------------- root ---------------- */
   function App() {
+    const [theme, setTheme] = useState(() => window.VRETheme?.initial || "electric-stars");
+    useEffect(() => {
+      const selected = window.VRETheme?.choose(theme);
+      if (selected) {
+        try { window.VreTheme?.postMessage(selected); } catch (_) {}
+      }
+    }, [theme]);
     const [data, setData] = useState(null);          // {trains, feedTs}
     const [alerts, setAlerts] = useState([]);
     const [fetchedAt, setFetchedAt] = useState(0);
@@ -3198,7 +3311,7 @@
         </nav>
 
         ${alerts.length > 0 && html`
-          <div className="card fade" style=${{ marginBottom: 12, borderColor: "#713f12" }}>
+          <div className="card fade" style=${{ marginBottom: 12, borderColor: "var(--amber)" }}>
             <div className="card-h" style=${{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 7 }}>
               <${AlertIcon} /> Service alerts</div>
             <div style=${{ padding: "6px 16px 14px" }}>
@@ -3264,6 +3377,7 @@
             route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
             alertPrefs=${alertPrefs} onSaveAlerts=${saveAlertPrefs}
             osAllowed=${commuteDay?.notificationsAllowed}
+            theme=${theme} onThemeChange=${setTheme}
             onSaveRoute=${r => {
               lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
             }} />`

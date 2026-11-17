@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Native mirrors of the PWA semantic color tokens in src/index.html. -->
+    <color name="vre_electric_bg">#011629</color>
+    <color name="vre_electric_card">#0C426D</color>
+    <color name="vre_electric_nav">#372B68</color>
+    <color name="vre_electric_fg">#F6B8FB</color>
+    <color name="vre_electric_muted">#E2D8F4</color>
+    <color name="vre_electric_cobalt">#3A74DB</color>
+    <color name="vre_electric_border">#BE74CD</color>
+    <color name="vre_electric_line_f">#FF9BA7</color>
+    <color name="vre_electric_line_m">#A6CBFF</color>
+
+    <color name="vre_nord_bg">#ECEFF4</color>
+    <color name="vre_nord_card">#FFFFFF</color>
+    <color name="vre_nord_nav">#D8DEE9</color>
+    <color name="vre_nord_fg">#2E3440</color>
+    <color name="vre_nord_muted">#434C5E</color>
+    <color name="vre_nord_accent">#365F90</color>
+    <color name="vre_nord_border">#BAC5D1</color>
+    <color name="vre_nord_line_f">#B74652</color>
+    <color name="vre_nord_line_m">#4574A4</color>
+</resources>
