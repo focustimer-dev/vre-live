@@ -2,6 +2,9 @@ package work.samelling.vrelive.lab
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
+import android.text.InputType
+import android.widget.EditText
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -147,6 +150,12 @@ class MainActivity : Activity() {
                     Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
                 ) handleCommutePrefs(message.data.orEmpty(), reply)
             }
+            WebViewCompat.addWebMessageListener(webView, "VrePushPair", setOf("https://$host")) {
+                    view, message, origin, isMainFrame, reply ->
+                if (isMainFrame && isPreviewOrigin(origin) &&
+                    Uri.parse(view.url.orEmpty()).path == Uri.parse(launchUrl).path
+                ) handlePushPair(message.data.orEmpty(), reply)
+            }
         }
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
@@ -207,6 +216,7 @@ class MainActivity : Activity() {
             ) { dismissSheetOrGoBack { if (isTaskRoot) moveTaskToBack(false) else finish() } }
         }
         CommuteCheckIns.reschedule(this)
+        CommutePushClient.onAppOpened(this)
         if (intent.action == CommuteCheckIns.CONFIRM) {
             CommuteCheckIns.confirm(this, intent.getStringExtra("profileId").orEmpty())
         }
@@ -222,6 +232,7 @@ class MainActivity : Activity() {
                 if (!CommuteCheckIns.sync(this, message)) return
                 val settings = message.optJSONObject("alerts")
                 val enabled = CommuteCheckIns.enabled(this)
+                CommutePushClient.onSettingsUpdated(this)
                 if (!enabled) {
                     alertArmed = false
                     alertPermissionReply = null
@@ -231,7 +242,8 @@ class MainActivity : Activity() {
                     stopService(Intent(this, RideMonitor::class.java))
                 }
                 if (enabled && (settings?.optBoolean("checkIns") == true ||
-                        settings?.optBoolean("arrival") == true) &&
+                        settings?.optBoolean("arrival") == true ||
+                        settings?.optBoolean("leaveNow") == true) &&
                     message.optBoolean("prompt") && Build.VERSION.SDK_INT >= 33 &&
                     checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 ) {
@@ -239,15 +251,62 @@ class MainActivity : Activity() {
                     requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 43)
                 }
             }
-            "plan" -> CommuteCheckIns.plan(this,
-                message.optString("profileId"), message.optString("train"))
-            "skipTrip" -> CommuteCheckIns.skipTrip(this, message.optString("profileId"))
-            "skipToday" -> CommuteCheckIns.skipToday(this)
+            "plan" -> {
+                val profileId = message.optString("profileId")
+                if (CommuteCheckIns.plan(this,profileId,message.optString("train"))) {
+                    CommutePushClient.cancelTrip(this,profileId)
+                    CommutePushClient.watchSelected(this,profileId)
+                }
+            }
+            "skipTrip" -> {
+                val profileId = message.optString("profileId")
+                CommuteCheckIns.skipTrip(this,profileId)
+                CommutePushClient.cancelTrip(this,profileId)
+            }
+            "skipToday" -> {
+                CommuteCheckIns.skipToday(this)
+                CommutePushClient.cancelAll(this)
+            }
             "reactivate" -> CommuteCheckIns.reactivate(this, message.optString("profileId"))
             "confirm" -> CommuteCheckIns.confirm(this, message.optString("profileId"))
             else -> return
         }
         reply.postMessage(CommuteCheckIns.state(this))
+    }
+
+    private fun handlePushPair(action: String, reply: JavaScriptReplyProxy) {
+        if (action == "status") {
+            reply.postMessage(JSONObject().put("paired",CommutePushClient.paired(this)).toString())
+            return
+        }
+        if (action != "pair") return
+        if (!CommuteCheckIns.enabled(this)) {
+            Toast.makeText(this, "Enable Notifications before pairing",Toast.LENGTH_LONG).show()
+            return
+        }
+        if (CommutePushClient.paired(this)) {
+            reply.postMessage(JSONObject().put("paired",true).toString())
+            return
+        }
+        val field=EditText(this).apply {
+            hint="Paste one-time pairing code"
+            inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            isSingleLine=true
+            setPadding(32,26,32,26)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Pair this phone")
+            .setMessage("Paste your one-time Cloudflare pairing code. It won't be saved.")
+            .setView(field)
+            .setNegativeButton("Cancel",null)
+            .setPositiveButton("Pair") { _, _ ->
+                val code=field.text.toString().trim()
+                field.text?.clear()
+                CommutePushClient.pair(this,code) { success,message ->
+                    Toast.makeText(this,message,Toast.LENGTH_LONG).show()
+                    reply.postMessage(JSONObject().put("paired",success).toString())
+                }
+            }.show()
     }
 
     private fun handleRideAlert(data: String, reply: JavaScriptReplyProxy) {
