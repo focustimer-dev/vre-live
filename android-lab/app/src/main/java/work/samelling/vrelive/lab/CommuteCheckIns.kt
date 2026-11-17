@@ -322,8 +322,8 @@ internal object CommuteCheckIns {
         return PendingIntent.getBroadcast(context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
-    private fun show(context: Context, id: String) {
-        if (!notificationsAllowed(context)) return
+    private fun show(context: Context, id: String, grouped: Int = 1) {
+        if (!notificationsAllowed(context) || !checkInsEnabled(context)) return
         val p = profile(context, id) ?: return
         if (daily(context).optBoolean("skippedDay")) return
         if (!hasService(context, p, nowDate())) return
@@ -331,14 +331,25 @@ internal object CommuteCheckIns {
         if (state.optJSONObject("confirmed")?.optBoolean(id) == true ||
             state.optJSONObject("skippedTrips")?.optBoolean(id) == true) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        manager.createNotificationChannel(NotificationChannel(CHANNEL,
-            "Commute check-ins", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            enableVibration(false)
+        // Android channel settings belong to the user once created. Use stable
+        // channel IDs for each sound/vibration combination, never mutate old channels.
+        val cfg = alerts(context)
+        val sound = cfg.optBoolean("sound")
+        val vibration = cfg.optBoolean("vibration")
+        val channelId = "commute_checkins_v2_" + (if (sound) "sound" else "silent") +
+            "_" + (if (vibration) "vibrate" else "still")
+        manager.createNotificationChannel(NotificationChannel(channelId,
+            "Commute check-ins (" + (if (sound) "sound" else "silent") +
+                ", " + (if (vibration) "vibration" else "no vibration") + ")",
+            NotificationManager.IMPORTANCE_DEFAULT).apply {
+            if (!sound) setSound(null, null)
+            enableVibration(vibration)
         })
-        val notification = Notification.Builder(context, CHANNEL)
+        val notification = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentTitle("Taking the train today?")
-            .setContentText(p.optString("name", "Your commute") + " · choose a preferred train")
+            .setContentText(if (grouped > 1) "Choose from $grouped upcoming commutes"
+                else p.optString("name", "Your commute") + " · choose a preferred train")
             .setAutoCancel(true)
             .setContentIntent(action(context, id, OPEN_PLAN, true))
             .addAction(Notification.Action.Builder(null, "Yes",
@@ -356,27 +367,44 @@ internal object CommuteCheckIns {
         val at = pref.getLong(NEXT_AT, 0)
         val id = pref.getString(NEXT_ID, "").orEmpty()
         val now = System.currentTimeMillis()
-        if (id.isNotEmpty() && at > 0 && now >= at - 120000 && now - at <= 30 * 60000) {
-            // Deliver all enabled commutes scheduled for the same minute, not just
-            // whichever profile won the single-alarm queue tie-break.
-            val profiles = storedProfiles(context)
-            val today = nowDate()
-            for (i in 0 until profiles.length()) {
-                val p = profiles.optJSONObject(i) ?: continue
-                if (!p.optBoolean("checkInEnabled") || !hasService(context, p, today)) continue
-                val time = runCatching { LocalTime.parse(p.optString("checkIn")) }.getOrNull() ?: continue
-                val trigger = today.atTime(time).atZone(zone).toInstant().toEpochMilli()
-                if (trigger == at) show(context, p.optString("id"))
+        if (id.isNotEmpty() && at > 0 && now >= at - 120000 && now - at <= 30 * 60000 &&
+            checkInsEnabled(context)) {
+            val state = daily(context)
+            if (!state.optBoolean("skippedDay")) {
+                val cfg = alerts(context)
+                val profiles = storedProfiles(context)
+                val today = nowDate()
+                val group = mutableListOf<String>()
+                for (i in 0 until profiles.length()) {
+                    val p = profiles.optJSONObject(i) ?: continue
+                    val pid = p.optString("id")
+                    if (state.optJSONObject("skippedTrips")?.optBoolean(pid) == true ||
+                        state.optJSONObject("confirmed")?.optBoolean(pid) == true ||
+                        state.optJSONObject("prompted")?.optBoolean(pid) == true) continue
+                    val due = checkInAt(context, p, today, cfg) ?: continue
+                    // Adjacent routine check-ins share one notification instead of
+                    // forcing the user to respond several times during a commute window.
+                    if (kotlin.math.abs(due - at) <= 15 * 60000) group.add(pid)
+                }
+                if (group.isNotEmpty()) {
+                    show(context, group.first(), group.size)
+                    val prompted = state.optJSONObject("prompted") ?: JSONObject()
+                    group.forEach { prompted.put(it, true) }
+                    state.put("prompted", prompted)
+                    persistDaily(context, state)
+                }
             }
         }
         reschedule(context, maxOf(now, at + 1000))
     }
 
     fun onReminder(context: Context, id: String) {
+        if (!checkInsEnabled(context)) return
         show(context, id)
     }
 
     fun later(context: Context, id: String) {
+        if (!checkInsEnabled(context)) return
         val p = profile(context, id) ?: return
         if (!hasService(context, p, nowDate())) return
         val state = daily(context)
