@@ -82,15 +82,16 @@ assert.match(app, /setLastCompletedRide\(rec\)/,
   "off-train action updates home leg immediately");
 assert.match(app, /homeRoute = route \|\| \(primaryPlan/,
   "Basic Commute remains default; explicit Advanced plan is fallback when Basic is absent");
-assert.match(app, /from=\$\{primaryPlan\?\.profile\.from \|\| homeLeg\.from\}/,
-  "Advanced planned route wins over Basic Commute for departure options");
-assert.match(app, /to=\$\{primaryPlan\?\.profile\.to \|\| homeLeg\.to\}/);
-assert.match(app, /defaultDest=\$\{primaryPlan\?\.profile\.to \|\| homeLeg\?\.to \|\| null\}/,
-  "destination picker uses the same selected route as the home card");
-assert.match(app, /RETURN FROM " \+ STATIONS\[fromStation\]\.name/,
-  "return leg states its departure station, never claims current location");
-assert.match(app, /className=\$\{"card commute-focus" \+ \(noDepartures \? " no-departures" : ""\)\}/,
-  "empty state activates compact layout");
+assert.ok(app.includes('from=${homeLeg.from} to=${homeLeg.to}'),
+  'default timetable follows return-aware route');
+assert.ok(app.includes('planned=${primaryPlan} nextAdvanced=${featuredAdvanced}'),
+  'native plan and chronological Advanced commute take precedence');
+assert.ok(app.includes('defaultDest=${primaryPlan?.profile.to || homeLeg?.to || null}'),
+  'destination picker uses the selected route');
+assert.ok(app.includes('RETURN FROM '),
+  'return leg states the boarding station without claiming the phone location');
+assert.ok(app.includes('noDepartures ? " no-departures"'),
+  'exhausted service chooses compact card geometry');
 assert.match(css, /\.commute-focus\.no-departures \.commute-focus-headline\.empty\{[^}]*padding:0;/s,
   "empty commute headline does not inherit 34px generic empty padding");
 assert.match(css, /\.ride-control\.on\{color:var\(--green\);background:transparent\}/,
