@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "source": "src/index.html",
+  "android_mirror": "android-lab/app/src/main/res/values/colors.xml",
+  "themes": {
+    "electric-stars": {
+      "display_name": "Electric Stars",
+      "direction": "Night Signal",
+      "status": "replacement",
+      "palette": {
+        "midnight_abyss": "#011629",
+        "petrol_navy": "#0C426D",
+        "velvet_plum": "#372B68",
+        "electric_cobalt": "#3A74DB",
+        "orchid_mesh": "#BE74CD",
+        "neon_lilac": "#F6B8FB"
+      },
+      "roles": {
+        "background": "#011629",
+        "flat_card": "#102D49",
+        "featured_gradient_from": "#0C2742",
+        "featured_gradient_to": "#102D49",
+        "primary_text": "#E4EAF2",
+        "display_text": "#F3F5FA",
+        "secondary_text": "#B8C9DC",
+        "readable_orchid": "#D4A0DF",
+        "selected_navigation": "#372B68",
+        "primary_action": "#F6B8FB",
+        "primary_action_text": "#011629",
+        "map_line_f": "#FF9BA7",
+        "map_line_m": "#A6CBFF"
+      },
+      "rules": [
+        "No general gradient on ordinary cards",
+        "Map is flat and borderless; route lines carry visual character",
+        "Only primary action uses lilac fill",
+        "Muted and body text contrast is at least 4.5:1 on assigned surface",
+        "Cobalt for large/graphical elements only",
+        "Theme-specific styling scoped to data-theme=electric-stars",
+        "Never change Nord Light as a side effect"
+      ]
+    },
+    "nord-light": {
+      "status": "preserved",
+      "source": "src/index.html",
+      "background": "#ECEFF4",
+      "card": "#FFFFFF",
+      "foreground": "#2E3440"
+    }
+  }
+}
