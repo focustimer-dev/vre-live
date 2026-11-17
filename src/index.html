@@ -78,6 +78,21 @@
   .pref-back span{font-size:24px;vertical-align:-2px;margin-right:6px}
   .pref-description{color:var(--muted);font-size:var(--fs-2);margin:9px 16px 12px}
   .pref-choice:focus-visible,.pref-back:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+  .global-alert-body{padding:6px 14px 16px}
+  .global-alert-row{display:flex;align-items:center;justify-content:space-between;
+    gap:14px;padding:14px 2px;min-height:65px;border-bottom:1px solid var(--border)}
+  .global-alert-copy{min-width:0;flex:1}
+  .global-alert-copy strong{display:block;font-size:var(--fs-3)}
+  .global-alert-copy small{display:block;color:var(--muted);font-size:var(--fs-2);
+    margin-top:4px;line-height:1.4}
+  .global-alert-row input[type="checkbox"]{width:22px;height:22px;flex:none;accent-color:var(--fg)}
+  .global-alert-row input:disabled{opacity:.4}
+  .global-alert-lead{padding:12px 2px}
+  .global-alert-section{font-size:var(--fs-2);font-weight:700;color:var(--muted);
+    margin:16px 2px 0}
+  .global-alert-migrate{display:grid;gap:9px;padding:14px 0}
+  .global-alert-migrate .btn{min-height:44px}
+
   .waiting-card{margin-bottom:12px}
   .waiting-body{padding:14px 16px 16px}
   .waiting-countdown{font-size:clamp(32px,11vw,46px);font-weight:800;letter-spacing:-.04em;
@@ -1422,9 +1437,6 @@
     const save = () => {
       if (!draft.name.trim()) { setError("Give this commute a name."); return; }
       if (!draft.days.length) { setError("Select at least one weekday."); return; }
-      if (draft.checkInEnabled && !draft.preferredTrains.length) {
-        setError("Select at least one train before enabling check-ins."); return;
-      }
       if (!VRECommutes.choices(VRECore, draft.from, draft.to).length) {
         setError("Choose stations served by a direct train."); return;
       }
@@ -1503,16 +1515,6 @@
           numeric("travelMinutes", "Travel (min)", 180),
           numeric("platformMinutes", "To platform (min)", 60),
           numeric("bufferMinutes", "Safety (min)", 60)),
-        typeof window.VreCommutePrefs !== "undefined"
-          ? field("Daily check-in notifications", h("span", { style: {
-              display: "flex", alignItems: "center", gap: 10
-            } }, h("input", { type: "checkbox", checked: !!draft.checkInEnabled,
-              onChange: e => change("checkInEnabled", e.target.checked) }),
-              h("span", null, "Ask if I'm taking the train on my commute days")))
-          : h("div", { className: "meta" }, "Daily check-in notifications are available in the Android app."),
-        field("Check-in time (Eastern)", h("input", {
-          type: "time", value: draft.checkIn, onChange: e => change("checkIn", e.target.value)
-        })),
         h("div", { className: "meta" }, "Typical commuting days"),
         h("div", { style: { display: "flex", flexWrap: "wrap", gap: 9 } },
           days.map((label, day) => h("label", { key: day, className: "chip",
@@ -1520,7 +1522,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Android check-ins are optional. Selecting a train shows a leave-by estimate while the app is open; automatic departure alerts and background monitoring aren't enabled yet."),
+          "Notification choices are in Preferences → Check-ins & Alerts. Leave-by estimates show after you choose a train; background departure alerts aren't active yet."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1730,8 +1732,68 @@
       </div>`;
   }
 
+  /* One app-wide notification policy; Android channels still respect system overrides. */
+  function GlobalAlertSettings({ settings, onSave, osAllowed }) {
+    const update = (key, value) => {
+      if (settings.unsupportedVersion) return;
+      const proposed = VREAlerts.normalize({ ...settings, [key]: value });
+      onSave(key === "checkIns" && value ? VREAlerts.useSmartSchedule(proposed) : proposed);
+    };
+    const control = (label, detail, checked, onChange, disabled = false) => html`
+      <label className="global-alert-row">
+        <span className="global-alert-copy"><strong>${label}</strong><small>${detail}</small></span>
+        <input type="checkbox" checked=${checked} disabled=${disabled}
+          onChange=${e => onChange(e.target.checked)} />
+      </label>`;
+    return html`
+      <div className="card">
+        <div className="card-h">Check-ins & Alerts</div>
+        <div className="global-alert-body">
+          ${settings.unsupportedVersion ? html`
+            <div className="stale-note">These settings require a newer version. Existing settings were preserved.</div>`
+          : html`
+            ${control("Notifications", "Master control for check-ins, commute alerts, and arrival alerts",
+              settings.enabled, value => update("enabled", value))}
+            ${typeof window.VreCommutePrefs !== "undefined" && osAllowed === false && html`
+              <div className="stale-note">Android notifications are disabled. Allow them in system settings to receive alerts.</div>`}
+            ${control("Ask if I'm taking the train", "One check-in before your usual leave time",
+              settings.checkIns, value => update("checkIns", value), !settings.enabled)}
+            ${settings.enabled && settings.checkIns && html`
+              <label className="fld global-alert-lead">
+                <span>Ask before I need to leave</span>
+                <select value=${settings.leadMinutes}
+                  onChange=${e => update("leadMinutes", Number(e.target.value))}>
+                  ${[5, 10, 15, 20, 30, 45, 60].map(n =>
+                    html`<option key=${n} value=${n}>${n} minutes</option>`)}
+                </select>
+              </label>`}
+            ${settings.legacyTimes && settings.enabled && settings.checkIns && html`
+              <div className="global-alert-migrate">
+                <div className="meta">Your previously enabled check-ins still use their original times and selected commutes.</div>
+                <button className="btn outline" onClick=${() => onSave(VREAlerts.useSmartSchedule(settings))}>
+                  Use automatic check-in timing for all commutes
+                </button>
+              </div>`}
+            ${control("Arrival alerts when riding", "New rides start with the in-ride bell on. You can turn it off for one ride.",
+              settings.arrival, value => update("arrival", value), !settings.enabled)}
+            ${control("Leave-now notifications", "Requires the upcoming event-driven monitoring release",
+              false, () => {}, true)}
+            <div className="global-alert-section">Commute notification style</div>
+            ${control("Sound", "Play a notification sound on commute check-ins",
+              settings.sound, value => update("sound", value), !settings.enabled)}
+            ${control("Vibration", "Vibrate for commute check-ins (off by default)",
+              settings.vibration, value => update("vibration", value), !settings.enabled)}
+            <div className="meta">
+              Changes save on this device. Android's notification-channel settings can override sound and vibration.
+              In-app notification choices never start GTFS polling on their own.
+            </div>
+          `}
+        </div>
+      </div>`;
+  }
+
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
-  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes }) {
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed }) {
     const open = name => onSection(name);
     return html`
       <section className="preferences" aria-label="Preferences">
@@ -1746,7 +1808,12 @@
               </button>
               <button className="pref-choice" type="button" onClick=${() => open("advanced")}>
                 <span><strong>Advanced Commute</strong>
-                  <small>Preferred trains, travel times, and planned alerts</small>
+                  <small>Preferred trains, travel time, safety buffer, and commuting days</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
+              <button className="pref-choice" type="button" onClick=${() => open("alerts")}>
+                <span><strong>Check-ins & Alerts</strong>
+                  <small>App notifications, commute check-ins, sound and vibration</small>
                 </span><span className="pref-arrow" aria-hidden="true">›</span>
               </button>
             </div>
@@ -1766,12 +1833,15 @@
                 onSave=${r => { onSaveRoute(r); onSection(null); }}
                 onCancel=${() => onSection(null)} />
             </div>`
+          : section === "alerts" ? html`
+            <${GlobalAlertSettings} settings=${alertPrefs} onSave=${onSaveAlerts}
+              osAllowed=${osAllowed} />`
           : html`
             <div className="card">
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
-                Choose preferred trains and optional local daily check-ins.
-                Leave-by estimates appear after you pick a train. Automatic background departure alerts aren't active yet.
+                Choose preferred trains and travel times. Check-in and notification settings
+                are under Check-ins & Alerts. Automatic background departure alerts aren't active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
