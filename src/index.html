@@ -1220,8 +1220,41 @@
       mode: "other", travelMinutes: 0, platformMinutes: 0, bufferMinutes: 5,
       checkIn: "06:45", checkInEnabled: false, days: [...DAYS] };
   }
+  // Resolve the home card's direction without pretending we know phone location.
+  // An explicit manual direction (including a widget's route) always wins.
+  // A finished ride selects a direction only when its chosen stop matches
+  // one endpoint of this saved commute, and only for the same Eastern day.
+  function homeLeg(route, manualReturn, lastRide, now, core, liveByTrip) {
+    if (!route || !core?.STATIONS?.[route.a] || !core?.STATIONS?.[route.b] ||
+        route.a === route.b || !Number.isFinite(now)) return null;
+    const easternClock = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", hour: "2-digit", hourCycle: "h23"
+    }).formatToParts(new Date(now));
+    const hour = Number(easternClock.find(p => p.type === "hour")?.value || "0");
+    let returning = hour >= 12, reason = "clock";
+    const finishedToday = !!lastRide?.manuallyEnded && Number.isFinite(lastRide.t) &&
+      lastRide.t <= now + 60000 && core.serviceDateKey(lastRide.t) === core.serviceDateKey(now);
+    if (manualReturn !== null && manualReturn !== undefined) {
+      returning = !!manualReturn;
+      reason = "manual";
+    } else if (finishedToday && lastRide.dest === route.b) {
+      returning = true;
+      reason = "finished-outbound";
+    } else if (finishedToday && lastRide.dest === route.a) {
+      returning = false;
+      reason = "finished-return";
+    }
+    const departures = (from, to) => core.nextDepartures(from, to, now, liveByTrip, 1);
+    if (!returning && reason === "clock" && core.isServiceDay(new Date(now)) &&
+        !departures(route.a, route.b).length && departures(route.b, route.a).length) {
+      returning = true;
+      reason = "return-preview";
+    }
+    return { returning, reason,
+      from: returning ? route.b : route.a, to: returning ? route.a : route.b };
+  }
   g.VRECommutes = Object.freeze({ KEY, choices, normalizeProfile, normalizeRecord,
-    migrateLegacy, load, save, upsert, remove, blank });
+    migrateLegacy, load, save, upsert, remove, blank, homeLeg });
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
