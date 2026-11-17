@@ -30,10 +30,14 @@ for (const [pkg, file, url] of [
 
 // Keep the established module bundling order stable. The synchronous theme
 // bootstrap is separate so it runs before the first paint without inline JS.
-const bootstrap = page.match(/<script id="vre-theme">([\\s\\S]*?)<\\/script>/);
-if (!bootstrap) throw new Error("Missing VRE theme bootstrap");
-await writeFile(join(output, "vre-theme.js"), bootstrap[1]);
-replace(bootstrap[0], '<script src="vre-theme.js"></script>');
+const bootstrapStart = '<script id="vre-theme">';
+const bootstrapEnd = '</script>';
+const bootStartAt = page.indexOf(bootstrapStart);
+const bootEndAt = page.indexOf(bootstrapEnd, bootStartAt + bootstrapStart.length);
+if (bootStartAt < 0 || bootEndAt < 0) throw new Error("Missing VRE theme bootstrap");
+const bootstrapCode = page.slice(bootStartAt + bootstrapStart.length, bootEndAt);
+await writeFile(join(output, "vre-theme.js"), bootstrapCode);
+replace(page.slice(bootStartAt, bootEndAt + bootstrapEnd.length), '<script src="vre-theme.js"></script>');
 
 for (const id of ["vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"]) {
   const block = page.match(new RegExp(`<script id="${id}">([\\s\\S]*?)</script>`));
