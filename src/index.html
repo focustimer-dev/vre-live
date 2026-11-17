@@ -2826,9 +2826,9 @@
       return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
     });
   }
-  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, onPick }) {
-    const all = new Map();
-    for (const t of [...(ghosts || []), ...(trains || [])]) all.set(t.tripId,t);
+  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, onPick }) {
+    const all = new globalThis.Map();
+    for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
     return html`<div className="branch-atlas">
       <svg className="atlas-svg" viewBox="0 0 390 445" role="img"
@@ -2879,7 +2879,6 @@
     const [overviewTrip, setOverviewTrip] = useState(null);
     const overview = !!myTripId && overviewTrip === myTripId;
     const setOverview = value => setOverviewTrip(value ? myTripId : null);
-    const labelSide = code => (LINE_M.indexOf(code) > 3 ? -1 : 1);
     const t_now = now || Date.now();
     const anchors = [...(ghosts || []), ...trains.map(t => ({ ...t, ...(t.tripId === myTripId && (t.signalLost || !t.ts || t_now-t.ts>300000 || t_now-t.ts < -60000) ? {} : (VRECore.driftPosition(t, t_now) || {})) }))];
     const activeTrain = anchors.find(t => t.tripId === myTripId) || (rideTrain && rideTrain.x != null ? rideTrain : null);
@@ -2889,14 +2888,7 @@
     const nextState = nextStop && VRECore.rideStatus(activeTrain, nextStop.code, t_now);
     const nextTime = !nextStop ? "" : nextState.phase === "atStop" ? "Stopped here" : nextState.phase === "uncertain" ? "Time unconfirmed" : nextState.left < -90000 ? "Time unconfirmed" : nextState.left <= 70000 ? "Due" : `${Math.ceil(nextState.left/60000)} min`;
     const nextLabel = nextState && nextState.phase === "atStop" ? "At" : fresh ? "Next stop" : "Scheduled next";
-    const focus = activeTrain ? focusLayout(activeTrain) : null;
-    const positions = layoutMarkers(anchors.filter(t => t.tripId !== myTripId), focus ? [
-      focus.card, { x: activeTrain.x-22, y: activeTrain.y-22, w:44, h:44 }
-    ] : []);
-    const relevantY = focus ? [activeTrain.y, focus.card.y-14, focus.card.y+focus.card.h+14, ...(nextStop && STATIONS[nextStop.code] ? [STATIONS[nextStop.code].y] : [])] : [];
-    const cropHeight = focus ? Math.min(700, Math.max(270, Math.max(...relevantY)-Math.min(...relevantY)+90)) : 700;
-    const cropY = focus ? Math.max(0, Math.min(700-cropHeight,(Math.max(...relevantY)+Math.min(...relevantY)-cropHeight)/2)) : 0;
-    const focused = !!focus && !overview;
+    const focused = !!activeTrain && !overview;
     return html`<div className="journey" style=${activeTrain ? { "--accent": LINE_COLOR[activeTrain.line] } : null}>
       ${activeTrain && html`<div className="journey-head">
         <div className="journey-title">
@@ -2914,113 +2906,13 @@
         </div>
       </div>`}
       <div className=${"journey-map" + (focused ? " focused" : "")}>
-      <svg className="sysmap" viewBox=${focused ? `0 ${cropY} 390 ${cropHeight}` : "0 0 390 700"} role="img" aria-label=${focused ? `Following train ${activeTrain.num}, ${positionLabel.toLowerCase()}` : "VRE system map with train positions"}>
-        <path d=${PATH_F} fill="none" stroke=${LINE_COLOR.F} strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" opacity=${focused ? (activeTrain.line === "F" ? 0.85 : 0.22) : 0.85}/>
-        <path d=${PATH_M} fill="none" stroke=${LINE_COLOR.M} strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" opacity=${focused ? (activeTrain.line === "M" ? 0.85 : 0.22) : 0.85}/>
-        ${ride && html`
-          <g aria-hidden="true" style=${{pointerEvents:"none"}}>
-            <path d=${ride.pathD} fill="none" stroke=${ride.color} strokeWidth="11" strokeLinejoin="round" strokeLinecap="round" opacity="0.16"/>
-            <path className="ridepath" d=${ride.pathD} fill="none" stroke="var(--map-highlight)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
-          </g>`}
-        ${anchors.filter(t => t.tripId !== myTripId).map(t => {
-          const p = positions[t.tripId];
-          const active = t.tripId === myTripId, highlighted = active || t.tripId === selected;
-          return html`<g key=${"leader-" + t.tripId} className=${active ? "train-leader active" : "train-leader"}
-            aria-hidden="true" style=${{ pointerEvents: "none" }}>
-            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="var(--map-ink)" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
-            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "var(--map-highlight)" : LINE_COLOR[t.line]}
-              strokeWidth=${active ? 3.4 : highlighted ? 2.4 : 1.1} strokeLinecap="round" opacity=${highlighted ? 1 : 0.55}/>
-            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="var(--map-ink)" stroke="var(--map-highlight)" strokeWidth="2.3"/>`}
-            <circle cx=${t.x} cy=${t.y} r=${active ? 3.3 : 2.7} fill=${LINE_COLOR[t.line]}/>
-          </g>`;
-        })}
-        ${Object.entries(STATIONS).map(([code, s]) => {
-          const trunk = LINE_F.indexOf(code) >= 0 && LINE_F.indexOf(code) < 4;
-          const side = labelSide(code);
-          const dim = ride && ride.dim.has(code) && (!nextStop || nextStop.code !== code);
-          const isDest = ride && ride.dest === code;
-          return html`
-            <g key=${code} opacity=${dim ? 0.4 : 1}>
-              ${isDest && html`
-                <circle className="destring" cx=${s.x} cy=${s.y} r="10.5" fill="none"
-                  stroke=${ride.color} strokeWidth="2" opacity="0.9"/>`}
-              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="var(--map-ink)"
-                stroke=${isDest ? "var(--map-highlight)" : trunk ? "var(--map-label-major)" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
-                strokeWidth=${trunk || isDest ? 2.4 : 2}/>
-              <text x=${s.x + side * (isDest ? 16 : 13)} y=${s.y + 3.5}
-                textAnchor=${side < 0 ? "end" : "start"}
-                style=${isDest ? { fill: "var(--map-highlight)", fontWeight: 700 } : null}
-                className=${"st-label" + (trunk || code === "SP" || code === "12" || isDest ? " major" : "")}>${s.name}</text>
-            </g>`;
-        })}
-        ${focus && html`
-          <g className="your-train-focus" role="button" tabIndex="0" aria-pressed="true"
-            aria-label=${`Your train ${activeTrain.num}. ${positionLabel}. Change destination.`}
-            onClick=${() => onPick(activeTrain.tripId)}
-            onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(activeTrain.tripId); } }}>
-            <rect x=${focus.card.x} y=${focus.card.y} width=${focus.card.w} height=${focus.card.h} rx="12" fill=${LINE_COLOR[activeTrain.line]}/>
-            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="var(--map-ink)">${activeTrain.num}</text>
-            <path d=${activeTrain.dir === 1 ? `M${focus.card.x+80},${focus.card.y+32} l6,-8 l6,8` : `M${focus.card.x+80},${focus.card.y+24} l6,8 l6,-8`}
-              fill="none" stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="var(--map-ink)" stroke="var(--map-ink)" strokeWidth="5"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="var(--map-highlight)" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
-            <path d=${activeTrain.dir === 1 ? `M${activeTrain.x-4},${activeTrain.y+2} l4,-5 l4,5` : `M${activeTrain.x-4},${activeTrain.y-2} l4,5 l4,-5`}
-              fill="none" stroke="var(--map-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </g>`}
-        ${(ghosts || []).filter(g => g.tripId !== myTripId).map(g => {
-          const sel = g.tripId === selected, mine = g.tripId === myTripId;
-          return html`
-          <g key=${"g" + g.tripId} className=${"train ghost" + (sel || mine ? " sel" : "")}
-             style=${{ transform: `translate(${positions[g.tripId].x}px,${positions[g.tripId].y}px)` }}
-             onClick=${() => onPick(g.tripId)} tabIndex="0" role="button"
-             aria-pressed=${sel || mine}
-             aria-label=${`Train ${g.num}, scheduled position, not reporting`}
-             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(g.tripId); } }}>
-            <g className="pop">
-              <circle cx="0" cy="0" r="31" fill="transparent"/>
-              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4"/>`}
-              <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${LINE_COLOR[g.line]} strokeWidth="1.5"/>
-              <circle cx="0" cy="0" r="13" fill="var(--map-ink)" stroke=${LINE_COLOR[g.line]}
-                strokeWidth="1.6" strokeDasharray="3 2.6" opacity="0.8"/>
-              <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="700"
-                fill=${LINE_COLOR[g.line]}>${g.num}</text>
-            </g>
-          </g>`; })}
-        ${trains.filter(t => t.tripId !== myTripId).map(t => {
-          const sel = t.tripId === selected, mine = t.tripId === myTripId;
-          const c = LINE_COLOR[t.line];
-          const up = t.dir === 1; // toward DC = up the map
-          const s = up ? -1 : 1;  // chevron side
-          const stale = t.ts && t_now - t.ts > 5 * 60000;
-          // dead-reckoned drift between polls; drifted markers go translucent
-          const drift = VRECore.driftPosition(t, t_now);
-          const px = drift ? drift.x : t.x, py = drift ? drift.y : t.y;
-          const projected = !!(drift && drift.drifted);
-          return html`
-            <g key=${t.tripId} className=${"train" + (sel || mine ? " sel" : "")}
-               opacity=${stale && !mine ? 0.68 : 1}
-               style=${{ transform: `translate(${positions[t.tripId].x}px,${positions[t.tripId].y}px)` }}
-               onClick=${() => onPick(t.tripId)} tabIndex="0" role="button"
-               aria-pressed=${sel || mine}
-               aria-label=${`Train ${t.num}, ${t.lineName}, ${up ? "toward DC" : "outbound"}${projected ? ", projected position" : ""}`}
-               onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(t.tripId); } }}>
-              <g className="pop">
-                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4" opacity="0.95"/>`}
-                ${projected && !mine && html`
-                  <circle cx="0" cy="0" r="17" fill="none" stroke=${c} strokeWidth="1.3"
-                    strokeDasharray="3 3" opacity="0.85"/>`}
-                <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${c} strokeWidth="1.5" opacity="0.7"/>
-                <circle cx="0" cy="0" r="31" fill="transparent"/>
-                <path d=${`M-6.5 ${s * 17} Q0 ${s * 23.5} 6.5 ${s * 17}`}
-                  fill="none" stroke=${c} strokeWidth="2.4" strokeLinecap="round"/>
-                <path d=${`M-4.5 ${s * 23} Q0 ${s * 27.5} 4.5 ${s * 23}`}
-                  fill="none" stroke=${c} strokeWidth="2" strokeLinecap="round" opacity="0.45"/>
-                <circle cx="0" cy="0" r="13" fill=${c} stroke="var(--map-ink)" strokeWidth="2"/>
-                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="var(--map-ink)">${t.num}</text>
-              </g>
-            </g>`;
-        })}
-      </svg></div>
+        ${focused
+          ? html`<${FollowLens} train=${activeTrain} ride=${ride} now=${t_now}
+              fresh=${fresh} positionLabel=${positionLabel} onPick=${onPick} />`
+          : html`<${BranchAtlas} trains=${trains} ghosts=${ghosts}
+              activeTrain=${activeTrain} selected=${selected}
+              myTripId=${myTripId} ride=${ride} onPick=${onPick} />`}
+      </div>
       ${activeTrain && html`<button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
         <div><strong>${nextStop ? `${nextLabel}: ${nextStop.name || STATIONS[nextStop.code]?.name || nextStop.code}` : "Next stop unavailable"}</strong>
           <small>${positionLabel}${activeTrain.ts ? ` · ${Math.max(0, Math.floor((t_now-activeTrain.ts)/60000))} min ago` : ""}</small></div>
