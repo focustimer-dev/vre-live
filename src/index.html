@@ -583,6 +583,135 @@
   .srow.plan-choice.chosen{background:var(--surface-hover);box-shadow:inset 3px 0 var(--focus)}
   .srow.plan-choice:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
   .commute-plan-confirm{min-height:44px;margin-top:12px}
+  /*
+   * Electric Stars / Night Signal
+   * Quiet hierarchy: midnight canvas, flat rail-map instrument, a single
+   * featured-commute gradient, plum only on selected navigation, and one
+   * lilac action. Scoped to Electric Stars so Nord Light is unchanged.
+   */
+  :root[data-theme="electric-stars"] body{
+    background:radial-gradient(ellipse at 80% 0%,var(--bg-glow),transparent 46%),var(--bg);
+    background-attachment:fixed;
+  }
+  :root[data-theme="electric-stars"] ::selection{
+    background:var(--night-plum);color:var(--night-display);
+  }
+  :root[data-theme="electric-stars"] input,
+  :root[data-theme="electric-stars"] select,
+  :root[data-theme="electric-stars"] textarea{caret-color:var(--night-lilac)}
+  :root[data-theme="electric-stars"] .hdr h1{
+    color:var(--night-display);letter-spacing:-.025em;font-weight:750}
+  :root[data-theme="electric-stars"] .hdr h1 svg{color:var(--night-orchid)}
+  :root[data-theme="electric-stars"] .hdr .sub{color:var(--muted)}
+  :root[data-theme="electric-stars"] .tabs{
+    background:var(--tab-surface);border-color:transparent;
+    padding:4px;margin-bottom:10px}
+  :root[data-theme="electric-stars"] .tabs button{
+    color:var(--muted);font-weight:650}
+  :root[data-theme="electric-stars"] .tabs button.on{
+    background:var(--night-plum);color:var(--night-display);
+    box-shadow:inset 0 -2px 0 var(--night-orchid)}
+  :root[data-theme="electric-stars"] .tabs button:focus-visible{
+    outline:2px solid var(--focus);outline-offset:-3px}
+  :root[data-theme="electric-stars"] .card{
+    background:var(--card);border:1px solid var(--border-soft);
+    box-shadow:none;border-radius:var(--radius)}
+  :root[data-theme="electric-stars"] .card-h{
+    color:var(--muted);font-weight:650;letter-spacing:.065em}
+  :root[data-theme="electric-stars"] .commute-focus{
+    background:linear-gradient(158deg,var(--card-elevated),var(--card));
+    border-color:transparent;
+    box-shadow:0 9px 24px var(--card-shadow)}
+  :root[data-theme="electric-stars"] .commute-focus-content{
+    padding:16px 18px 14px}
+  :root[data-theme="electric-stars"] .commute-focus-label{
+    color:var(--meta-ink);font-weight:700;letter-spacing:.055em}
+  :root[data-theme="electric-stars"] .commute-focus-headline{
+    color:var(--night-display);font-variant-numeric:tabular-nums;
+    font-weight:800;letter-spacing:-.03em}
+  :root[data-theme="electric-stars"] .commute-focus-headline.empty{
+    color:var(--night-display)}
+  :root[data-theme="electric-stars"] .commute-focus-train{
+    color:var(--night-lilac);font-weight:700}
+  :root[data-theme="electric-stars"] .commute-focus-route{color:var(--muted)}
+  :root[data-theme="electric-stars"] .commute-focus-actions{
+    margin-top:12px}
+  :root[data-theme="electric-stars"] .commute-focus-actions .commute-options{
+    background:var(--action-bg);color:var(--action-fg);
+    border-color:transparent;min-height:44px;font-weight:750;
+    box-shadow:none}
+  :root[data-theme="electric-stars"] .commute-focus-actions .commute-options[aria-expanded="true"]{
+    background:var(--card-2);color:var(--fg);
+    border:1px solid var(--border-soft)}
+  :root[data-theme="electric-stars"] .commute-extra{
+    border-top-color:var(--line-separator);margin-top:13px;padding-top:9px}
+  :root[data-theme="electric-stars"] .commute-extra-label{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .srow.plan-choice.chosen{
+    background:var(--surface-hover);
+    box-shadow:inset 0 0 0 1px var(--accent-outline)}
+  :root[data-theme="electric-stars"] .srow .mid .l1{
+    color:var(--fg);font-weight:650}
+  :root[data-theme="electric-stars"] .srow .mid .l2{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .commute-plan-travel{
+    border-top-color:var(--line-separator)}
+  :root[data-theme="electric-stars"] .commute-plan-travel-label{
+    color:var(--fg);font-weight:650}
+  :root[data-theme="electric-stars"] .commute-plan-travel-stepper{
+    background:var(--card-elevated);border-color:var(--border)}
+  :root[data-theme="electric-stars"] .commute-plan-step{
+    color:var(--fg)}
+  :root[data-theme="electric-stars"] .commute-plan-travel-value input{
+    color:var(--night-display)}
+  :root[data-theme="electric-stars"] .commute-plan-confirm{
+    background:var(--action-bg);color:var(--action-fg);
+    border-color:transparent;font-weight:750}
+  :root[data-theme="electric-stars"] .commute-extra .marey-wrap{
+    border-top-color:var(--line-separator)}
+  :root[data-theme="electric-stars"] .commute-extra .marey-toggle{
+    color:var(--muted);font-weight:600}
+  :root[data-theme="electric-stars"] .system-map-card{
+    background:var(--card);border:0;box-shadow:none}
+  :root[data-theme="electric-stars"] .system-map-card .card-h{
+    padding:12px 14px 0;color:var(--muted)}
+  :root[data-theme="electric-stars"] .system-map-card .map-wrap{
+    padding:2px 3px 8px}
+  :root[data-theme="electric-stars"] .map-legend{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .badge{
+    background:transparent;border-color:var(--border-soft)}
+  :root[data-theme="electric-stars"] .btn{
+    box-shadow:none}
+  :root[data-theme="electric-stars"] .btn.outline{
+    border-color:var(--border);color:var(--fg)}
+  :root[data-theme="electric-stars"] .btn.ghost{
+    border-color:transparent;color:var(--muted)}
+  :root[data-theme="electric-stars"] .chip.on{
+    background:var(--selected-bg);color:var(--selected-fg);
+    border-color:var(--selected-bg)}
+  :root[data-theme="electric-stars"] .sheet{
+    background:var(--sheet-bg);backdrop-filter:none;
+    -webkit-backdrop-filter:none;border-color:var(--border-soft)}
+  :root[data-theme="electric-stars"] .journey-views{
+    background:var(--card-elevated)}
+  :root[data-theme="electric-stars"] .journey-views button[aria-pressed="true"]{
+    background:var(--night-plum);color:var(--night-display)}
+  :root[data-theme="electric-stars"] .journey-icon{
+    color:var(--night-orchid-readable)}
+  :root[data-theme="electric-stars"] .theme-option[aria-pressed="true"]{
+    border-color:var(--night-orchid-readable);
+    box-shadow:0 0 0 1px var(--night-orchid-readable)}
+  :root[data-theme="electric-stars"] .theme-swatch.electric{
+    background:linear-gradient(155deg,var(--card),var(--bg));
+    color:var(--night-lilac);
+    box-shadow:inset 0 0 0 1px var(--night-petrol)}
+  @media(max-width:360px){
+    :root[data-theme="electric-stars"] .commute-focus-content{
+      padding:14px 14px 12px}
+    :root[data-theme="electric-stars"] .system-map-card .map-wrap{
+      padding:1px 2px 6px}
+  }
 </style>
 </head>
 <body>
