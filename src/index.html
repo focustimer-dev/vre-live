@@ -102,6 +102,15 @@
   .leave-by-confidence{margin-top:5px}
   .today-train-leave{display:block;color:var(--muted);font-size:var(--fs-1);font-weight:400;
     margin-top:3px}
+  .today-compact{margin:12px 0}
+  .today-compact-body{padding:10px 14px 14px}
+  .today-compact-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .today-compact-top>div{min-width:0}
+  .today-compact-time{font-size:clamp(18px,5vw,25px);line-height:1.2;
+    font-weight:750;letter-spacing:-.02em;margin:5px 0}
+  .today-plan-edit{flex:none;white-space:nowrap}
+  .today-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .commute-plan-trigger{white-space:nowrap}
   .today-commute{margin-bottom:12px}
   .today-body{padding:10px 14px 12px}
   .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
@@ -1547,6 +1556,52 @@
       return String(hour % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") +
         (hour < 12 ? " AM" : " PM");
     };
+    // No active plan: keep the main screen focused on next departures.
+    // Full multi-profile choices only open after a direct "Plan train" action.
+    if (selectedId === null) {
+      const upcoming = profiles.map(p => {
+        const train = planned[p.id];
+        if (!train || skipped[p.id]) return null;
+        const forecast = VRELeaveBy.calculate({
+          ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+        }, train, VRECore, liveByTrip, samples, now);
+        return { profile: p, train, forecast };
+      }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
+        .sort((a, b) => (a.forecast.leaveBy ?? Infinity) - (b.forecast.leaveBy ?? Infinity));
+      if (!upcoming.length) return null;
+      const next = upcoming[0], p = next.profile, f = next.forecast;
+      const clock = ms => new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
+      }).format(new Date(ms));
+      return html`
+        <div className="card today-compact" aria-label="Upcoming planned commute">
+          <div className="card-h">Planned commute · Train ${next.train}</div>
+          <div className="today-compact-body">
+            <div className="today-compact-top">
+              <div>
+                <div className="meta">${p.name} · ${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
+                <div className="today-compact-time">${f.state === "needs-travel-time"
+                  ? "Travel time needed" : f.state === "leave-now"
+                    ? "Leave now" : "Leave by " + clock(f.leaveBy)}</div>
+                ${f.state !== "needs-travel-time" && html`
+                  <div className="meta">Train at ${clock(f.scheduled)} · ${f.remaining > 0
+                    ? f.remaining + " min until leave time" : "departure approaching"}</div>`}
+              </div>
+              <button className="btn ghost today-plan-edit" onClick=${() => onSelect(p.id)}>
+                Change train
+              </button>
+            </div>
+            ${f.confidence === "delay-unconfirmed" && html`
+              <div className="meta">Delay unconfirmed — keeping your scheduled leave time.</div>`}
+            <${DailyTravelControl} profile=${p} override=${overrides[p.id]}
+              onChange=${value => onTravelChange(p.id, value)} />
+            ${upcoming.length > 1 && html`
+              <button className="btn ghost" onClick=${() => onSelect("")}>
+                View ${upcoming.length - 1} other planned commute(s)
+              </button>`}
+          </div>
+        </div>`;
+    }
     return html`
       <div className="card today-commute">
         <div className="card-h">Today's commute</div>
@@ -1555,7 +1610,7 @@
             <div className="meta">You marked today as a non-riding day. You can change that below.</div>`
           : null}
           ${selected ? html`
-            <button className="btn ghost today-back" onClick=${() => onSelect(null)}>‹ All commutes</button>
+            <button className="btn ghost today-back" onClick=${() => onSelect("")}>‹ All commutes</button>
             <div className="today-head">
               <strong>${selected.name}</strong>
               <span className="meta">${STATIONS[selected.from].name} → ${STATIONS[selected.to].name}</span>
@@ -1608,9 +1663,12 @@
                   ${planned[p.id] ? "Change" : "Choose train"}
                 </button>
               </div>`)}
-            <button className="btn ghost today-skip" onClick=${() => onAction("skipToday", "")}>
-              Not riding today
-            </button>`}
+            <div className="today-actions">
+              <button className="btn ghost today-skip" onClick=${() => {
+                onAction("skipToday", ""); onSelect(null);
+              }}>Not riding today</button>
+              <button className="btn ghost" onClick=${() => onSelect(null)}>Done</button>
+            </div>`}
         </div>
       </div>`;
   }
@@ -1664,7 +1722,7 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive }) {
+  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive, onPlan }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
     const service = isServiceDay(new Date(now));
@@ -1673,7 +1731,9 @@
       <div className="card">
         <div className="card-h row" style=${{ paddingRight: 10 }}>
           <span>Next to ${STATIONS[to].name}${auto ? "" : " · flipped"}</span>
-          <span style=${{ display: "flex", gap: 2 }}>
+          <span style=${{ display: "flex", gap: 4, alignItems: "center" }}>
+            ${onPlan && html`<button className="btn ghost commute-plan-trigger"
+              onClick=${onPlan}>Plan train</button>`}
             <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onFlip}
               aria-label="Swap direction"><${FlipIcon} /></button>
           </span>
@@ -2948,13 +3008,6 @@
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
 
-        ${tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
-          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
-            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
-            now=${now} liveByTrip=${liveByTrip} samples=${devlog}
-            overrides=${todayTravel} onTravelChange=${saveTravelOverride}
-            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
-
         ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
             ${route
@@ -2967,6 +3020,8 @@
                     auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
                     now=${now} liveByTrip=${liveByTrip}
                     onFlip=${() => setFlipDir(!showReturn)}
+                    onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
+                      ? () => setPlanProfile("") : null}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
               : html`<div className="card">
@@ -2979,6 +3034,13 @@
                   </div>
                 </div>`}
           </div>`}
+
+        ${!myTrip && tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
+          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+            now=${now} liveByTrip=${liveByTrip} samples=${devlog}
+            overrides=${todayTravel} onTravelChange=${saveTravelOverride}
+            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
 
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
