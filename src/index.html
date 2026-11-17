@@ -2795,7 +2795,16 @@
     const yFor = i => 40 + i * 65;
     const activeLocal = Math.max(0, Math.min(view.stops.length - 1,
       view.nextIndex - view.start));
-    const activeY = yFor(activeLocal) - (activeLocal > 0 ? 22 : 0);
+    // Convert the current measured rail position to the visible stop segment.
+    // A stale or missing GPS coordinate is deliberately shown as a dashed estimate.
+    const previous = view.stops[activeLocal-1], upcoming = view.stops[activeLocal];
+    const prevY = STATIONS[previous?.code]?.y, nextY = STATIONS[upcoming?.code]?.y;
+    const fraction = fresh && Number.isFinite(train.y) && Number.isFinite(prevY) &&
+      Number.isFinite(nextY) && prevY !== nextY
+      ? Math.max(0, Math.min(1, (train.y-prevY)/(nextY-prevY))) : null;
+    const activeY = fraction != null
+      ? yFor(activeLocal-1) + fraction * 65
+      : yFor(activeLocal) - (activeLocal > 0 ? 22 : 0);
     return html`<div className="follow-lens">
       <div className="lens-eyebrow">
         <span>${fresh ? "Live train position" : positionLabel}</span>
@@ -2842,7 +2851,7 @@
 
   // B: Branch Atlas. Its compact geometry deliberately discards geographic
   // distance while retaining real station topology, train identity and status.
-  const ATLAS_MAJOR = new Set(["01","04","06","09","0C","SP","0F","12"]);
+  const ATLAS_MAJOR = new Set(["01","03","04","05","06","09","0C","SP","0D","0F","12"]);
   function atlasY(y) { return 30 + (y - 40) * (365 / 608); }
   function atlasPath(codes) {
     return codes.map((c,i) => `${i ? "L" : "M"}${STATIONS[c].x},${atlasY(STATIONS[c].y)}`).join(" ");
@@ -2864,7 +2873,7 @@
       return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
     });
   }
-  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, onPick }) {
+  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, now, onPick }) {
     const all = new globalThis.Map();
     for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
@@ -2892,10 +2901,12 @@
         ${markers.map(t => {
           const selectedTrain = t.tripId===selected || t.tripId===myTripId;
           const color = LINE_COLOR[t.line] || "var(--muted)";
+          const estimated = t.ghost || t.signalLost || !t.ts ||
+            now - t.ts > 300000 || now - t.ts < -60000;
           return html`<g key=${t.tripId} role="button" tabIndex="0"
             className=${"atlas-train" + (selectedTrain?" sel":"")}
             aria-pressed=${selectedTrain}
-            aria-label=${`Train ${t.num}, ${t.ghost ? "timetable estimate" : "reported train"}. Select train.`}
+            aria-label=${`Train ${t.num}, ${estimated ? "position unconfirmed" : "reported position"}. Select train.`}
             onClick=${()=>onPick(t.tripId)}
             onKeyDown=${e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();onPick(t.tripId);} }}>
             <path d=${`M${t.x},${atlasY(t.y)} L${t.markerX},${t.markerY}`}
@@ -2903,7 +2914,7 @@
             <circle cx=${t.markerX} cy=${t.markerY} r="22" fill="transparent"/>
             <circle className="atlas-halo" cx=${t.markerX} cy=${t.markerY} r="16"
               fill="var(--map-ink)" stroke=${selectedTrain?"var(--map-highlight)":color}
-              strokeWidth=${selectedTrain?3:2} strokeDasharray=${t.ghost?"3 3":null}/>
+              strokeWidth=${selectedTrain?3:2} strokeDasharray=${estimated?"3 3":null}/>
             <text x=${t.markerX} y=${t.markerY+4} textAnchor="middle"
               className="atlas-train-num" fill=${color}>${t.num}</text>
           </g>`;
@@ -2949,7 +2960,7 @@
               fresh=${fresh} positionLabel=${positionLabel} onPick=${onPick} />`
           : html`<${BranchAtlas} trains=${trains} ghosts=${ghosts}
               activeTrain=${activeTrain} selected=${selected}
-              myTripId=${myTripId} ride=${ride} onPick=${onPick} />`}
+              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick} />`}
       </div>
       ${activeTrain && html`<button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
         <div><strong>${nextStop ? `${nextLabel}: ${nextStop.name || STATIONS[nextStop.code]?.name || nextStop.code}` : "Next stop unavailable"}</strong>
@@ -3715,7 +3726,7 @@ ${lockError}
             return { ...waitingFor, waiting: true, ts: train?.ts, eta: stop?.time };
           })() : null;
       window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain, myStop?.time]);
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time]);
     const lockBridge = window.VreLockCard;
     const [lockState, setLockState] = useState("off");
     const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
