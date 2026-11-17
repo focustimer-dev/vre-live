@@ -3368,28 +3368,48 @@ if (!train) return html`
 return html`
       <div className="card fade">
         <div className="eta-hero ride-eta">
-          <div className=${"ride-notifications" + (showTools ? " expanded" : "")}
-            role="group" aria-label="Ride notification controls">
-            <button type="button" className=${"ride-control ride-bell" + (notify ? " on" : "")}
-              aria-label="Show notification options" title="Notification options"
-              aria-expanded=${showTools} onClick=${() => setShowTools(!showTools)}>
+          <div className="ride-notifications" role="group" aria-label="Ride alert controls">
+            <button type="button" ref=${bellRef}
+              className=${"ride-control ride-bell" + (notify || wake || lockActive ? " on" : "")}
+              aria-label="Ride alert options" title="Ride alert options"
+              aria-haspopup="true" aria-expanded=${showTools}
+              aria-controls="ride-alert-popover" onClick=${toggleTools}>
               <${BellIcon} size=${16} />
+              ${(notify || wake || lockActive) && html`
+                <span className="ride-bell-dot" aria-hidden="true"></span>`}
             </button>
-            ${showTools && html`
-              <button type="button" className=${"ride-control alert-toggle" + (notify ? " on" : "")}
-                aria-label=${notify ? "Turn off arrival alerts" : "Turn on arrival alerts"}
-                title=${notify ? "Arrival alerts on" : "Arrival alerts off"}
-                aria-pressed=${notify} onClick=${onNotify}>
-                Alerts ${notify ? "on" : "off"}
-                ${notify && html`<span className="ride-state-dot" aria-hidden="true"></span>`}
-              </button>`}
-            ${canWake && (showTools || wake) && html`
-              <button type="button" className=${"ride-control" + (wake ? " on" : "")}
-                aria-label="Keep screen on" aria-pressed=${wake}
-                title=${wake ? "Screen stays on" : "Keep screen on"}
-                onClick=${onWake}><${ScreenIcon} size=${19} /></button>`}
-            ${(showTools || lockActive) && lockButton}
           </div>
+          ${showTools && ReactDOM.createPortal(html`
+            <div id="ride-alert-popover" className="ride-alert-popover"
+              role="region" aria-label="Ride alert options" ref=${popupRef}
+              style=${{ left: popupAnchor.left, top: popupAnchor.top }}>
+              <div className="ride-alert-title">Ride alerts</div>
+              <div className="ride-alert-intro">Choose what happens while following this train.</div>
+              <button type="button" className="ride-alert-option"
+                aria-pressed=${notify}
+                onClick=${() => { onNotify(); setSnackbar("Updating arrival alerts…"); }}>
+                <span><strong>Arrival alerts</strong><small>Notify before your stop</small></span>
+                <span className=${"ride-alert-state" + (notify ? " on" : "")}>
+                  ${notify ? "On" : "Off"}</span>
+              </button>
+              ${canWake && html`
+                <button type="button" className="ride-alert-option"
+                  aria-pressed=${wake} onClick=${onWake}>
+                  <span><strong>Keep screen awake</strong><small>While VRE Live is visible</small></span>
+                  <span className=${"ride-alert-state" + (wake ? " on" : "")}>
+                    ${wake ? "On" : "Off"}</span>
+                </button>`}
+              ${lockButton && html`
+                <div className="ride-alert-option lock-option">
+                  <span><strong>Lock-screen card</strong><small>Show this ride on your lock screen</small></span>
+                  ${lockButton}
+                </div>`}
+              ${pushErr && html`<div className="ride-alert-error" role="status">${pushErr}</div>`}
+            </div>`, document.body)}
+          ${snackbar && ReactDOM.createPortal(html`
+            <div className="ride-alert-snackbar" role="status" aria-live="polite">
+              ${snackbar}
+            </div>`, document.body)}
           <div className="ride-status">
             <span className=${"badge line-" + train.line}>${train.lineName}</span>
             <span className=${"badge " + statusClass}>${statusText}</span>
