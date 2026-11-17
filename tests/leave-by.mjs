@@ -117,4 +117,30 @@ assert.match(app,/todayState = day\?\.date === dateKey \? day : null/,
   "yesterday's native plan doesn't appear on a new service day");
 assert.match(app,/Automatic leave-time notifications are coming later/,
   "no claim that background alerts already operate");
+
+assert.match(app, /if \(selectedId === null\) \{[\s\S]*?if \(!upcoming\.length\) return null;/,
+  "without an active plan, the oversized multi-profile list stays hidden");
+assert.match(app, /aria-label="Upcoming planned commute"/,
+  "planned train renders a compact next-departure summary");
+assert.match(app, /onPlan=\$\{commutes\.profiles\.some\(p => p\.preferredTrains\.length > 0\)/,
+  "profiles expose on-demand train planning from the standard timetable");
+assert.match(app, /onClick=\$\{onPlan\}>Plan train<\/button>/,
+  "existing next-train card has a Plan train entry");
+assert.match(app, /onClick=\$\{\(\) => onSelect\(""\)\}/,
+  "Back returns to saved commute profiles");
+assert.match(app, /onClick=\$\{\(\) => onSelect\(null\)\}>Done/,
+  "manual planner can be dismissed without choosing a train");
+assert.match(app, /setPlanProfile\(""\)/,
+  "manual entry opens the profile list");
+assert.match(app, /No more trains today on this route\./,
+  "original timetable retains no-more-trains state");
+assert.match(app, /No VRE service today\./,
+  "original timetable retains no-service state");
+const nextCard = app.indexOf('!myTrip && tab !== "preferences" && html');
+const plannerCard = app.indexOf("TodayCommute} profiles=", nextCard);
+assert.ok(nextCard >= 0 && plannerCard > nextCard,
+  "standard next-departure card precedes optional commute planning");
+assert.equal((app.match(/TodayCommute\} profiles=/g) || []).length, 1,
+  "optional planner is rendered only once");
+
 console.log("VRE leave-by calculations, confidence, DST and Android packaging passed");
