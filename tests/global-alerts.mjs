@@ -50,8 +50,9 @@ assert.equal(empty.vibration,false,"commute vibration is opt-in");
 assert.equal(pref.normalize({...empty,leadMinutes:250}).leadMinutes,15);
 assert.equal(pref.normalize({...empty,leadMinutes:5}).leadMinutes,5);
 assert.equal(pref.normalize({...empty,leadMinutes:90}).leadMinutes,90);
-assert.equal(pref.normalize({...empty,leaveNow:true}).leaveNow,false,
-  "unimplemented background leave notification cannot be enabled");
+assert.equal(pref.normalize({...empty,leaveNow:true}).leaveNow,true,
+  "leave-now selection requires explicit UI opt-in after native phone pairing");
+assert.equal(empty.leaveNow,false,"leave-now notifications default off");
 const future = store({[pref.KEY]:JSON.stringify({version:2,enabled:true})});
 const unknown = pref.load(future,legacy);
 assert.equal(unknown.unsupportedVersion,true);
