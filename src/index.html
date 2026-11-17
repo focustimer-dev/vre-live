@@ -540,6 +540,24 @@
   .switch-sheet .switch-actions{display:flex;gap:8px;margin-top:12px}
   .switch-sheet .switch-actions .btn{min-height:44px}
   @media (prefers-reduced-motion:reduce){.ride-control{transition:none}}
+  .commute-focus-actions{margin-top:10px}
+  .commute-focus-actions .commute-options{width:auto;min-height:44px;
+    padding:8px 12px;color:var(--fg);border:1px solid var(--border)}
+  .commute-plan-note{padding:10px 8px}
+  .commute-plan-travel{display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:10px;border-top:1px solid var(--line-separator);
+    padding:12px 8px 2px;font-weight:700;font-size:var(--fs-2);color:var(--muted)}
+  .commute-plan-travel-input{display:inline-flex;gap:8px;align-items:center;color:var(--fg)}
+  .commute-plan-travel-input input{width:72px;min-height:44px;padding:7px;
+    text-align:center;font:inherit;color:var(--fg);background:var(--bg);
+    border:1px solid var(--border);border-radius:9px}
+  .commute-plan-travel-input input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  .commute-focus.future-commute .commute-focus-headline{font-size:clamp(20px,5vw,26px)}
+  .commute-focus.future-commute .commute-focus-content{padding:15px 16px 13px}
+  .srow.plan-choice.chosen{background:var(--surface-hover);box-shadow:inset 3px 0 var(--focus)}
+  .srow.plan-choice:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+  .commute-plan-confirm{min-height:44px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -1265,8 +1283,55 @@
     return { returning, reason,
       from: returning ? route.b : route.a, to: returning ? route.a : route.b };
   }
+  // Choose the next configured Advanced Commute by actual Eastern departure time,
+  // not live-feed activity or the Android check-in state. Future dates are previews
+  // only: native planning is deliberately day-scoped.
+  function nextScheduled(profiles, day, now, core, leaveBy, horizonDays = 8) {
+    if (!Array.isArray(profiles) || !Number.isFinite(now) || !core?.SCHEDULE ||
+        typeof leaveBy?.easternMinute !== "function") return null;
+    const tz = "America/New_York";
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit"
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(new Date(now))
+      .map(p => [p.type, p.value]));
+    const todayKey = core.serviceDateKey(now);
+    const today = day?.date === todayKey ? day : null;
+    const skipped = today?.skippedTrips || {};
+    const weekday = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" });
+    const weekIndex = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    let best = null;
+    for (let offset = 0; offset < horizonDays; offset++) {
+      // Noon Eastern remains on the intended date on both sides of DST.
+      const probe = Date.UTC(+parts.year, +parts.month - 1, +parts.day + offset, 17);
+      const date = new Date(probe), key = core.serviceDateKey(probe);
+      if (!core.isServiceDay(date)) continue;
+      const dayNum = weekIndex[weekday.format(date)];
+      const reduced = core.SCHEDULE.reducedService.includes(key);
+      for (const profile of profiles) {
+        if (!core.STATIONS[profile.from] || !core.STATIONS[profile.to] ||
+            !profile.days?.includes(dayNum) || !profile.preferredTrains?.length) continue;
+        if (offset === 0 && (today?.skippedDay || skipped[profile.id])) continue;
+        for (const trip of core.SCHEDULE.trips) {
+          if (!profile.preferredTrains.includes(String(trip.num))) continue;
+          if (reduced && !core.SCHEDULE.sTrains.has(trip.num)) continue;
+          const a = trip.stops.findIndex(stop => stop[0] === profile.from);
+          const b = trip.stops.findIndex(stop => stop[0] === profile.to);
+          if (a < 0 || b <= a) continue;
+          const dep = leaveBy.easternMinute(probe, trip.stops[a][1]);
+          if (dep < now - 60000) continue;
+          const candidate = { profile, train: String(trip.num),
+            tripId: trip.trip, dep, date: key, today: offset === 0, dayOffset: offset };
+          if (!best || candidate.dep < best.dep) best = candidate;
+        }
+      }
+      if (best) break;
+    }
+    return best;
+  }
+
   g.VRECommutes = Object.freeze({ KEY, choices, normalizeProfile, normalizeRecord,
-    migrateLegacy, load, save, upsert, remove, blank, homeLeg });
+    migrateLegacy, load, save, upsert, remove, blank, homeLeg, nextScheduled });
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
@@ -1820,8 +1885,9 @@
     const upcoming = profiles.map(p => {
       const train = planned[p.id];
       if (!train || skipped[p.id]) return null;
+      const travel = overrides[p.id] ?? p.travelMinutes;
       const forecast = VRELeaveBy.calculate({
-        ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+        ...p, travelMinutes: Number.isInteger(travel) && travel > 0 ? travel : 10
       }, train, VRECore, liveByTrip, samples, now);
       return { profile: p, train, forecast };
     }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
@@ -2113,42 +2179,77 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive,
-      onPlan, planned, returning, onChangePlan, onOtherPlans, onTravelChange, travelOverride }) {
-    // Explicit Advanced Commute plans own both the headline and departures.
-    // The Basic Commute route is used only without a selected native plan.
-    const fromStation = planned?.profile.from || from;
-    const toStation = planned?.profile.to || to;
-    const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 3),
+  function CommuteCard({ from, to, now, liveByTrip, onFlip, onPlanTrain,
+      planned, nextAdvanced, returning, travelOverride, initialExpanded = false }) {
+    const fromStation = planned?.profile.from || nextAdvanced?.profile.from || from;
+    const toStation = planned?.profile.to || nextAdvanced?.profile.to || to;
+    const candidateProfile = planned?.profile || nextAdvanced?.profile || null;
+    const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 32),
       [fromStation, toStation, Math.floor(now / 15000), liveByTrip]);
-    const noDepartures = !planned && rows.length === 0;
+    const preferred = candidateProfile?.preferredTrains || [];
+    const planRows = (candidateProfile && preferred.length
+      ? rows.filter(r => preferred.includes(r.num)) : rows)
+      .filter(() => !nextAdvanced || nextAdvanced.today || !!planned).slice(0, 4);
+    const noDepartures = !planned && !nextAdvanced && rows.length === 0;
     const service = isServiceDay(new Date(now));
-    const [showDetails, setShowDetails] = useState(false);
+    const [showDetails, setShowDetails] = useState(initialExpanded);
+    const [selectedTrain, setSelectedTrain] = useState(
+      nextAdvanced?.today ? nextAdvanced.train : planned?.train || null);
     const [showMarey, setShowMarey] = useState(() => lsGet("vre-live-marey", false));
-    const f = planned?.forecast;
+    const [minutes, setMinutes] = useState(() => {
+      const n = travelOverride ?? candidateProfile?.travelMinutes;
+      return Number.isInteger(n) && n > 0 ? n : 10;
+    });
+    useEffect(() => {
+      const n = travelOverride ?? candidateProfile?.travelMinutes;
+      setMinutes(Number.isInteger(n) && n > 0 ? n : 10);
+    }, [candidateProfile?.id, travelOverride, fromStation, toStation]);
+    useEffect(() => {
+      setSelectedTrain(nextAdvanced?.today ? nextAdvanced.train : planned?.train || null);
+    }, [candidateProfile?.id, fromStation, toStation, nextAdvanced?.train]);
+    const selectedRow = planRows.find(row => row.num === selectedTrain);
+    const forecast = planned?.forecast;
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
     }).format(new Date(ms));
-    const visibleRows = rows;
+    const futureDate = dep => new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric"
+    }).format(new Date(dep));
+    const confirm = () => {
+      if (!selectedRow || !Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
+      onPlanTrain({ profile: candidateProfile, from: fromStation, to: toStation,
+        train: String(selectedRow.num), today: !nextAdvanced || nextAdvanced.today }, minutes);
+      setShowDetails(false);
+    };
     return html`
-      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "")} aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
+      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "") + (nextAdvanced && !nextAdvanced.today ? " future-commute" : "")}
+        aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
         <div className="commute-focus-content">
           <div className="commute-focus-label">
-            ${planned ? "YOUR NEXT COMMUTE" : returning ? "RETURN FROM " + STATIONS[fromStation].name : "NEXT TO " + STATIONS[toStation].name}
+            ${planned ? "YOUR NEXT COMMUTE" : nextAdvanced
+              ? nextAdvanced.profile.name + " · NEXT COMMUTE"
+              : returning ? "RETURN FROM " + STATIONS[fromStation].name
+              : "NEXT TO " + STATIONS[toStation].name}
           </div>
           ${planned ? html`
             <div className="commute-focus-headline" role="status">
-              ${f.state === "needs-travel-time" ? "Set travel time"
-                : f.state === "leave-now" ? "Leave now" : "Leave by " + clock(f.leaveBy)}
+              ${forecast.state === "needs-travel-time" ? "Set travel time"
+                : forecast.state === "leave-now" ? "Leave now"
+                : "Leave by " + clock(forecast.leaveBy)}
             </div>
-            <div className="commute-focus-train">Train ${planned.train} · ${clock(f.scheduled)}</div>
-            <div className="commute-focus-route">
-              ${STATIONS[planned.profile.from].name} → ${STATIONS[planned.profile.to].name}
-            </div>
-            ${f.confidence === "delay-unconfirmed" && html`
+            <div className="commute-focus-train">Train ${planned.train} · ${clock(forecast.scheduled)}</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
+            ${forecast.confidence === "delay-unconfirmed" && html`
               <div className="commute-focus-warning" role="status">
                 Delay unconfirmed; using scheduled departure.
               </div>`}
+          ` : nextAdvanced ? html`
+            <div className="commute-focus-headline">
+              ${nextAdvanced.today ? clock(nextAdvanced.dep)
+                : futureDate(nextAdvanced.dep) + " · " + clock(nextAdvanced.dep)}
+            </div>
+            <div className="commute-focus-train">Train ${nextAdvanced.train} · Timetable</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
           ` : rows.length ? html`
             <div className="commute-focus-headline">${fmtClock(rows[0].dep)}</div>
             <div className="commute-focus-train">Train ${rows[0].num} · ${fmtWhen(rows[0].dep, now)}</div>
@@ -2159,61 +2260,64 @@
             <div className="commute-focus-headline empty">
               ${service ? "No departures remaining today." : "No VRE service today."}
             </div>
-            <div className="commute-focus-route">
-              ${STATIONS[fromStation].name} → ${STATIONS[toStation].name}
-            </div>`}
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>`}
           <div className="commute-focus-actions">
-            ${planned ? html`<button type="button" className="btn"
-              onClick=${() => onChangePlan(planned.profile.id)}>Change train</button>`
-              : rows.length > 0 && onPlan && html`<button type="button" className="btn"
-                onClick=${onPlan}>Plan train</button>`}
             <button type="button" className="btn ghost commute-options"
-              aria-expanded=${showDetails} onClick=${() => setShowDetails(!showDetails)}>
-              ${showDetails ? "Fewer options" : "More options"}
-              <${Chevron} open=${showDetails} />
+              aria-expanded=${showDetails} aria-controls="inline-commute-blueprint"
+              onClick=${() => setShowDetails(!showDetails)}>
+              Plan train <${Chevron} open=${showDetails} />
             </button>
           </div>
           ${showDetails && html`
-            <div className="commute-extra">
+            <div className="commute-extra" id="inline-commute-blueprint">
               <div className="commute-extra-actions">
                 ${!planned && html`<button type="button" className="btn ghost" onClick=${onFlip}>
                   Swap direction
                 </button>`}
-                ${planned && planned.otherCount > 0 && html`
-                  <button type="button" className="btn ghost" onClick=${onOtherPlans}>
-                    Other planned trips (${planned.otherCount})
-                  </button>`}
               </div>
-              ${planned && html`
-                <${DailyTravelControl} profile=${planned.profile} override=${travelOverride}
-                  onChange=${value => onTravelChange(planned.profile.id, value)} />`}
-              ${visibleRows.length > 0 && html`
-                <div className="commute-extra-label">
-                  ${planned ? "Other departures" : "Departure details"}
-                </div>
-                ${visibleRows.map(r => html`
-                  <button key=${r.trip} className="srow" aria-label=${`Choose train ${r.num}`}
-                    onClick=${() => onPickLive(r.trip)}>
+              ${planRows.length > 0 ? html`
+                <div className="commute-extra-label">Choose a departure</div>
+                ${planRows.map(r => html`
+                  <button key=${r.trip} className=${"srow plan-choice" + (selectedTrain === r.num ? " chosen" : "")}
+                    aria-pressed=${selectedTrain === r.num} aria-label=${`Select train ${r.num} to plan`}
+                    onClick=${() => setSelectedTrain(r.num)}>
                     <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
                     <span className="mid">
                       <span className="l1">${fmtClock(r.dep)} from ${STATIONS[fromStation].name}</span>
                       <span className="l2">Arrives ${STATIONS[toStation].name} ${fmtClock(r.arr)}</span>
                     </span>
-                    <span className="right">
-                      <span className=${"badge " + (r.live ? "ok" : "dim")}>${fmtWhen(r.dep, now)}</span>
-                    </span>
+                    <span className="right"><span className="badge">${fmtWhen(r.dep, now)}</span></span>
+                    <${Chevron} />
                   </button>`)}
-              `}
-              ${rows.length > 0 && html`
+              ` : nextAdvanced && !nextAdvanced.today ? html`
+                <div className="meta commute-plan-note">
+                  Next saved departure: ${futureDate(nextAdvanced.dep)} at ${clock(nextAdvanced.dep)}.
+                  Confirm that train on its service day.
+                </div>`
+              : html`<div className="meta commute-plan-note">No future departures remain today on this route.</div>`}
+              ${planRows.length > 0 && html`
                 <div className="marey-wrap">
                   <button className="marey-toggle" aria-expanded=${showMarey}
                     onClick=${() => { lsSet("vre-live-marey", !showMarey); setShowMarey(!showMarey); }}>
                     Time-space chart <${Chevron} open=${showMarey} />
                   </button>
                   ${showMarey && html`
-                    <${Marey} from=${fromStation} to=${toStation} deps=${rows}
+                    <${Marey} from=${fromStation} to=${toStation} deps=${planRows}
                       liveByTrip=${liveByTrip} now=${now} />`}
                 </div>`}
+              <label className="commute-plan-travel" for="commute-plan-minutes">
+                <span>Travel time to station</span>
+                <span className="commute-plan-travel-input">
+                  <input id="commute-plan-minutes" type="number" inputMode="numeric"
+                    min="1" max="180" step="1" value=${minutes}
+                    onChange=${e => {
+                      const value = Number(e.target.value);
+                      if (Number.isInteger(value) && value >= 1 && value <= 180) setMinutes(value);
+                    }} /> min
+                </span>
+              </label>
+              <button type="button" className="btn commute-plan-confirm"
+                disabled=${!selectedRow} onClick=${confirm}>Confirm train</button>
             </div>`}
         </div>
       </div>`;
@@ -3206,6 +3310,7 @@ ${lockError}
         : lsGet("vre-live-board", null) || (lsGet(ROUTE_KEY, null) || {}).a || "01";
     });
     const [summary, setSummary] = useState(null);
+    const [inlinePlan, setInlinePlan] = useState(() => lsGet("vre-live-inline-plan-v1", null));
     const [lastCompletedRide, setLastCompletedRide] = useState(() => {
       const rides = lsGet(RIDE_KEY, []);
       return Array.isArray(rides) ? rides.filter(r => r?.manuallyEnded).at(-1) || null : null;
@@ -3555,17 +3660,52 @@ ${lockError}
     const accent = myTrip && myTrain ? { "--accent": LINE_COLOR[myTrain.line] } : null;
 
     const plannedProfiles = commutes.profiles.filter(p => p.preferredTrains.length > 0);
-    const primaryPlan = !myTrip && typeof window.VreCommutePrefs !== "undefined"
+    const nativePrimary = !myTrip && typeof window.VreCommutePrefs !== "undefined"
       ? primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel)
       : null;
-    // Basic Commute owns the unplanned home card. An explicitly confirmed
-    // Advanced Commute may supply its own route even without a Basic setup.
+    const todayInline = inlinePlan?.date === todayKey ? inlinePlan : null;
+    const localPrimary = !myTrip && todayInline ? (() => {
+      const p = { id: "inline-basic", name: "Commute",
+        from: todayInline.from, to: todayInline.to,
+        preferredTrains: [todayInline.train],
+        travelMinutes: todayInline.minutes, platformMinutes: 0, bufferMinutes: 5 };
+      const forecast = VRELeaveBy.calculate(p, todayInline.train, VRECore, liveByTrip, devlog, now);
+      return ["upcoming", "leave-now"].includes(forecast.state)
+        ? { profile: p, train: todayInline.train, forecast, local: true } : null;
+    })() : null;
+    const primaryPlan = nativePrimary || localPrimary;
+    const nextAdvanced = !myTrip ? VRECommutes.nextScheduled(
+      commutes.profiles, commuteDay, now, VRECore, VRELeaveBy) : null;
     const homeRoute = route || (primaryPlan
-      ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to } : null);
+      ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to }
+      : nextAdvanced ? { a: nextAdvanced.profile.from, b: nextAdvanced.profile.to } : null);
     const homeLeg = useMemo(() => homeRoute
       ? VRECommutes.homeLeg(homeRoute, flipDir, lastCompletedRide, now, VRECore, liveByTrip)
       : null, [homeRoute?.a, homeRoute?.b, flipDir, lastCompletedRide?.t,
         Math.floor(now / 15000), liveByTrip]);
+    const manualRoute = flipDir !== null || !!widgetRoute;
+    const nextBasic = homeLeg
+      ? nextDepartures(homeLeg.from, homeLeg.to, now, liveByTrip, 1)[0] : null;
+    const featuredAdvanced = !primaryPlan && !manualRoute && nextAdvanced &&
+      (!nextBasic || nextAdvanced.dep <= nextBasic.dep) ? nextAdvanced : null;
+    const activeProfile = primaryPlan?.profile || featuredAdvanced?.profile || null;
+    const planOverride = activeProfile && todayTravel[activeProfile.id] != null
+      ? todayTravel[activeProfile.id] : null;
+    const confirmInlinePlan = (choice, travelMinutes) => {
+      if (!choice.today || !Number.isInteger(travelMinutes) ||
+          travelMinutes < 1 || travelMinutes > 180) return;
+      if (choice.profile?.id && choice.profile.id !== "inline-basic" &&
+          choice.profile.preferredTrains.includes(choice.train) &&
+          typeof window.VreCommutePrefs !== "undefined") {
+        saveTravelOverride(choice.profile.id, travelMinutes);
+        nativeCommute({ type: "plan", profileId: choice.profile.id, train: choice.train });
+      } else {
+        const record = { date: VRECore.serviceDateKey(Date.now()),
+          from: choice.from, to: choice.to, train: choice.train, minutes: travelMinutes };
+        lsSet("vre-live-inline-plan-v1", record);
+        setInlinePlan(record);
+      }
+    };
     const todayCard = !myTrip && tab !== "preferences" && planProfile !== null &&
       typeof window.VreCommutePrefs !== "undefined" ? html`
         <${TodayCommute} profiles=${plannedProfiles}
@@ -3638,19 +3778,13 @@ ${lockError}
           <div style=${{ marginBottom: 12 }}>
             ${homeLeg
               ? html`<${CommuteCard}
-                  from=${primaryPlan?.profile.from || homeLeg.from}
-                  to=${primaryPlan?.profile.to || homeLeg.to}
-                  auto=${homeLeg.reason !== "manual"}
+                  from=${homeLeg.from} to=${homeLeg.to}
                   returning=${!primaryPlan && homeLeg.returning}
                   now=${now} liveByTrip=${liveByTrip}
+                  planned=${primaryPlan} nextAdvanced=${featuredAdvanced}
+                  travelOverride=${planOverride}
                   onFlip=${() => setFlipDir(!homeLeg.returning)}
-                  onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
-                    ? () => setPlanProfile("") : null}
-                  planned=${primaryPlan} onChangePlan=${setPlanProfile}
-                  onOtherPlans=${() => setPlanProfile("")}
-                  onTravelChange=${saveTravelOverride}
-                  travelOverride=${primaryPlan ? todayTravel[primaryPlan.profile.id] : null}
-                  onPickLive=${id => { setSelected(id); setPicking(false); }} />`
+                  onPlanTrain=${confirmInlinePlan} />`
               : html`<div className="card">
                   <div className="card-h">Set up your commute</div>
                   <p className="pref-description">Save your usual stations to show your next departures here.</p>

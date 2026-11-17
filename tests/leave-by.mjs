@@ -98,7 +98,7 @@ assert.equal(VRELeaveBy.easternMinute(time("2026-11-02T11:45:00Z"),7*60+25),
 assert.match(app,/function DailyTravelControl\(/,"one-day adjustment control exists");
 assert.match(app,/vre-leave-day-overrides-v1/,"one-day override uses a separate storage record");
 assert.match(app,/travelOverrides\?\.date === todayKey/,"yesterday's overrides never apply today");
-assert.match(app,/travelMinutes: overrides\[p\.id\] \?\? p\.travelMinutes/,
+assert.match(app,/const travel = overrides\[p\.id\] \?\? p\.travelMinutes/,
   "the countdown accepts today's travel time without mutating the saved profile");
 assert.match(app,/travelMinutes: overrides\[selected\.id\] \?\? selected\.travelMinutes/,
   "alternate train previews honor today's travel override");
@@ -118,28 +118,12 @@ assert.match(app,/todayState = day\?\.date === dateKey \? day : null/,
 assert.match(app,/Automatic leave-time notifications are coming later/,
   "no claim that background alerts already operate");
 
-assert.match(app, /if \(selectedId === null\) return null;/,
-  "the multi-profile planner only appears after an explicit user action");
-assert.match(app, /aria-label=\$\{planned \? "Upcoming planned commute" : "Next departure"\}/,
-  "focused card distinguishes planned commute from timetable departures");
-assert.match(app, /function primaryPlannedCommute\(/,
-  "primary commute is selected without displaying the full profile list");
-assert.match(app, /planned=\$\{primaryPlan\}/,
-  "the focused card receives the selected planned commute");
-assert.match(app, /aria-expanded=\$\{showDetails\} onClick=\$\{\(\) => setShowDetails\(!showDetails\)\}/,
-  "secondary actions require explicit More options expansion");
-assert.match(app, /visibleRows\.map\(r => html`[\s\S]*?onClick=\$\{\(\) => onPickLive\(r\.trip\)\}/,
-  "expanded departure rows remain selectable");
-assert.match(app, /onPlan=\$\{commutes\.profiles\.some\(p => p\.preferredTrains\.length > 0\)/,
-  "profiles expose on-demand train planning from the standard timetable");
-assert.match(app, /onClick=\$\{onPlan\}>Plan train<\/button>/,
-  "existing next-train card has a Plan train entry");
-assert.match(app, /onClick=\$\{\(\) => onSelect\(""\)\}/,
-  "Back returns to saved commute profiles");
-assert.match(app, /onClick=\$\{\(\) => onSelect\(null\)\}>Done/,
-  "manual planner can be dismissed without choosing a train");
-assert.match(app, /setPlanProfile\(""\)/,
-  "manual entry opens the profile list");
+assert.ok(app.includes('function primaryPlannedCommute('), 'native planned ride logic retained');
+assert.ok(app.includes('planned=${primaryPlan} nextAdvanced=${featuredAdvanced}'), 'next chronological commute passed to card');
+assert.ok(app.includes('aria-controls="inline-commute-blueprint"'), 'Plan train expands existing options in card');
+assert.ok(app.includes('onPlanTrain=${confirmInlinePlan}'), 'in-card plan uses one confirmation handler');
+assert.ok(app.includes('setSelectedTrain(r.num)'), 'train selection is explicit');
+assert.ok(app.includes('onClick=${confirm}>Confirm train'), 'confirmation happens after selecting and setting travel time');
 assert.match(app, /No departures remaining today\./,
   "exhausted timetable retains a truthful, compact no-departures state");
 assert.match(app, /No VRE service today\./,
@@ -147,8 +131,7 @@ assert.match(app, /No VRE service today\./,
 const nextCard = app.indexOf('!myTrip && tab !== "preferences" && planProfile === null && html');
 const openedPlanner = app.indexOf('planProfile !== null && todayCard');
 assert.ok(nextCard >= 0 && openedPlanner >= 0 && openedPlanner < nextCard,
-  "the focused departure card is default and planner is shown on explicit request");
+  'inline planning is the default, legacy deep-link planner only opens explicitly');
 assert.equal((app.match(/TodayCommute\} profiles=/g) || []).length, 1,
-  "planner component is instantiated only once");
-
+  'legacy widget planner is not duplicated');
 console.log("VRE leave-by calculations, confidence, DST and Android packaging passed");
