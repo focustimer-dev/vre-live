@@ -95,6 +95,30 @@ internal object CommuteCheckIns {
     fun enabled(context: Context): Boolean = alerts(context).optBoolean("enabled")
     fun arrivalEnabled(context: Context): Boolean =
         enabled(context) && alerts(context).optBoolean("arrival")
+
+    fun leaveNowEnabled(context: Context): Boolean =
+        enabled(context) && alerts(context).optBoolean("leaveNow")
+    fun soundEnabled(context: Context): Boolean = alerts(context).optBoolean("sound")
+    fun vibrationEnabled(context: Context): Boolean = alerts(context).optBoolean("vibration")
+    fun stateObject(context: Context): JSONObject = daily(context)
+
+    /** No network: resolve only an explicit train choice from today's local timetable. */
+    fun confirmedPlan(context: Context, id: String): JSONObject? {
+        val state = daily(context)
+        if (state.optBoolean("skippedDay") ||
+            state.optJSONObject("skippedTrips")?.optBoolean(id) == true ||
+            state.optJSONObject("confirmed")?.optBoolean(id) != true) return null
+        val train = state.optJSONObject("planned")?.optString(id).orEmpty()
+        if (train.isBlank()) return null
+        val p = profile(context,id) ?: return null
+        if (!hasService(context,p,nowDate(),train)) return null
+        return JSONObject().put("profileId",id).put("train",train)
+            .put("serviceDate",dayKey())
+            .put("from",p.optString("from")).put("to",p.optString("to"))
+            .put("travelMinutes",p.optInt("travelMinutes"))
+            .put("platformMinutes",p.optInt("platformMinutes"))
+            .put("bufferMinutes",p.optInt("bufferMinutes"))
+    }
     private fun checkInsEnabled(context: Context): Boolean =
         enabled(context) && alerts(context).optBoolean("checkIns")
 
@@ -501,7 +525,12 @@ class CommuteCheckReceiver : BroadcastReceiver() {
                 CommuteCheckIns.onReminder(context, intent.data?.lastPathSegment.orEmpty())
             CommuteCheckIns.LATER ->
                 CommuteCheckIns.later(context, intent.getStringExtra("profileId").orEmpty())
-            CommuteCheckIns.SKIP_DAY -> CommuteCheckIns.skipToday(context)
+            CommuteCheckIns.SKIP_DAY -> {
+                CommuteCheckIns.skipToday(context)
+                // Local confirmation is revoked first; remote cancellation is
+                // queued and retried on next launch if the receiver is killed.
+                CommutePushClient.cancelAll(context)
+            }
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED,
             CommuteCheckIns.RECHECK -> CommuteCheckIns.reschedule(context)
