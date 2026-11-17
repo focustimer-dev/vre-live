@@ -15,5 +15,6 @@ tag = "monitor_sqlite_v1"
 new_sqlite_classes = ["CommuteMonitorCoordinator"]
 
 # Secrets, configured OUTSIDE git:
-# MONITOR_GATEWAY_TOKEN (>=32 characters; server-to-server only; NEVER ship to Android)
+# PAIRING_CODE (24+ character randomly generated ONE-TIME secret; never ship inside Android)
+# Pairing is allowed only with a matching code; all later calls use per-device credentials.
 # FCM_SERVICE_ACCOUNT_JSON (Google service account; never commit/log)
