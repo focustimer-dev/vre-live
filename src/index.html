@@ -552,6 +552,12 @@
     text-align:center;font:inherit;color:var(--fg);background:var(--bg);
     border:1px solid var(--border);border-radius:9px}
   .commute-plan-travel-input input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+  .commute-focus.future-commute .commute-focus-headline{font-size:clamp(20px,5vw,26px)}
+  .commute-focus.future-commute .commute-focus-content{padding:15px 16px 13px}
+  .srow.plan-choice.chosen{background:var(--surface-hover);box-shadow:inset 3px 0 var(--focus)}
+  .srow.plan-choice:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+  .commute-plan-confirm{min-height:44px;margin-top:12px}
 </style>
 </head>
 <body>
@@ -2181,11 +2187,14 @@
     const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 32),
       [fromStation, toStation, Math.floor(now / 15000), liveByTrip]);
     const preferred = candidateProfile?.preferredTrains || [];
-    const planRows = candidateProfile && preferred.length
-      ? rows.filter(r => preferred.includes(r.num)) : rows;
+    const planRows = (candidateProfile && preferred.length
+      ? rows.filter(r => preferred.includes(r.num)) : rows)
+      .filter(() => !nextAdvanced || nextAdvanced.today || !!planned).slice(0, 4);
     const noDepartures = !planned && !nextAdvanced && rows.length === 0;
     const service = isServiceDay(new Date(now));
     const [showDetails, setShowDetails] = useState(initialExpanded);
+    const [selectedTrain, setSelectedTrain] = useState(
+      nextAdvanced?.today ? nextAdvanced.train : planned?.train || null);
     const [showMarey, setShowMarey] = useState(() => lsGet("vre-live-marey", false));
     const [minutes, setMinutes] = useState(() => {
       const n = travelOverride ?? candidateProfile?.travelMinutes;
@@ -2195,6 +2204,10 @@
       const n = travelOverride ?? candidateProfile?.travelMinutes;
       setMinutes(Number.isInteger(n) && n > 0 ? n : 10);
     }, [candidateProfile?.id, travelOverride, fromStation, toStation]);
+    useEffect(() => {
+      setSelectedTrain(nextAdvanced?.today ? nextAdvanced.train : planned?.train || null);
+    }, [candidateProfile?.id, fromStation, toStation, nextAdvanced?.train]);
+    const selectedRow = planRows.find(row => row.num === selectedTrain);
     const forecast = planned?.forecast;
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
@@ -2202,14 +2215,14 @@
     const futureDate = dep => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric"
     }).format(new Date(dep));
-    const confirm = row => {
-      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
+    const confirm = () => {
+      if (!selectedRow || !Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
       onPlanTrain({ profile: candidateProfile, from: fromStation, to: toStation,
-        train: String(row.num), today: !nextAdvanced || nextAdvanced.today }, minutes);
+        train: String(selectedRow.num), today: !nextAdvanced || nextAdvanced.today }, minutes);
       setShowDetails(false);
     };
     return html`
-      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "")}
+      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "") + (nextAdvanced && !nextAdvanced.today ? " future-commute" : "")}
         aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
         <div className="commute-focus-content">
           <div className="commute-focus-label">
@@ -2265,8 +2278,9 @@
               ${planRows.length > 0 ? html`
                 <div className="commute-extra-label">Choose a departure</div>
                 ${planRows.map(r => html`
-                  <button key=${r.trip} className="srow" aria-label=${`Plan train ${r.num}`}
-                    onClick=${() => confirm(r)}>
+                  <button key=${r.trip} className=${"srow plan-choice" + (selectedTrain === r.num ? " chosen" : "")}
+                    aria-pressed=${selectedTrain === r.num} aria-label=${`Select train ${r.num} to plan`}
+                    onClick=${() => setSelectedTrain(r.num)}>
                     <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
                     <span className="mid">
                       <span className="l1">${fmtClock(r.dep)} from ${STATIONS[fromStation].name}</span>
@@ -2302,6 +2316,8 @@
                     }} /> min
                 </span>
               </label>
+              <button type="button" className="btn commute-plan-confirm"
+                disabled=${!selectedRow} onClick=${confirm}>Confirm train</button>
             </div>`}
         </div>
       </div>`;
