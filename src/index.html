@@ -1300,7 +1300,7 @@
   }
   const REFRESH_MS = 180000;          // 3 minutes
   const MIN_FETCH_GAP = 65000;        // never hit the proxy/feeds faster than this
-  const LINE_COLOR = { F: "#ef4444", M: "#60a5fa" };
+  const LINE_COLOR = { F: "var(--line-F)", M: "var(--line-M)" };
   function isCurrentRide(ride, now = Date.now()) {
     const started = Number(ride && ride.boardedAt);
     // The ride timestamp is taken at tap time while the screen clock ticks once per
@@ -1907,7 +1907,7 @@
   }
 
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
-  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed }) {
+  function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed, theme, onThemeChange }) {
     const open = name => onSection(name);
     return html`
       <section className="preferences" aria-label="Preferences">
@@ -2255,9 +2255,9 @@
         <div className="journey-title">
           <svg className="journey-icon" viewBox="0 0 38 46" fill="none" aria-hidden="true">
             <rect x="5" y="2" width="28" height="34" rx="9" fill="currentColor"/>
-            <path d="M10 12h18v10H10z" fill="#09090b"/><path d="M19 12v10" stroke="currentColor" strokeWidth="2"/>
+            <path d="M10 12h18v10H10z" fill="var(--map-ink)"/><path d="M19 12v10" stroke="currentColor" strokeWidth="2"/>
             <path d="M10 43l5-7m13 7l-5-7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-            <circle cx="12" cy="29" r="2" fill="#09090b"/><circle cx="26" cy="29" r="2" fill="#09090b"/>
+            <circle cx="12" cy="29" r="2" fill="var(--map-ink)"/><circle cx="26" cy="29" r="2" fill="var(--map-ink)"/>
           </svg>
           <div><strong>Train ${activeTrain.num}</strong><small>${activeTrain.dir === 1 ? "Toward DC" : "Outbound"} · Your ride</small></div>
         </div>
@@ -2273,17 +2273,17 @@
         ${ride && html`
           <g aria-hidden="true" style=${{pointerEvents:"none"}}>
             <path d=${ride.pathD} fill="none" stroke=${ride.color} strokeWidth="11" strokeLinejoin="round" strokeLinecap="round" opacity="0.16"/>
-            <path className="ridepath" d=${ride.pathD} fill="none" stroke="#fafafa" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
+            <path className="ridepath" d=${ride.pathD} fill="none" stroke="var(--map-highlight)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
           </g>`}
         ${anchors.filter(t => t.tripId !== myTripId).map(t => {
           const p = positions[t.tripId];
           const active = t.tripId === myTripId, highlighted = active || t.tripId === selected;
           return html`<g key=${"leader-" + t.tripId} className=${active ? "train-leader active" : "train-leader"}
             aria-hidden="true" style=${{ pointerEvents: "none" }}>
-            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="#09090b" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
-            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "#fafafa" : LINE_COLOR[t.line]}
+            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="var(--map-ink)" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
+            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "var(--map-highlight)" : LINE_COLOR[t.line]}
               strokeWidth=${active ? 3.4 : highlighted ? 2.4 : 1.1} strokeLinecap="round" opacity=${highlighted ? 1 : 0.55}/>
-            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="#09090b" stroke="#fafafa" strokeWidth="2.3"/>`}
+            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="var(--map-ink)" stroke="var(--map-highlight)" strokeWidth="2.3"/>`}
             <circle cx=${t.x} cy=${t.y} r=${active ? 3.3 : 2.7} fill=${LINE_COLOR[t.line]}/>
           </g>`;
         })}
@@ -2297,12 +2297,12 @@
               ${isDest && html`
                 <circle className="destring" cx=${s.x} cy=${s.y} r="10.5" fill="none"
                   stroke=${ride.color} strokeWidth="2" opacity="0.9"/>`}
-              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="#0b0b0d"
-                stroke=${isDest ? "#fafafa" : trunk ? "#e4e4e7" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
+              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="var(--map-ink)"
+                stroke=${isDest ? "var(--map-highlight)" : trunk ? "var(--map-label-major)" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
                 strokeWidth=${trunk || isDest ? 2.4 : 2}/>
               <text x=${s.x + side * (isDest ? 16 : 13)} y=${s.y + 3.5}
                 textAnchor=${side < 0 ? "end" : "start"}
-                style=${isDest ? { fill: "#fafafa", fontWeight: 700 } : null}
+                style=${isDest ? { fill: "var(--map-highlight)", fontWeight: 700 } : null}
                 className=${"st-label" + (trunk || code === "SP" || code === "12" || isDest ? " major" : "")}>${s.name}</text>
             </g>`;
         })}
@@ -2312,13 +2312,13 @@
             onClick=${() => onPick(activeTrain.tripId)}
             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(activeTrain.tripId); } }}>
             <rect x=${focus.card.x} y=${focus.card.y} width=${focus.card.w} height=${focus.card.h} rx="12" fill=${LINE_COLOR[activeTrain.line]}/>
-            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="#09090b">${activeTrain.num}</text>
+            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="var(--map-ink)">${activeTrain.num}</text>
             <path d=${activeTrain.dir === 1 ? `M${focus.card.x+80},${focus.card.y+32} l6,-8 l6,8` : `M${focus.card.x+80},${focus.card.y+24} l6,8 l6,-8`}
-              fill="none" stroke="#09090b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="#09090b" stroke="#09090b" strokeWidth="5"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="#fafafa" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
+              fill="none" stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="var(--map-ink)" stroke="var(--map-ink)" strokeWidth="5"/>
+            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="var(--map-highlight)" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
             <path d=${activeTrain.dir === 1 ? `M${activeTrain.x-4},${activeTrain.y+2} l4,-5 l4,5` : `M${activeTrain.x-4},${activeTrain.y-2} l4,5 l4,-5`}
-              fill="none" stroke="#09090b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+              fill="none" stroke="var(--map-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </g>`}
         ${(ghosts || []).filter(g => g.tripId !== myTripId).map(g => {
           const sel = g.tripId === selected, mine = g.tripId === myTripId;
@@ -2331,9 +2331,9 @@
              onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(g.tripId); }}>
             <g className="pop">
               <circle cx="0" cy="0" r="31" fill="transparent"/>
-              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="#fafafa" strokeWidth="1.4"/>`}
+              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4"/>`}
               <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${LINE_COLOR[g.line]} strokeWidth="1.5"/>
-              <circle cx="0" cy="0" r="13" fill="#0b0b0d" stroke=${LINE_COLOR[g.line]}
+              <circle cx="0" cy="0" r="13" fill="var(--map-ink)" stroke=${LINE_COLOR[g.line]}
                 strokeWidth="1.6" strokeDasharray="3 2.6" opacity="0.8"/>
               <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="700"
                 fill=${LINE_COLOR[g.line]}>${g.num}</text>
@@ -2358,7 +2358,7 @@
                aria-label=${`Train ${t.num}, ${t.lineName}, ${up ? "toward DC" : "outbound"}${projected ? ", projected position" : ""}`}
                onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") onPick(t.tripId); }}>
               <g className="pop">
-                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="#fafafa" strokeWidth="1.4" opacity="0.95"/>`}
+                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4" opacity="0.95"/>`}
                 ${projected && !mine && html`
                   <circle cx="0" cy="0" r="17" fill="none" stroke=${c} strokeWidth="1.3"
                     strokeDasharray="3 3" opacity="0.85"/>`}
@@ -2368,8 +2368,8 @@
                   fill="none" stroke=${c} strokeWidth="2.4" strokeLinecap="round"/>
                 <path d=${`M-4.5 ${s * 23} Q0 ${s * 27.5} 4.5 ${s * 23}`}
                   fill="none" stroke=${c} strokeWidth="2" strokeLinecap="round" opacity="0.45"/>
-                <circle cx="0" cy="0" r="13" fill=${c} stroke="#0b0b0d" strokeWidth="2"/>
-                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="#0b0b0d">${t.num}</text>
+                <circle cx="0" cy="0" r="13" fill=${c} stroke="var(--map-ink)" strokeWidth="2"/>
+                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="var(--map-ink)">${t.num}</text>
               </g>
             </g>`;
         })}
@@ -2456,10 +2456,10 @@
           <span style=${{ flex: 1 }}></span>
           <button className=${"chip" + (lineF === "all" ? " on" : "")} onClick=${() => setLineF("all")}>All</button>
           <button className=${"chip" + (lineF === "F" ? " on" : "")}
-            style=${lineF === "F" ? { background: LINE_COLOR.F, borderColor: LINE_COLOR.F, color: "#0b0b0d" } : { color: "#fca5a5" }}
+            style=${lineF === "F" ? { background: LINE_COLOR.F, borderColor: LINE_COLOR.F, color: "var(--map-ink)" } : { color: "var(--line-F)" }}
             onClick=${() => setLineF("F")}>FBG</button>
           <button className=${"chip" + (lineF === "M" ? " on" : "")}
-            style=${lineF === "M" ? { background: LINE_COLOR.M, borderColor: LINE_COLOR.M, color: "#0b0b0d" } : { color: "#93c5fd" }}
+            style=${lineF === "M" ? { background: LINE_COLOR.M, borderColor: LINE_COLOR.M, color: "var(--map-ink)" } : { color: "var(--line-M)" }}
             onClick=${() => setLineF("M")}>MSS</button>
         </div>
         ${!service && html`<div className="banner">No VRE service today (weekday-only schedule shown).</div>`}
@@ -2542,9 +2542,9 @@
               <g key=${c}>
                 <line x1=${L} y1=${Y(i)} x2=${W - R} y2=${Y(i)} stroke="var(--border)" strokeWidth="0.7"/>
                 <circle cx=${L} cy=${Y(i)} r=${ends ? 2.6 : 1.5}
-                  fill=${ends ? "#d4d4d8" : "var(--muted-2)"}/>
+                  fill=${ends ? "var(--map-label-major)" : "var(--muted-2)"}/>
                 <text x=${L - 7} y=${Y(i) + 3} fontSize=${ends ? 8.5 : 7} textAnchor="end"
-                  fill=${ends ? "#d4d4d8" : "var(--muted-2)"} fontWeight=${ends ? 600 : 400}>
+                  fill=${ends ? "var(--map-label-major)" : "var(--muted-2)"} fontWeight=${ends ? 600 : 400}>
                   ${ends ? gutterName(STATIONS[c].name) : ""}</text>
               </g>`;
           })}
@@ -2580,7 +2580,7 @@
                 <text x=${Math.max(L + 2, Math.min(pts[0][0] + 3, W - 24))} y=${Math.max(T + 8, pts[0][1] - 3.5)}
                   fontSize="8" fill=${c} fontWeight="700">${dep.num}</text>
                 ${dep.live && dot && html`
-                  <circle cx=${dot[0]} cy=${dot[1]} r="3.4" fill=${c} stroke="#0b0b0d" strokeWidth="1.2"/>`}
+                  <circle cx=${dot[0]} cy=${dot[1]} r="3.4" fill=${c} stroke="var(--map-ink)" strokeWidth="1.2"/>`}
               </g>`;
           })}
         </svg>
@@ -2814,6 +2814,13 @@
 
   /* ---------------- root ---------------- */
   function App() {
+    const [theme, setTheme] = useState(() => window.VRETheme?.initial || "electric-stars");
+    useEffect(() => {
+      const selected = window.VRETheme?.choose(theme);
+      if (selected) {
+        try { window.VreTheme?.postMessage(selected); } catch (_) {}
+      }
+    }, [theme]);
     const [data, setData] = useState(null);          // {trains, feedTs}
     const [alerts, setAlerts] = useState([]);
     const [fetchedAt, setFetchedAt] = useState(0);
@@ -3272,7 +3279,7 @@
         </nav>
 
         ${alerts.length > 0 && html`
-          <div className="card fade" style=${{ marginBottom: 12, borderColor: "#713f12" }}>
+          <div className="card fade" style=${{ marginBottom: 12, borderColor: "var(--amber)" }}>
             <div className="card-h" style=${{ color: "var(--amber)", display: "flex", alignItems: "center", gap: 7 }}>
               <${AlertIcon} /> Service alerts</div>
             <div style=${{ padding: "6px 16px 14px" }}>
@@ -3338,6 +3345,7 @@
             route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
             alertPrefs=${alertPrefs} onSaveAlerts=${saveAlertPrefs}
             osAllowed=${commuteDay?.notificationsAllowed}
+            theme=${theme} onThemeChange=${setTheme}
             onSaveRoute=${r => {
               lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
             }} />`
