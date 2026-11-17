@@ -25,10 +25,15 @@ assert.equal(lens.stops[0].code,"03","lens starts with a previous stop for conte
 assert.equal(lens.stops[1].code,"04","the next stop is placed near the focused train");
 assert.equal(lens.destination,"08","destination preserved even if outside lens");
 assert.equal(view(null,"08",now).stops.length,0,"empty/unavailable positions are safe");
-const points=runInNewContext(app.slice(atlasFrom,atlasTo)+"\n;atlasY",{STATIONS:stops});
+const lineF=["01","02","03","04","05","06","07","08","09","0A","0B","0C","SP"];
+const lineM=["01","02","03","04","0D","0E","0F","10","11","12"];
+const atlasStops=Object.fromEntries(lineF.map((code,i)=>[code,{y:40+i*608/12}]));
+lineM.slice(4).forEach((code,i)=>{atlasStops[code]={y:40+(i+4)*608/12};});
+const points=runInNewContext(app.slice(atlasFrom,atlasTo)+"\n;atlasY",
+  {STATIONS:atlasStops,LINE_F:lineF,LINE_M:lineM});
 assert.equal(points(40),25,"northern endpoint");
 assert.equal(points(648),325,"southern endpoint");
-assert.equal(points(stops["01"]?.y ?? 40),25, "atlas preserves top-of-line position");
+assert.equal(points(40,"M"),25, "shared trunk station stays aligned on both lines");
 assert.match(app,/const ATLAS_MAJOR = new Set\(\["01","03","04"/,
   "key shared trunk stations remain labeled");
 assert.ok(points(244)<200,"branch atlas uses station-spaced schematic coordinates");
