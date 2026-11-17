@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "404706528514",
+    "project_id": "vre-live",
+    "storage_bucket": "vre-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:404706528514:android:5a547444806d2800d7861b",
+        "android_client_info": {
+          "package_name": "work.samelling.vrelive.lab"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBm6KZFwImKUuj1fD_lowqE_uN1rWU9-MY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
