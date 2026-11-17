@@ -81,10 +81,11 @@ function nextWake(watches, now) {
   for (const w of Object.values(watches)) {
     if (w.expires<=now) continue;
     if (w.startsAt>now) times.push(w.startsAt);
-    else {
+    else if(w.nextRetry>now) {
+      times.push(w.nextRetry);
+    } else {
       const leave=w.scheduled-w.leadMs;
       times.push(now+stepMs(leave-now));
-      if (w.nextRetry>now) times.push(w.nextRetry);
     }
   }
   return times.length?Math.max(now+1000,Math.min(...times)):null;
