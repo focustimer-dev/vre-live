@@ -41,6 +41,7 @@ internal object CommutePushClient {
     private const val CREDENTIAL = "credential"
     private const val WATCHES = "watches"
     private const val PENDING_CANCEL = "pending_cancel"
+    private const val PENDING_REVOKE = "pending_revoke"
     private const val KEY_ALIAS = "vre_commute_push_device_v1"
     private const val CHANNEL = "commute_leave_now_v1"
     private val io = Executors.newSingleThreadExecutor()
@@ -201,11 +202,19 @@ internal object CommutePushClient {
     }
     private fun queueCancel(context: Context, ids: List<String>, all: Boolean = false) {
         if (ids.isEmpty() && !all) return
-        val identity = identity(context) ?: return
-        val toCancel = JSONObject().put("all", all)
-            .put("ids", org.json.JSONArray(ids))
-        prefs(context).edit().putString(PENDING_CANCEL, toCancel.toString()).commit()
-        io.execute { flushCancels(context, identity) }
+        val credential = identity(context) ?: return
+        val old = runCatching {
+            JSONObject(prefs(context).getString(PENDING_CANCEL,"{}").orEmpty())
+        }.getOrDefault(JSONObject())
+        val pendingIds=linkedSetOf<String>()
+        old.optJSONArray("ids")?.let { oldIds ->
+            for (i in 0 until oldIds.length()) pendingIds.add(oldIds.optString(i))
+        }
+        pendingIds.addAll(ids)
+        val next=JSONObject().put("all",all || old.optBoolean("all"))
+            .put("ids",org.json.JSONArray(pendingIds.toList()))
+        prefs(context).edit().putString(PENDING_CANCEL,next.toString()).commit()
+        io.execute { flushCancels(context,credential) }
     }
     private fun flushCancels(context: Context, credential: JSONObject) {
         val pending = runCatching {
@@ -243,9 +252,34 @@ internal object CommutePushClient {
         saveWatches(context, JSONObject())
         queueCancel(context, emptyList(),true)
     }
+
+    /** Master Notifications Off revokes device access, without relying on future push gating. */
+    fun disconnect(context: Context) {
+        val credential=identity(context) ?: return
+        saveWatches(context,JSONObject())
+        val sealed=runCatching { encrypt(credential.toString()) }.getOrNull() ?: return
+        prefs(context).edit().remove(CREDENTIAL).remove(PENDING_CANCEL)
+            .putString(PENDING_REVOKE,sealed).commit()
+        FirebaseMessaging.getInstance().isAutoInitEnabled=false
+        FirebaseMessaging.getInstance().deleteToken()
+        io.execute { flushRevocation(context) }
+    }
+    private fun flushRevocation(context: Context) {
+        val sealed=prefs(context).getString(PENDING_REVOKE,null) ?: return
+        val credential=runCatching { JSONObject(decrypt(sealed)) }.getOrNull() ?: return
+        if (runCatching {
+                request("/v1/devices/revoke",JSONObject(),credential).optBoolean("ok")
+            }.getOrDefault(false)) {
+            prefs(context).edit().remove(PENDING_REVOKE).commit()
+        }
+    }
     fun onSettingsUpdated(context: Context) {
+        if (!CommuteCheckIns.enabled(context)) {
+            disconnect(context)
+            return
+        }
         if (!allowed(context)) {
-            cancelAll(context)
+            if (localWatches(context).length()>0) cancelAll(context)
             return
         }
         if (!paired(context)) return
@@ -263,7 +297,10 @@ internal object CommutePushClient {
         }
     }
     fun onAppOpened(context: Context) {
-        identity(context)?.let { id -> io.execute { flushCancels(context,id) } }
+        io.execute {
+            flushRevocation(context)
+            identity(context)?.let { id -> flushCancels(context,id) }
+        }
     }
     fun displayIfAllowed(context: Context, data: Map<String, String>) {
         if (!allowed(context)) return
@@ -271,6 +308,7 @@ internal object CommutePushClient {
         if (data["serviceDate"] != currentDate()) return
         val id = data["watchId"] ?: return
         val w = localWatches(context).optJSONObject(id) ?: return
+        if (w.optBoolean("shown")) return
         if (w.optString("train") != data["trainNumber"] ||
             w.optString("date") != data["serviceDate"] ||
             w.optString("station") != data["stationCode"]) return
