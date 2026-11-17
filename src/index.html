@@ -497,7 +497,6 @@
   .ride-notifications{position:absolute;left:7px;top:5px;z-index:5;
     display:flex;align-items:center;gap:2px;max-width:calc(100% - 14px);
     min-height:44px;border-radius:13px}
-  .ride-notifications.expanded{padding-right:4px;background:transparent;box-shadow:none}
   .ride-control{appearance:none;border:0;background:transparent;color:var(--muted-2);
     border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
     flex:none;min-width:44px;min-height:44px;padding:8px;cursor:pointer;
@@ -505,10 +504,6 @@
   .ride-control:active{background:var(--surface-hover)}
   .ride-control.on{color:var(--green);background:transparent}
   .ride-control:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
-  .ride-control.alert-toggle{min-width:70px;font-size:var(--fs-1);font-weight:750;
-    padding:8px 6px}
-  .ride-control.alert-toggle.on{color:var(--green)}
-  .ride-state-dot{width:5px;height:5px;border-radius:50%;background:currentColor;margin-left:5px}
   .ride-notifications .icon-btn{appearance:none;border:0;background:transparent;
     border-radius:10px;min-width:44px;min-height:44px;width:44px;height:44px;
     color:var(--muted-2);box-shadow:none}
@@ -610,7 +605,7 @@
     color:var(--muted);font-weight:650}
   :root[data-theme="electric-stars"] .tabs button.on{
     background:var(--night-plum);color:var(--night-display);
-    box-shadow:inset 0 -2px 0 var(--night-orchid)}
+    box-shadow:none}
   :root[data-theme="electric-stars"] .tabs button:focus-visible{
     outline:2px solid var(--focus);outline-offset:-3px}
   :root[data-theme="electric-stars"] .card{
@@ -710,6 +705,79 @@
     :root[data-theme="electric-stars"] .system-map-card .map-wrap{
       padding:1px 2px 6px}
   }
+  /* A / Follow Lens: readable current ride in a short, stable viewport. */
+  .follow-lens{padding:4px 5px 0}
+  .lens-eyebrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:8px 12px 0;color:var(--muted);font-size:var(--fs-1)}
+  .lens-service{font-weight:750;color:var(--fg)}
+  .lens-svg,.atlas-svg{display:block;width:100%;height:auto;max-width:100%;overflow:visible}
+  .lens-stop{font:650 13px system-ui,sans-serif;fill:var(--muted)}
+  .lens-stop.emphasis{font-weight:800;fill:var(--fg)}
+  .lens-destination{fill:var(--map-highlight);font:700 9px system-ui,sans-serif;letter-spacing:.05em}
+  .lens-arrival{padding:1px 16px 10px;color:var(--muted);font-size:var(--fs-2)}
+  .lens-arrival strong{color:var(--fg)}
+  /* B / Branch Atlas: two lines, schematic rather than geographical length. */
+  .branch-atlas{padding:3px 4px 4px}
+  .atlas-label{font:600 11px system-ui,sans-serif;fill:var(--map-label-major)}
+  .atlas-label.destination{font-weight:800;fill:var(--map-highlight)}
+  .atlas-train{cursor:pointer;outline:none}
+  .atlas-halo{transition:stroke-width .12s ease}
+  .atlas-train-num{font:800 11px system-ui,sans-serif;pointer-events:none}
+  .atlas-train:focus-visible .atlas-halo,.atlas-train:focus .atlas-halo{
+    stroke:var(--focus);stroke-width:3.5}
+  .atlas-caption{font-size:var(--fs-1);color:var(--muted);padding:0 8px 7px;text-align:right}
+  .follow-lens svg [role=button]{cursor:pointer;outline:none}
+  .follow-lens svg [role=button]:focus-visible circle:nth-child(2),
+  .follow-lens svg [role=button]:focus circle:nth-child(2){
+    stroke:var(--focus);stroke-width:4}
+  .journey-head{padding:9px 8px 8px}
+  .journey-icon{width:29px;height:36px}
+  .journey-title strong{font-size:20px}
+  .journey-views{background:var(--surface-hover)}
+  .journey-views button{font-size:var(--fs-2);padding:0 9px}
+  @media (max-width:355px){
+    .atlas-label{font-size:10.5px}
+    .journey-title strong{font-size:18px}
+    .journey-views button{padding:0 7px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .atlas-halo,.journey-map.focused{animation:none;transition:none}
+  }
+  /* Alerts are a small anchored overlay, not another row in the ETA card.
+     Portalled to <body> because .card intentionally clips its contents. */
+  .ride-bell{position:relative}
+  .ride-bell-dot{position:absolute;right:8px;top:7px;width:5px;height:5px;
+    border-radius:50%;background:var(--green)}
+  .ride-alert-popover{position:fixed;z-index:1000;box-sizing:border-box;
+    width:min(268px,calc(100vw - 16px));padding:13px 13px 10px;
+    background:var(--sheet-bg);color:var(--fg);border:1px solid var(--border);
+    border-radius:15px;box-shadow:0 12px 30px var(--card-shadow)}
+  .ride-alert-title{font-size:var(--fs-3);font-weight:800;letter-spacing:-.01em}
+  .ride-alert-intro{font-size:var(--fs-2);line-height:1.4;color:var(--muted);
+    margin:3px 0 9px}
+  .ride-alert-option{appearance:none;display:flex;align-items:center;justify-content:space-between;
+    width:100%;min-height:60px;gap:10px;padding:8px 2px;
+    text-align:left;font:inherit;color:var(--fg);background:transparent;
+    border:0;border-top:1px solid var(--line-separator);cursor:pointer}
+  .ride-alert-option strong{display:block;font-size:var(--fs-2);font-weight:750}
+  .ride-alert-option small{display:block;font-size:var(--fs-1);margin-top:3px;
+    color:var(--muted);line-height:1.3}
+  .ride-alert-option:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+  .ride-alert-option .ride-alert-state{font-size:var(--fs-2);color:var(--muted);
+    font-weight:750;min-width:27px;text-align:right}
+  .ride-alert-option .ride-alert-state.on{color:var(--green)}
+  .ride-alert-option.lock-option{cursor:default}
+  .ride-alert-option.lock-option .icon-btn{min-width:44px;min-height:44px;
+    border:0;border-radius:10px;color:var(--muted);background:transparent}
+  .ride-alert-option.lock-option .icon-btn.on{color:var(--green)}
+  .ride-alert-option.lock-option .icon-btn:focus-visible{outline:2px solid var(--focus)}
+  .ride-alert-error{font-size:var(--fs-1);color:var(--amber);padding:9px 2px 3px}
+  .ride-alert-snackbar{position:fixed;bottom:max(20px,env(safe-area-inset-bottom,20px));
+    left:50%;transform:translateX(-50%);z-index:1100;pointer-events:none;
+    max-width:calc(100vw - 32px);padding:11px 16px;
+    border-radius:12px;background:var(--card-2);color:var(--fg);
+    border:1px solid var(--border);box-shadow:0 10px 24px var(--card-shadow);
+    font-size:var(--fs-2);font-weight:650;text-align:center}
 </style>
 </head>
 <body>
@@ -2738,11 +2806,168 @@
     return positions;
   }
 
+  // A: Follow Lens. The active ride supplies the lens; never pretend that
+  // position is verified when using schedule-only or stale telemetry.
+  function followLensStops(train, destination, now) {
+    const stops = (train?.stops || []).filter(stop => STATIONS[stop.code]);
+    if (!stops.length) return { stops: [], nextIndex: -1, destination };
+    const next = VRECore.remainingStops(train, now)[0];
+    const idx = next ? stops.findIndex(s => s.code === next.code) : stops.length - 1;
+    const nextIndex = Math.max(0, idx);
+    const start = Math.max(0, Math.min(nextIndex - 1, stops.length - 4));
+    return { stops: stops.slice(start, start + 4),
+      start, nextIndex, destination };
+  }
+  function FollowLens({ train, ride, now, fresh, positionLabel, onPick }) {
+    const view = followLensStops(train, ride?.dest, now);
+    const next = VRECore.remainingStops(train, now)[0];
+    const line = LINE_COLOR[train.line];
+    const yFor = i => 40 + i * 65;
+    const activeLocal = Math.max(0, Math.min(view.stops.length - 1,
+      view.nextIndex - view.start));
+    // Convert the current measured rail position to the visible stop segment.
+    // A stale or missing GPS coordinate is deliberately shown as a dashed estimate.
+    const previous = view.stops[activeLocal-1], upcoming = view.stops[activeLocal];
+    const prevY = STATIONS[previous?.code]?.y, nextY = STATIONS[upcoming?.code]?.y;
+    const fraction = fresh && Number.isFinite(train.y) && Number.isFinite(prevY) &&
+      Number.isFinite(nextY) && prevY !== nextY
+      ? Math.max(0, Math.min(1, (train.y-prevY)/(nextY-prevY))) : null;
+    const activeY = fraction != null
+      ? yFor(activeLocal-1) + fraction * 65
+      : yFor(activeLocal) - (activeLocal > 0 ? 22 : 0);
+    return html`<div className="follow-lens">
+      <div className="lens-eyebrow">
+        <span>${fresh ? "Live train position" : positionLabel}</span>
+        <span className="lens-service">Train ${train.num}</span>
+      </div>
+      <svg className="lens-svg" viewBox="0 0 390 284" role="img"
+        aria-label=${`Following train ${train.num}. ${fresh ? "Live position" : "Position unconfirmed"}. ${next ? "Next station "+(STATIONS[next.code]?.name || next.code) : "Next station unavailable"}.`}>
+        <path d="M86 25 V244" fill="none" stroke=${line} strokeWidth="5"
+          strokeLinecap="round" opacity=".24"/>
+        <path d=${`M86 25 V${Math.max(25,activeY)}`} fill="none"
+          stroke=${line} strokeWidth="5" strokeLinecap="round" opacity=".95"/>
+        ${view.stops.map((stop, i) => {
+          const y = yFor(i);
+          const current = i === activeLocal;
+          const destination = stop.code === ride?.dest;
+          return html`<g key=${stop.code}>
+            <circle cx="86" cy=${y} r=${current || destination ? 7 : 5}
+              fill="var(--map-ink)" stroke=${current || destination ? "var(--map-highlight)" : line}
+              strokeWidth=${current || destination ? "3" : "2"}/>
+            <text x="110" y=${y+5} className=${"lens-stop" + (current || destination ? " emphasis" : "")}>
+              ${STATIONS[stop.code].name}</text>
+            ${destination && html`<text x="370" y=${y+5}
+              textAnchor="end" className="lens-destination">YOUR STOP</text>`}
+          </g>`;
+        })}
+        <g role="button" tabIndex="0"
+          aria-label=${`Train ${train.num}. Open ride details.`}
+          onClick=${() => onPick(train.tripId)}
+          onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault(); onPick(train.tripId);
+          } }}>
+          <circle cx="86" cy=${activeY} r="24" fill="transparent"/>
+          <circle cx="86" cy=${activeY} r="15" fill=${line}
+            stroke="var(--map-ink)" strokeWidth="3"
+            strokeDasharray=${fresh ? null : "3 3"}/>
+          <path d="M81 ${activeY+3}l5,-6 l5,6" fill="none"
+            stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round"/>
+        </g>
+      </svg>
+      ${ride?.dest && STATIONS[ride.dest] && !view.stops.some(stop => stop.code === ride.dest) &&
+        html`<div className="lens-arrival">Your stop <strong>${STATIONS[ride.dest].name}</strong></div>`}
+    </div>`;
+  }
+
+  // B: Branch Atlas. Its compact geometry deliberately discards geographic
+  // distance while retaining real station topology, train identity and status.
+  const ATLAS_MAJOR = new Set(["01","03","04","05","06","09","0C","SP","0D","0F","12"]);
+  function atlasY(y, line = "F") {
+    // Schematic spacing, not geographical distance: each station keeps
+    // enough vertical room for legible labels on a compact phone.
+    const codes = line === "M" ? LINE_M : LINE_F;
+    if (y <= STATIONS[codes[0]].y) return 25;
+    for (let i=1;i<codes.length;i++) {
+      const a=STATIONS[codes[i-1]].y, b=STATIONS[codes[i]].y;
+      if (y <= b) return 25 + ((i-1) + Math.max(0,Math.min(1,(y-a)/(b-a))))*25;
+    }
+    return 25 + (codes.length-1)*25;
+  }
+  function atlasPath(codes,line) {
+    return codes.map((c,i) => `${i ? "L" : "M"}${STATIONS[c].x},${atlasY(STATIONS[c].y,line)}`).join(" ");
+  }
+  function atlasTrainMarkers(items) {
+    const groups = { F: [], M: [] };
+    for (const train of items) {
+      if (groups[train.line]) groups[train.line].push(train);
+    }
+    return Object.values(groups).flatMap(group => {
+      group.sort((a,b) => a.y-b.y);
+      let last = -30;
+      const markers = group.map(t => {
+        const y = Math.max(30, atlasY(t.y,t.line), last + 31);
+        last = y;
+        return { ...t, markerX: t.line === "M" ? 40 : 350, markerY: y };
+      });
+      const overflow = Math.max(0, last - 325);
+      return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
+    });
+  }
+  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, now, onPick }) {
+    const all = new globalThis.Map();
+    for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
+    const markers = atlasTrainMarkers([...all.values()]);
+    return html`<div className="branch-atlas">
+      <svg className="atlas-svg" viewBox="0 0 390 350" role="img"
+        aria-label="Compact VRE system atlas showing Fredericksburg and Manassas lines and selectable train positions">
+        <path d=${atlasPath(LINE_F,"F")} fill="none" stroke=${LINE_COLOR.F}
+          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+        <path d=${atlasPath(LINE_M,"M")} fill="none" stroke=${LINE_COLOR.M}
+          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+        ${Object.entries(STATIONS).map(([code,station]) => {
+          const major = ATLAS_MAJOR.has(code) || code === ride?.dest;
+          const side = LINE_M.indexOf(code) > 3 ? -1 : 1;
+          const y = atlasY(station.y, side < 0 ? "M" : "F");
+          return html`<g key=${code}>
+            <circle cx=${station.x} cy=${y} r=${major ? 5.2 : 3.1}
+              fill="var(--map-ink)" stroke=${side < 0 ? LINE_COLOR.M : LINE_COLOR.F}
+              strokeWidth="2"/>
+            ${major && html`<text x=${station.x + side * 12} y=${y+4}
+              textAnchor=${side<0?"end":"start"}
+              className=${"atlas-label" + (code===ride?.dest?" destination":"")}>
+              ${station.name}</text>`}
+          </g>`;
+        })}
+        ${markers.map(t => {
+          const selectedTrain = t.tripId===selected || t.tripId===myTripId;
+          const color = LINE_COLOR[t.line] || "var(--muted)";
+          const estimated = t.ghost || t.signalLost || !t.ts ||
+            now - t.ts > 300000 || now - t.ts < -60000;
+          return html`<g key=${t.tripId} role="button" tabIndex="0"
+            className=${"atlas-train" + (selectedTrain?" sel":"")}
+            aria-pressed=${selectedTrain}
+            aria-label=${`Train ${t.num}, ${estimated ? "position unconfirmed" : "reported position"}. Select train.`}
+            onClick=${()=>onPick(t.tripId)}
+            onKeyDown=${e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();onPick(t.tripId);} }}>
+            <path d=${`M${t.x},${atlasY(t.y,t.line)} L${t.markerX},${t.markerY}`}
+              stroke=${color} strokeWidth="1.4" fill="none" opacity=".40"/>
+            <circle cx=${t.markerX} cy=${t.markerY} r="22" fill="transparent"/>
+            <circle className="atlas-halo" cx=${t.markerX} cy=${t.markerY} r="16"
+              fill="var(--map-ink)" stroke=${selectedTrain?"var(--map-highlight)":color}
+              strokeWidth=${selectedTrain?3:2} strokeDasharray=${estimated?"3 3":null}/>
+            <text x=${t.markerX} y=${t.markerY+4} textAnchor="middle"
+              className="atlas-train-num" fill=${color}>${t.num}</text>
+          </g>`;
+        })}
+      </svg>
+      <div className="atlas-caption">Schematic view · Distances not to scale</div>
+    </div>`;
+  }
+
   function Map({ trains, ghosts, selected, myTripId, myTrain: rideTrain, ride, now, onPick }) {
     const [overviewTrip, setOverviewTrip] = useState(null);
     const overview = !!myTripId && overviewTrip === myTripId;
     const setOverview = value => setOverviewTrip(value ? myTripId : null);
-    const labelSide = code => (LINE_M.indexOf(code) > 3 ? -1 : 1);
     const t_now = now || Date.now();
     const anchors = [...(ghosts || []), ...trains.map(t => ({ ...t, ...(t.tripId === myTripId && (t.signalLost || !t.ts || t_now-t.ts>300000 || t_now-t.ts < -60000) ? {} : (VRECore.driftPosition(t, t_now) || {})) }))];
     const activeTrain = anchors.find(t => t.tripId === myTripId) || (rideTrain && rideTrain.x != null ? rideTrain : null);
@@ -2752,14 +2977,7 @@
     const nextState = nextStop && VRECore.rideStatus(activeTrain, nextStop.code, t_now);
     const nextTime = !nextStop ? "" : nextState.phase === "atStop" ? "Stopped here" : nextState.phase === "uncertain" ? "Time unconfirmed" : nextState.left < -90000 ? "Time unconfirmed" : nextState.left <= 70000 ? "Due" : `${Math.ceil(nextState.left/60000)} min`;
     const nextLabel = nextState && nextState.phase === "atStop" ? "At" : fresh ? "Next stop" : "Scheduled next";
-    const focus = activeTrain ? focusLayout(activeTrain) : null;
-    const positions = layoutMarkers(anchors.filter(t => t.tripId !== myTripId), focus ? [
-      focus.card, { x: activeTrain.x-22, y: activeTrain.y-22, w:44, h:44 }
-    ] : []);
-    const relevantY = focus ? [activeTrain.y, focus.card.y-14, focus.card.y+focus.card.h+14, ...(nextStop && STATIONS[nextStop.code] ? [STATIONS[nextStop.code].y] : [])] : [];
-    const cropHeight = focus ? Math.min(700, Math.max(270, Math.max(...relevantY)-Math.min(...relevantY)+90)) : 700;
-    const cropY = focus ? Math.max(0, Math.min(700-cropHeight,(Math.max(...relevantY)+Math.min(...relevantY)-cropHeight)/2)) : 0;
-    const focused = !!focus && !overview;
+    const focused = !!activeTrain && !overview;
     return html`<div className="journey" style=${activeTrain ? { "--accent": LINE_COLOR[activeTrain.line] } : null}>
       ${activeTrain && html`<div className="journey-head">
         <div className="journey-title">
@@ -2777,113 +2995,13 @@
         </div>
       </div>`}
       <div className=${"journey-map" + (focused ? " focused" : "")}>
-      <svg className="sysmap" viewBox=${focused ? `0 ${cropY} 390 ${cropHeight}` : "0 0 390 700"} role="img" aria-label=${focused ? `Following train ${activeTrain.num}, ${positionLabel.toLowerCase()}` : "VRE system map with train positions"}>
-        <path d=${PATH_F} fill="none" stroke=${LINE_COLOR.F} strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" opacity=${focused ? (activeTrain.line === "F" ? 0.85 : 0.22) : 0.85}/>
-        <path d=${PATH_M} fill="none" stroke=${LINE_COLOR.M} strokeWidth="4.5" strokeLinejoin="round" strokeLinecap="round" opacity=${focused ? (activeTrain.line === "M" ? 0.85 : 0.22) : 0.85}/>
-        ${ride && html`
-          <g aria-hidden="true" style=${{pointerEvents:"none"}}>
-            <path d=${ride.pathD} fill="none" stroke=${ride.color} strokeWidth="11" strokeLinejoin="round" strokeLinecap="round" opacity="0.16"/>
-            <path className="ridepath" d=${ride.pathD} fill="none" stroke="var(--map-highlight)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
-          </g>`}
-        ${anchors.filter(t => t.tripId !== myTripId).map(t => {
-          const p = positions[t.tripId];
-          const active = t.tripId === myTripId, highlighted = active || t.tripId === selected;
-          return html`<g key=${"leader-" + t.tripId} className=${active ? "train-leader active" : "train-leader"}
-            aria-hidden="true" style=${{ pointerEvents: "none" }}>
-            ${highlighted && html`<line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke="var(--map-ink)" strokeWidth=${active ? 7 : 5} strokeLinecap="round"/>`}
-            <line x1=${t.x} y1=${t.y} x2=${p.x} y2=${p.y} stroke=${highlighted ? "var(--map-highlight)" : LINE_COLOR[t.line]}
-              strokeWidth=${active ? 3.4 : highlighted ? 2.4 : 1.1} strokeLinecap="round" opacity=${highlighted ? 1 : 0.55}/>
-            ${active && html`<circle cx=${t.x} cy=${t.y} r="6.5" fill="var(--map-ink)" stroke="var(--map-highlight)" strokeWidth="2.3"/>`}
-            <circle cx=${t.x} cy=${t.y} r=${active ? 3.3 : 2.7} fill=${LINE_COLOR[t.line]}/>
-          </g>`;
-        })}
-        ${Object.entries(STATIONS).map(([code, s]) => {
-          const trunk = LINE_F.indexOf(code) >= 0 && LINE_F.indexOf(code) < 4;
-          const side = labelSide(code);
-          const dim = ride && ride.dim.has(code) && (!nextStop || nextStop.code !== code);
-          const isDest = ride && ride.dest === code;
-          return html`
-            <g key=${code} opacity=${dim ? 0.4 : 1}>
-              ${isDest && html`
-                <circle className="destring" cx=${s.x} cy=${s.y} r="10.5" fill="none"
-                  stroke=${ride.color} strokeWidth="2" opacity="0.9"/>`}
-              <circle cx=${s.x} cy=${s.y} r=${trunk ? 6 : 4.5} fill="var(--map-ink)"
-                stroke=${isDest ? "var(--map-highlight)" : trunk ? "var(--map-label-major)" : (LINE_M.indexOf(code) > 3 ? LINE_COLOR.M : LINE_COLOR.F)}
-                strokeWidth=${trunk || isDest ? 2.4 : 2}/>
-              <text x=${s.x + side * (isDest ? 16 : 13)} y=${s.y + 3.5}
-                textAnchor=${side < 0 ? "end" : "start"}
-                style=${isDest ? { fill: "var(--map-highlight)", fontWeight: 700 } : null}
-                className=${"st-label" + (trunk || code === "SP" || code === "12" || isDest ? " major" : "")}>${s.name}</text>
-            </g>`;
-        })}
-        ${focus && html`
-          <g className="your-train-focus" role="button" tabIndex="0" aria-pressed="true"
-            aria-label=${`Your train ${activeTrain.num}. ${positionLabel}. Change destination.`}
-            onClick=${() => onPick(activeTrain.tripId)}
-            onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(activeTrain.tripId); } }}>
-            <rect x=${focus.card.x} y=${focus.card.y} width=${focus.card.w} height=${focus.card.h} rx="12" fill=${LINE_COLOR[activeTrain.line]}/>
-            <text x=${focus.card.x+12} y=${focus.card.y+35} fontSize="30" fontWeight="800" fill="var(--map-ink)">${activeTrain.num}</text>
-            <path d=${activeTrain.dir === 1 ? `M${focus.card.x+80},${focus.card.y+32} l6,-8 l6,8` : `M${focus.card.x+80},${focus.card.y+24} l6,8 l6,-8`}
-              fill="none" stroke="var(--map-ink)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="12" fill="var(--map-ink)" stroke="var(--map-ink)" strokeWidth="5"/>
-            <circle cx=${activeTrain.x} cy=${activeTrain.y} r="10" fill=${LINE_COLOR[activeTrain.line]} stroke="var(--map-highlight)" strokeWidth="2.5" strokeDasharray=${fresh ? null : "3 3"}/>
-            <path d=${activeTrain.dir === 1 ? `M${activeTrain.x-4},${activeTrain.y+2} l4,-5 l4,5` : `M${activeTrain.x-4},${activeTrain.y-2} l4,5 l4,-5`}
-              fill="none" stroke="var(--map-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </g>`}
-        ${(ghosts || []).filter(g => g.tripId !== myTripId).map(g => {
-          const sel = g.tripId === selected, mine = g.tripId === myTripId;
-          return html`
-          <g key=${"g" + g.tripId} className=${"train ghost" + (sel || mine ? " sel" : "")}
-             style=${{ transform: `translate(${positions[g.tripId].x}px,${positions[g.tripId].y}px)` }}
-             onClick=${() => onPick(g.tripId)} tabIndex="0" role="button"
-             aria-pressed=${sel || mine}
-             aria-label=${`Train ${g.num}, scheduled position, not reporting`}
-             onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(g.tripId); } }}>
-            <g className="pop">
-              <circle cx="0" cy="0" r="31" fill="transparent"/>
-              ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4"/>`}
-              <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${LINE_COLOR[g.line]} strokeWidth="1.5"/>
-              <circle cx="0" cy="0" r="13" fill="var(--map-ink)" stroke=${LINE_COLOR[g.line]}
-                strokeWidth="1.6" strokeDasharray="3 2.6" opacity="0.8"/>
-              <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="700"
-                fill=${LINE_COLOR[g.line]}>${g.num}</text>
-            </g>
-          </g>`; })}
-        ${trains.filter(t => t.tripId !== myTripId).map(t => {
-          const sel = t.tripId === selected, mine = t.tripId === myTripId;
-          const c = LINE_COLOR[t.line];
-          const up = t.dir === 1; // toward DC = up the map
-          const s = up ? -1 : 1;  // chevron side
-          const stale = t.ts && t_now - t.ts > 5 * 60000;
-          // dead-reckoned drift between polls; drifted markers go translucent
-          const drift = VRECore.driftPosition(t, t_now);
-          const px = drift ? drift.x : t.x, py = drift ? drift.y : t.y;
-          const projected = !!(drift && drift.drifted);
-          return html`
-            <g key=${t.tripId} className=${"train" + (sel || mine ? " sel" : "")}
-               opacity=${stale && !mine ? 0.68 : 1}
-               style=${{ transform: `translate(${positions[t.tripId].x}px,${positions[t.tripId].y}px)` }}
-               onClick=${() => onPick(t.tripId)} tabIndex="0" role="button"
-               aria-pressed=${sel || mine}
-               aria-label=${`Train ${t.num}, ${t.lineName}, ${up ? "toward DC" : "outbound"}${projected ? ", projected position" : ""}`}
-               onKeyDown=${e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(t.tripId); } }}>
-              <g className="pop">
-                ${mine && html`<circle cx="0" cy="0" r="20" fill="none" stroke="var(--map-highlight)" strokeWidth="1.4" opacity="0.95"/>`}
-                ${projected && !mine && html`
-                  <circle cx="0" cy="0" r="17" fill="none" stroke=${c} strokeWidth="1.3"
-                    strokeDasharray="3 3" opacity="0.85"/>`}
-                <circle className="halo" cx="0" cy="0" r="16" fill="none" stroke=${c} strokeWidth="1.5" opacity="0.7"/>
-                <circle cx="0" cy="0" r="31" fill="transparent"/>
-                <path d=${`M-6.5 ${s * 17} Q0 ${s * 23.5} 6.5 ${s * 17}`}
-                  fill="none" stroke=${c} strokeWidth="2.4" strokeLinecap="round"/>
-                <path d=${`M-4.5 ${s * 23} Q0 ${s * 27.5} 4.5 ${s * 23}`}
-                  fill="none" stroke=${c} strokeWidth="2" strokeLinecap="round" opacity="0.45"/>
-                <circle cx="0" cy="0" r="13" fill=${c} stroke="var(--map-ink)" strokeWidth="2"/>
-                <text x="0" y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="var(--map-ink)">${t.num}</text>
-              </g>
-            </g>`;
-        })}
-      </svg></div>
+        ${focused
+          ? html`<${FollowLens} train=${activeTrain} ride=${ride} now=${t_now}
+              fresh=${fresh} positionLabel=${positionLabel} onPick=${onPick} />`
+          : html`<${BranchAtlas} trains=${trains} ghosts=${ghosts}
+              activeTrain=${activeTrain} selected=${selected}
+              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick} />`}
+      </div>
       ${activeTrain && html`<button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
         <div><strong>${nextStop ? `${nextLabel}: ${nextStop.name || STATIONS[nextStop.code]?.name || nextStop.code}` : "Next stop unavailable"}</strong>
           <small>${positionLabel}${activeTrain.ts ? ` · ${Math.max(0, Math.floor((t_now-activeTrain.ts)/60000))} min ago` : ""}</small></div>
@@ -3167,19 +3285,23 @@ const ExitTrainIcon = () => html`
       <path d="M17.2 17.3l5.1 6.5m-5.1-6.5-4.4 7.1M12.6 14.2l-2.2 3"
         strokeWidth="2.7"/>
     </svg>`;
-  const ReverseTrainIcon = () => html`
-    <svg width="25" height="25" viewBox="0 0 24 24" fill="none"
-      aria-hidden="true" stroke="currentColor" strokeWidth="2.1"
+  // Two train fronts connected by one forward transfer arrow; not a route flip.
+  const TransferTrainIcon = () => html`
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"
+      aria-hidden="true" stroke="currentColor" strokeWidth="1.6"
       strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 8.1h13l-3.4-3.4M18 8.1l-3.4 3.4"/>
-      <path d="M19 15.9H6l3.4 3.4M6 15.9l3.4-3.4"/>
+      <rect x="1.5" y="5" width="8.5" height="15" rx="2.5"/>
+      <path d="M3.5 9h4.5v5H3.5zM3.5 23l2-3m2 3-2-3"/>
+      <rect x="18" y="5" width="8.5" height="15" rx="2.5"/>
+      <path d="M20 9h4.5v5H20zM20 23l2-3m2 3-2-3"/>
+      <path d="M11.5 12.5h4.2m-2.5-3 3 3-3 3" strokeWidth="1.8"/>
     </svg>`;
   function RideQuickActions({ onSwitchTrain, onLeave }) {
     return html`
       <div className="ride-quick-actions" role="group" aria-label="Ride actions">
         <button type="button" className="ride-control" onClick=${onSwitchTrain}
           aria-label="Change train" title="Change train">
-          <${ReverseTrainIcon} />
+          <${TransferTrainIcon} />
         </button>
         <button type="button" className="ride-control ride-exit"
           onClick=${() => onLeave(true)}
@@ -3192,6 +3314,49 @@ const ExitTrainIcon = () => html`
   function EtaBanner({ train, dest, notify, pushActive, pushErr, wake, now, onNotify, onWake,
     onChange, onSwitchTrain, onLeave, lockButton, lockActive, lockError }) {
     const [showTools, setShowTools] = useState(false);
+    const [popupAnchor, setPopupAnchor] = useState({ left: 12, top: 100 });
+    const [snackbar, setSnackbar] = useState("");
+    const bellRef = useRef(null), popupRef = useRef(null);
+    const previousControls = useRef({ notify, wake, lockActive });
+    useEffect(() => {
+      const old = previousControls.current;
+      if (old.notify !== notify) setSnackbar(notify ? "Arrival alerts enabled" : "Arrival alerts disabled");
+      else if (old.wake !== wake) setSnackbar(wake ? "Keep-screen-awake selected" : "Keep-screen-awake off");
+      else if (old.lockActive !== lockActive)
+        setSnackbar(lockActive ? "Lock-screen card enabled" : "Lock-screen card disabled");
+      previousControls.current = { notify, wake, lockActive };
+    }, [notify, wake, lockActive]);
+    useEffect(() => {
+      if (!snackbar) return;
+      const timer = setTimeout(() => setSnackbar(""), 2800);
+      return () => clearTimeout(timer);
+    }, [snackbar]);
+    useEffect(() => {
+      if (!showTools) return;
+      const closeOutside = e => {
+        if (!bellRef.current?.contains(e.target) && !popupRef.current?.contains(e.target))
+          setShowTools(false);
+      };
+      const closeEscape = e => {
+        if (e.key === "Escape") { setShowTools(false); bellRef.current?.focus(); }
+      };
+      document.addEventListener("pointerdown", closeOutside);
+      document.addEventListener("keydown", closeEscape);
+      return () => {
+        document.removeEventListener("pointerdown", closeOutside);
+        document.removeEventListener("keydown", closeEscape);
+      };
+    }, [showTools]);
+    const toggleTools = () => {
+      if (!showTools && bellRef.current) {
+        const rect = bellRef.current.getBoundingClientRect();
+        setPopupAnchor({
+          left: Math.max(8, Math.min(rect.left, window.innerWidth - 280)),
+          top: Math.max(8, Math.min(rect.bottom + 5, window.innerHeight - 305))
+        });
+      }
+      setShowTools(!showTools);
+    };
     const stop = train && train.stops.find(s => s.code === dest);
 if (!train) return html`
       <div className="card fade"><div className="eta-hero ride-sparse">
@@ -3233,28 +3398,48 @@ if (!train) return html`
 return html`
       <div className="card fade">
         <div className="eta-hero ride-eta">
-          <div className=${"ride-notifications" + (showTools ? " expanded" : "")}
-            role="group" aria-label="Ride notification controls">
-            <button type="button" className=${"ride-control ride-bell" + (notify ? " on" : "")}
-              aria-label="Show notification options" title="Notification options"
-              aria-expanded=${showTools} onClick=${() => setShowTools(!showTools)}>
+          <div className="ride-notifications" role="group" aria-label="Ride alert controls">
+            <button type="button" ref=${bellRef}
+              className=${"ride-control ride-bell" + (notify || wake || lockActive ? " on" : "")}
+              aria-label="Ride alert options" title="Ride alert options"
+              aria-haspopup="true" aria-expanded=${showTools}
+              aria-controls="ride-alert-popover" onClick=${toggleTools}>
               <${BellIcon} size=${16} />
+              ${(notify || wake || lockActive) && html`
+                <span className="ride-bell-dot" aria-hidden="true"></span>`}
             </button>
-            ${showTools && html`
-              <button type="button" className=${"ride-control alert-toggle" + (notify ? " on" : "")}
-                aria-label=${notify ? "Turn off arrival alerts" : "Turn on arrival alerts"}
-                title=${notify ? "Arrival alerts on" : "Arrival alerts off"}
-                aria-pressed=${notify} onClick=${onNotify}>
-                Alerts ${notify ? "on" : "off"}
-                ${notify && html`<span className="ride-state-dot" aria-hidden="true"></span>`}
-              </button>`}
-            ${canWake && (showTools || wake) && html`
-              <button type="button" className=${"ride-control" + (wake ? " on" : "")}
-                aria-label="Keep screen on" aria-pressed=${wake}
-                title=${wake ? "Screen stays on" : "Keep screen on"}
-                onClick=${onWake}><${ScreenIcon} size=${19} /></button>`}
-            ${(showTools || lockActive) && lockButton}
           </div>
+          ${showTools && ReactDOM.createPortal(html`
+            <div id="ride-alert-popover" className="ride-alert-popover"
+              role="region" aria-label="Ride alert options" ref=${popupRef}
+              style=${{ left: popupAnchor.left, top: popupAnchor.top }}>
+              <div className="ride-alert-title">Ride alerts</div>
+              <div className="ride-alert-intro">Choose what happens while following this train.</div>
+              <button type="button" className="ride-alert-option"
+                aria-pressed=${notify}
+                onClick=${() => { onNotify(); setSnackbar("Updating arrival alerts…"); }}>
+                <span><strong>Arrival alerts</strong><small>Notify before your stop</small></span>
+                <span className=${"ride-alert-state" + (notify ? " on" : "")}>
+                  ${notify ? "On" : "Off"}</span>
+              </button>
+              ${canWake && html`
+                <button type="button" className="ride-alert-option"
+                  aria-pressed=${wake} onClick=${onWake}>
+                  <span><strong>Keep screen awake</strong><small>While VRE Live is visible</small></span>
+                  <span className=${"ride-alert-state" + (wake ? " on" : "")}>
+                    ${wake ? "On" : "Off"}</span>
+                </button>`}
+              ${lockButton && html`
+                <div className="ride-alert-option lock-option">
+                  <span><strong>Lock-screen card</strong><small>Show this ride on your lock screen</small></span>
+                  ${lockButton}
+                </div>`}
+              ${pushErr && html`<div className="ride-alert-error" role="status">${pushErr}</div>`}
+            </div>`, document.body)}
+          ${snackbar && ReactDOM.createPortal(html`
+            <div className="ride-alert-snackbar" role="status" aria-live="polite">
+              ${snackbar}
+            </div>`, document.body)}
           <div className="ride-status">
             <span className=${"badge line-" + train.line}>${train.lineName}</span>
             <span className=${"badge " + statusClass}>${statusText}</span>
@@ -3620,17 +3805,35 @@ ${lockError}
       if (!window.VreWidgetData) return;
       const live = Object.fromEntries(Object.entries(liveByTrip).map(([id, train]) =>
         [id, { ts: train.ts, stops: Object.fromEntries(train.stops.map(stop => [stop.code, stop.time])) }]));
+      // Explicitly confirmed onboard ride only: waiting-for-train snapshots
+      // never activate the native Journey Ribbon.
+      const origin = myTrip?.from && STATIONS[myTrip.from]
+        ? myTrip.from : myTrain?.stops?.find(stop => STATIONS[stop.code])?.code;
+      const originY = STATIONS[origin]?.y, destinationY = STATIONS[rideDest]?.y;
+      const freshRidePosition = !!observedTrain && !observedTrain.signalLost &&
+        !!observedTrain.ts && Date.now() - observedTrain.ts >= -60000 &&
+        Date.now() - observedTrain.ts <= 300000 &&
+        Number.isFinite(observedTrain.y);
+      const routeProgress = freshRidePosition && originY != null &&
+        destinationY != null && originY !== destinationY
+        ? Math.max(0, Math.min(100, Math.round(
+            100 * (observedTrain.y - originY) / (destinationY - originY))))
+        : null;
+      const nextRideStop = myTrain
+        ? VRECore.remainingStops(myTrain, Date.now())[0]?.code : null;
       const ride = rideTrip && rideDest
-        ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num, sourceTrip: myTrain?.sourceTripId || rideTrip,
+        ? { trip: rideTrip, dest: rideDest, from: origin || null, boarded: true,
+            started: rideStarted, num: myTrain?.num, sourceTrip: myTrain?.sourceTripId || rideTrip,
             lead: alertLead(myTrain, rideDest),
-            ts: observedTrain?.ts, eta: observedTrain && myStop?.time }
+            ts: observedTrain?.ts, eta: observedTrain && myStop?.time,
+            next: nextRideStop, progress: routeProgress, positionFresh: freshRidePosition }
         : waitingFor ? (() => {
             const train = liveByTrip[waitingFor.trip];
             const stop = train?.stops.find(s => s.code === waitingFor.dest);
             return { ...waitingFor, waiting: true, ts: train?.ts, eta: stop?.time };
           })() : null;
       window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor]);
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time]);
     const lockBridge = window.VreLockCard;
     const [lockState, setLockState] = useState("off");
     const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
@@ -4018,7 +4221,7 @@ ${lockError}
             <div className="map-legend" aria-label="Map marker legend">
               <span><i className="map-key solid" aria-hidden="true"></i>Live feed</span>
               <span><i className="map-key scheduled" aria-hidden="true"></i>Timetable estimate</span>
-              <span className="map-position-note">Frame: your train · dashed marker: estimated position.</span>
+              <span className="map-position-note">Follow: your train · System: both lines · Dashed: timetable estimate.</span>
             </div>
           </div>`
         : tab === "sched" ? html`

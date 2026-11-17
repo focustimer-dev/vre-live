@@ -96,8 +96,8 @@ assert.match(css, /\.commute-focus\.no-departures \.commute-focus-headline\.empt
   "empty commute headline does not inherit 34px generic empty padding");
 assert.match(css, /\.ride-control\.on\{color:var\(--green\);background:transparent\}/,
   "active bell no longer paints a filled background");
-assert.match(css, /\.ride-notifications\.expanded\{[^}]*background:transparent;/,
-  "expanding controls does not box in the bell");
+assert.match(css, /\.ride-alert-popover\{position:fixed;/,
+  "expanded options now float outside the ride card without reflowing the hero");
 assert.match(app, /<\$\{BellIcon\} size=\$\{16\} \/>/,
   "bell glyph is smaller while touch target remains 44px");
 assert.match(css, /\.ride-control\{[^}]*min-width:44px;min-height:44px;/s,
