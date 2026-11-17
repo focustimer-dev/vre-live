@@ -153,8 +153,10 @@ try {
       assert.equal(init.headers.authorization,"Bearer mock-short-lived-token");
       const envelope=JSON.parse(init.body);
       assert.equal(envelope.message.data.kind,"leave_now");
-      assert.equal(envelope.message.notification.title,"Leave now for train 310");
-      assert.equal(envelope.message.android.notification.channel_id,"commute_leave_now_v1");
+      assert.equal(envelope.message.data.title,"Leave now for train 310");
+      assert.equal(envelope.message.android.priority,"HIGH");
+      assert.equal(envelope.message.notification,undefined,
+        "data-only delivery prevents automatic notification display after opt-out");
       return Response.json({name:"projects/vre-live-test/messages/123"});
     }
     throw new Error("Unexpected outbound request "+address);
