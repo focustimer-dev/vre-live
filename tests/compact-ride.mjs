@@ -16,28 +16,48 @@ assert.match(css, /\.ride-notifications\{position:absolute;/, "bell controls ove
 assert.match(css, /\.ride-eta\{position:relative;/, "overlay is anchored to the ETA card");
 assert.match(css, /\.ride-control\{[^}]*min-width:44px;min-height:44px;/s,
   "micro controls keep minimum touch target");
-assert.match(css, /\.ride-notifications \.icon-btn\{[^}]*border:0;/s,
-  "native lock control is unframed in this area");
+assert.match(css, /\.ride-alert-option\.lock-option \.icon-btn\{[^}]*border:0;/s,
+  "native lock control is unframed within the alert popover");
 assert.match(css, /\.ride-quick-actions\{[^}]*justify-content:flex-end;/s,
-  "reverse and exit icons are at the bottom right");
+  "transfer and exit icons are at the bottom right");
 assert.match(css, /\.ride-eta \.eta-big\{[^}]*clamp\(34px,11vw,50px\)/,
   "countdown retains a legible type size");
 assert.match(css, /@media \(prefers-reduced-motion:reduce\)/);
 
-assert.match(eta, /aria-expanded=\$\{showTools\} onClick=\$\{\(\) => setShowTools\(!showTools\)\}/,
-  "bell toggles expansion, not notification enrollment");
-assert.match(eta, /\$\{showTools && html`[\s\S]*?aria-pressed=\$\{notify\} onClick=\$\{onNotify\}/,
-  "arrival alerts remain an explicit secondary toggle");
-assert.match(eta, /\$\{canWake && \(showTools \|\| wake\) && html`/,
-  "screen-wake option remains visible when active");
-assert.match(eta, /\$\{\(showTools \|\| lockActive\) && lockButton\}/,
-  "lock-screen option remains visible when active");
+assert.match(eta, /aria-controls="ride-alert-popover" onClick=\$\{toggleTools\}/,
+  "bell toggles a popover rather than enabling alerts directly");
+assert.match(eta, /showTools && ReactDOM\.createPortal\(html`/,
+  "popover is portalled outside overflow-hidden ride card");
+assert.match(eta, /role="region" aria-label="Ride alert options"/,
+  "popover has a meaningful accessible label");
+assert.match(eta, /aria-pressed=\$\{notify\}/,
+  "arrival alerts remain a separate opt-in choice");
+assert.match(eta, /\$\{canWake && html`/,
+  "supported screen awake control is in the popup");
+assert.match(eta, /\$\{lockButton && html`/,
+  "native lock-screen card option remains available");
+assert.match(eta, /role="status" aria-live="polite"/,
+  "state changes are confirmed by a non-blocking snackbar");
+assert.match(eta, /document\.addEventListener\("pointerdown", closeOutside\)/,
+  "popover dismisses on outside tap");
+assert.match(eta, /e\.key === "Escape"/,
+  "popover is dismissible by keyboard");
+assert.match(css, /\.ride-alert-popover\{position:fixed;/,
+  "popovers are positioned independently of hero content");
+assert.match(css, /\.ride-alert-snackbar\{position:fixed;/,
+  "snackbar cannot push card content down");
+assert.match(app, /const TransferTrainIcon =/,
+  "change-train icon uses two trains and a forward transfer arrow");
+assert.doesNotMatch(app, /const ReverseTrainIcon =/,
+  "ambiguous reverse-direction icon is removed");
+assert.doesNotMatch(css, /box-shadow:inset 0 -2px 0 var\(--night-orchid\)/,
+  "selected header tabs no longer need decorative underlines");
 assert.match(eta, /className="ride-stop-button" onClick=\$\{onChange\}/,
   "destination tap still opens change-stop flow");
 assert.doesNotMatch(eta, /Trip options|Stop tracking|showSet/,
   "duplicate gear/stop-tracking controls removed");
 assert.match(app, /aria-label="Change train" title="Change train"/,
-  "reverse icon is labeled for accessibility");
+  "transfer icon is labeled for accessibility");
 assert.match(app, /aria-label="I'm off the train" title="I'm off the train"/,
   "exit pictogram is labeled");
 assert.match(app, /onClick=\$\{\(\) => onLeave\(true\)\}/,
