@@ -4,7 +4,7 @@
   "version": "0.0.0-recovered",
   "type": "module",
   "scripts": {
-    "check": "node tests/baseline.mjs && node tests/service-idle.mjs && node tests/commute-profiles.mjs && node tests/commute-checkins.mjs && node tests/ride-workflow.mjs && node tests/compact-ride.mjs && node tests/lab-upgrades.mjs && node tests/leave-by.mjs && node tests/global-alerts.mjs && node tests/firebase-android.mjs && node tests/monitor-coordinator.mjs && node tests/themes.mjs",
+    "check": "node tests/baseline.mjs && node tests/service-idle.mjs && node tests/commute-profiles.mjs && node tests/commute-checkins.mjs && node tests/ride-workflow.mjs && node tests/compact-ride.mjs && node tests/lab-upgrades.mjs && node tests/leave-by.mjs && node tests/home-leg.mjs && node tests/global-alerts.mjs && node tests/firebase-android.mjs && node tests/monitor-coordinator.mjs && node tests/themes.mjs",
     "dev": "wrangler dev",
     "check:monitor": "node tests/monitor-coordinator.mjs"
   },

@@ -140,8 +140,8 @@ assert.match(app, /onClick=\$\{\(\) => onSelect\(null\)\}>Done/,
   "manual planner can be dismissed without choosing a train");
 assert.match(app, /setPlanProfile\(""\)/,
   "manual entry opens the profile list");
-assert.match(app, /No more trains today on this route\./,
-  "original timetable retains no-more-trains state");
+assert.match(app, /No departures remaining today\./,
+  "exhausted timetable retains a truthful, compact no-departures state");
 assert.match(app, /No VRE service today\./,
   "original timetable retains no-service state");
 const nextCard = app.indexOf('!myTrip && tab !== "preferences" && planProfile === null && html');
