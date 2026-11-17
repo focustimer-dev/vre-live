@@ -34,7 +34,23 @@ assert.match(receiver, /class CommuteFirebaseMessagingService : FirebaseMessagin
 assert.match(receiver, /override fun onNewToken\(token: String\)/);
 assert.match(receiver, /override fun onMessageReceived\(message: RemoteMessage\)/);
 assert.match(receiver, /if \(message\.data\["kind"\] != "leave_now"\) return/);
-assert.match(receiver, /if \(!CommuteCheckIns\.enabled\(this\)\) return/);
-assert.doesNotMatch(receiver, /getToken\(|setAutoInitEnabled\(true\)|log\(|Log\.|\.notify\(|startForegroundService/,
-  "SDK scaffold must not register tokens, log identifiers, send notifications or start monitoring");
+assert.match(receiver, /CommutePushClient\.displayIfAllowed\(this, message\.data\)/);
+assert.match(receiver, /CommutePushClient\.onTokenRotated\(this, token\)/);
+const push = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/CommutePushClient.kt");
+const main = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/MainActivity.kt");
+assert.match(push, /AndroidKeyStore/);
+assert.match(push, /AES\/GCM\/NoPadding/);
+assert.match(push, /fun pair\(context: Context, code: String/);
+assert.match(push, /if \(!CommuteCheckIns\.enabled\(context\)\)/);
+assert.match(push, /if \(!paired\(context\) \|\| !allowed\(context\)\) return/);
+assert.match(push, /CommuteCheckIns\.confirmedPlan\(context, w\.optString\("profileId"\)\)/);
+assert.match(push, /if \(w\.optBoolean\("shown"\)\) return/);
+assert.match(push, /fun cancelAll\(context: Context\)/);
+assert.match(push, /fun disconnect\(context: Context\)/);
+assert.match(main, /VrePushPair/);
+assert.match(main, /CommutePushClient\.watchSelected\(this,profileId\)/);
+assert.match(main, /CommutePushClient\.cancelAll\(this\)/);
+assert.doesNotMatch(push, /MONITOR_GATEWAY_TOKEN|FCM_SERVICE_ACCOUNT_JSON|PAIRING_CODE/,
+  "mobile client must not include a shared server or FCM admin secret");
+
 console.log("Firebase Android client configuration and default-off messaging guard verified");
