@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VRE Live</title>
-<meta name="theme-color" content="#09090b">
+<meta name="theme-color" content="#011629">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2309090b'/%3E%3Crect x='16' y='8' width='32' height='38' rx='8' fill='%23fafafa'/%3E%3Crect x='21' y='15' width='22' height='11' rx='3' fill='%2309090b'/%3E%3Ccircle cx='24.5' cy='36' r='3.2' fill='%2309090b'/%3E%3Ccircle cx='39.5' cy='36' r='3.2' fill='%2309090b'/%3E%3Cpath d='M24 47L18 56M40 47L46 56' stroke='%23fafafa' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
@@ -15,14 +15,65 @@
 <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/htm@3.1.1/dist/htm.umd.js"></script>
+<script id="vre-theme">
+(function (root) {
+  "use strict";
+  const KEY = "vre-live-theme-v1";
+  const THEMES = ["electric-stars", "nord-light"];
+  const valid = name => THEMES.includes(name) ? name : "electric-stars";
+  let stored = null;
+  try { stored = window.localStorage.getItem(KEY); } catch (_) {}
+  const initial = valid(stored);
+  root.setAttribute("data-theme", initial);
+  function choose(value) {
+    const theme = valid(value);
+    root.setAttribute("data-theme", theme);
+    try { window.localStorage.setItem(KEY, theme); } catch (_) {}
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "nord-light" ? "#ECEFF4" : "#011629");
+    return theme;
+  }
+  window.VRETheme = Object.freeze({ KEY, THEMES, initial, choose });
+})(document.documentElement);
+</script>
 <style>
-  :root{
-    --bg:#09090b; --card:#101013; --card-2:#17171b; --border:#26262b;
-    --fg:#fafafa; --muted:#a1a1aa; --muted-2:#92929d;
-    --red:#ef4444; --blue:#60a5fa; --green:#22c55e; --amber:#f59e0b;
+  /* Stable semantic tokens; Electric Stars is dark-first for new installs.
+     Surfaces ~60% abyss / ~30% petrol+plum, with cobalt/orchid/lilac accents.
+     Keep small text AA readable: cobalt is NOT a body-text color. */
+  :root, :root[data-theme="electric-stars"] {
+    color-scheme: dark;
+    --bg:#011629; --card:#0C426D; --card-2:#372B68; --nav:#372B68;
+    --border:rgba(246,184,251,.32); --border-soft:rgba(246,184,251,.19);
+    --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB;
+    --red:#FFADB8; --blue:#A3C8FF; --green:#BAF6DA; --amber:#FFE09A;
+    --accent:#3A74DB; --action-bg:#F6B8FB; --action-fg:#011629;
+    --action-border:#3A74DB; --selected-bg:#F6B8FB; --selected-fg:#011629;
+    --sheet-bg:rgba(12,66,109,.96); --surface-hover:rgba(246,184,251,.09);
+    --banner-bg:rgba(255,224,154,.10); --danger-bg:rgba(255,173,184,.12);
+    --map-label-major:#F6B8FB; --map-ink:#011629; --map-highlight:#F6B8FB;
+    --map-stroke:#F6B8FB; --line-F:#FF9BA7; --line-M:#A6CBFF;
+    --line-ink:#011629; --line-separator:rgba(246,184,251,.22);
+    --accent-outline:#BE74CD; --ring:rgba(246,184,251,.8);
+    --tab-surface:#372B68; --focus:#F6B8FB; --pulse:rgba(186,246,218,.45);
     --radius:16px;
     /* type scale: micro / secondary / row / subhead / title / hero */
     --fs-1:11px; --fs-2:13px; --fs-3:14.5px; --fs-4:19px; --fs-5:24px; --fs-hero:52px;
+  }
+  :root[data-theme="nord-light"] {
+    color-scheme: light;
+    --bg:#ECEFF4; --card:#FFFFFF; --card-2:#E5E9F0; --nav:#D8DEE9;
+    --border:#BAC5D1; --border-soft:rgba(76,86,106,.18);
+    --fg:#2E3440; --muted:#434C5E; --muted-2:#4C566A; --meta-ink:#434C5E;
+    --red:#9D3044; --blue:#365F90; --green:#236A4C; --amber:#8A551A;
+    --accent:#365F90; --action-bg:#2E3440; --action-fg:#ECEFF4;
+    --action-border:#365F90; --selected-bg:#2E3440; --selected-fg:#ECEFF4;
+    --sheet-bg:rgba(236,239,244,.97); --surface-hover:rgba(76,86,106,.07);
+    --banner-bg:rgba(138,85,26,.08); --danger-bg:rgba(157,48,68,.08);
+    --map-label-major:#2E3440; --map-ink:#FFFFFF; --map-highlight:#2E3440;
+    --map-stroke:#2E3440; --line-F:#B74652; --line-M:#4574A4;
+    --line-ink:#FFFFFF; --line-separator:rgba(76,86,106,.18);
+    --accent-outline:#5E81AC; --ring:rgba(54,95,144,.72);
+    --tab-surface:#D8DEE9; --focus:#365F90; --pulse:rgba(35,106,76,.28);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0; background:var(--bg); color:var(--fg);
