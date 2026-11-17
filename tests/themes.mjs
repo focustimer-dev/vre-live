@@ -31,6 +31,8 @@ for (const [stored, expected] of [
   const win = { localStorage: storage };
   runInNewContext(script("vre-theme"), { document: doc, window: win });
   assert.equal(doc.attributes["data-theme"], expected, "theme restored before rendering");
+  assert.equal(doc.meta.value, expected === "nord-light" ? "#ECEFF4" : "#011629",
+    "browser theme-color must restore before rendering");
   assert.equal(win.VRETheme.initial, expected);
   assert.equal(win.VRETheme.choose("nord-light"), "nord-light");
   assert.equal(storage.records.get("vre-live-theme-v1"), "nord-light");

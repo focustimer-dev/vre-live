@@ -33,6 +33,8 @@
     if (meta) meta.setAttribute("content", theme === "nord-light" ? "#ECEFF4" : "#011629");
     return theme;
   }
+  // Apply the restored theme to both the page and browser/system chrome before first paint.
+  choose(initial);
   window.VRETheme = Object.freeze({ KEY, THEMES, initial, choose });
 })(document.documentElement);
 </script>
