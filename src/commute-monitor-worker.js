@@ -9,6 +9,9 @@ const FEED_BASE = "https://gtfs.vre.org/containercdngtfsupload/";
 const MAX_WATCHES = 1000;
 const MAX_PER_OWNER = 6;
 const MAX_PAYLOAD = 8192;
+const MAX_PAIR_FAILURES = 12;
+const PAIR_WINDOW_MS = 10 * 60000;
+const FCM_TOKEN = /^[A-Za-z0-9_:\-]{40,4096}$/;
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
 const DATE = /^\d{8}$/;
 const SAFE_ID = /^[a-zA-Z0-9_-]{12,72}$/;
@@ -26,6 +29,14 @@ function secureMatch(a,b) {
     difference|=(aBytes[i]||0)^(bBytes[i]||0);
   return difference===0;
 }
+const hashToken = async token => {
+  const digest = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,"0")).join("");
+};
+const newSecret = () => btoa(String.fromCharCode(...crypto.getRandomValues(
+  new Uint8Array(32)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+const plausibleFCM = token => typeof token==="string" &&
+  token.length>=40 && token.length<=4096 && !/[\s\u0000-\u001f]/.test(token);
 const isServiceDay = now => CORE.isServiceDay(new Date(now));
 const liveIndex = trains => CORE.liveTrainIndex(trains);
 const stepMs = remaining => remaining>45*60000 ? 5*60000
@@ -123,12 +134,73 @@ export class CommuteMonitorCoordinator {
     const now=Date.now();
     let body;
     try {body=await readBody(req);} catch{return fail("invalid JSON",400);}
-    const ownerId=body?.ownerId,watchId=body?.watchId;
-    if(!SAFE_ID.test(ownerId||"")) return fail("invalid owner",400);
+    // One-time pairing code is an encrypted Cloudflare Worker secret, never
+    // placed in the distributed APK. Only its digest is kept in DO storage.
+    if(action==="/pair"){
+      if(typeof this.env.PAIRING_CODE!=="string" ||
+         !/^[A-Za-z0-9_-]{24,96}$/.test(this.env.PAIRING_CODE))
+        return fail("pairing not configured",503);
+      if(!fcmConfigured(this.env)) return fail("FCM not configured",503);
+      if(typeof body?.pairingCode!=="string"||!plausibleFCM(body?.fcmToken))
+        return fail("invalid pairing request",400);
+      const rate=await this.ctx.storage.get("pairFailures")||{since:now,count:0};
+      if(now-rate.since>PAIR_WINDOW_MS){rate.since=now;rate.count=0;}
+      if(rate.count>=MAX_PAIR_FAILURES) return fail("pairing temporarily limited",429);
+      if(!secureMatch(body.pairingCode,this.env.PAIRING_CODE)){
+        rate.count++;
+        await this.ctx.storage.put("pairFailures",rate);
+        return fail("invalid pairing code",401);
+      }
+      const codeHash=await hashToken(this.env.PAIRING_CODE);
+      const deviceId="device_"+crypto.randomUUID().replace(/-/g,"");
+      const accessToken=newSecret();
+      const tokenHash=await hashToken(accessToken);
+      // An atomic transaction prevents reusing a code during concurrent pairing
+      // requests and prevents issuing a credential without saving its digest.
+      const issued=await this.ctx.storage.transaction(async txn=>{
+        if(await txn.get("usedPairingCodeHash")===codeHash) return false;
+        const devices=await txn.get("devices")||{};
+        if(Object.keys(devices).length>=20) return false;
+        devices[deviceId]={hash:tokenHash,fcmToken:body.fcmToken,created:now};
+        await txn.put("devices",devices);
+        await txn.put("usedPairingCodeHash",codeHash);
+        return true;
+      });
+      if(!issued) return fail("pairing code already used or device limit reached",409);
+      await this.ctx.storage.delete("pairFailures");
+      return respond({deviceId,accessToken,paired:true},201);
+    }
+    const match=/^Bearer (device_[a-f0-9]{32})\.([A-Za-z0-9_-]{43})$/.exec(
+      req.headers.get("authorization")||"");
+    if(!match) return fail("unauthorized",401);
+    const ownerId=match[1],watchId=body?.watchId;
+    const devices=await this.ctx.storage.get("devices")||{};
+    const device=devices[ownerId];
+    if(!device||!secureMatch(device.hash,await hashToken(match[2])))
+      return fail("unauthorized",401);
     const watches=await this.load();
+    if(action==="/token"){
+      if(!plausibleFCM(body?.fcmToken)) return fail("invalid FCM registration",400);
+      devices[ownerId]={...device,fcmToken:body.fcmToken};
+      await this.ctx.storage.put("devices",devices);
+      for(const w of Object.values(watches))
+        if(w.ownerId===ownerId) w.fcmToken=body.fcmToken;
+      await this.save(watches);
+      return respond({ok:true});
+    }
+    if(action==="/revoke"){
+      delete devices[ownerId];
+      await this.ctx.storage.put("devices",devices);
+      for(const [key,w] of Object.entries(watches))
+        if(w.ownerId===ownerId) delete watches[key];
+      await this.save(watches);
+      return respond({ok:true});
+    }
     if(action==="/subscribe"){
       let watch;
-      try {watch=validatedWatch(body,now);}catch(e){return fail(e.message,422);}
+      try {
+        watch=validatedWatch({...body,ownerId,fcmToken:device.fcmToken},now);
+      }catch(e){return fail(e.message,422);}
       const key=ownerId+":"+watchId;
       const delivered=await this.ctx.storage.get("delivered")||{};
       if(delivered[key]&&delivered[key]>now)
@@ -237,17 +309,16 @@ export class CommuteMonitorCoordinator {
     await this.save(watches);
   }
 }
-// This preview-only gateway must never have its token hard-coded into Android.
+// Device API: no server-side master bearer is present in Android or browsers.
 export default {
   async fetch(req,env) {
     const path=new URL(req.url).pathname;
     if(req.method==="GET"&&path==="/health")
       return respond({service:"commute-monitor",enabled:fcmConfigured(env),version:1});
-    const secret=env.MONITOR_GATEWAY_TOKEN;
-    if(typeof secret!=="string"||secret.length<32) return fail("gateway not configured",503);
-    const given=req.headers.get("authorization")?.replace(/^Bearer /i,"");
-    if(!secureMatch(given,secret)) return fail("unauthorized",401);
     const paths={
+      "POST /v1/devices/pair":"/pair",
+      "POST /v1/devices/token":"/token",
+      "POST /v1/devices/revoke":"/revoke",
       "POST /v1/watches":"/subscribe",
       "DELETE /v1/watches":"/cancel",
       "POST /v1/watches/cancel-all":"/cancel-owner",
@@ -255,13 +326,19 @@ export default {
     };
     const internal=paths[req.method+" "+path];
     if(!internal)return fail("not found",404);
-    if(internal==="/subscribe"&&!fcmConfigured(env))return fail("FCM delivery not configured",503);
+    if((internal==="/subscribe"||internal==="/pair")&&!fcmConfigured(env))
+      return fail("FCM delivery not configured",503);
     if(!env.COMMUTE_MONITOR)return fail("Durable Object not configured",503);
+    if(Number(req.headers.get("content-length"))>MAX_PAYLOAD)
+      return fail("body too large",413);
+    const requestBody=await req.text();
+    if(requestBody.length>MAX_PAYLOAD) return fail("body too large",413);
     const stub=env.COMMUTE_MONITOR.get(
       env.COMMUTE_MONITOR.idFromName("shared-active-commutes"));
     return stub.fetch(new Request("https://coordinator.internal"+internal,{
-      method:"POST",headers:{"content-type":"application/json"},
-      body:await req.text()
+      method:"POST",headers:{"content-type":"application/json",
+        "authorization":req.headers.get("authorization")||""},
+      body:requestBody
     }));
   }
 };
