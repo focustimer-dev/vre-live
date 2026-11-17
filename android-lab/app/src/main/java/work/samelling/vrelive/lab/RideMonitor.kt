@@ -33,7 +33,8 @@ class RideMonitor : Service() {
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == "stop" || intent?.getStringExtra("ride") == null) {
+        if (!CommuteCheckIns.enabled(this) ||
+            intent?.action == "stop" || intent?.getStringExtra("ride") == null) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -61,6 +62,7 @@ class RideMonitor : Service() {
 
     private fun poll() {
         if (stopped) return
+        if (!CommuteCheckIns.enabled(this)) { stopSelf(); return }
         val age = System.currentTimeMillis() - ride.optLong("started")
         if (age !in 0L..14400000L || !stopMatches()) { stopSelf(); return }
         // An old ride cannot cross a service-day boundary or override a closure.
@@ -147,6 +149,7 @@ class RideMonitor : Service() {
     }
 
     private fun checkArrival(eta: Long, timestamp: Long) {
+        if (!CommuteCheckIns.enabled(this)) { stopSelf(); return }
         val now = System.currentTimeMillis()
         if (eta <= 0 || now - timestamp !in -60000L..300000L) {
             manager.notify(31, card("Waiting for a fresh train update"))
