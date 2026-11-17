@@ -211,7 +211,15 @@
     text-transform:uppercase;color:var(--meta-ink)}
   .commute-focus-headline{margin:8px 0 4px;font-size:clamp(30px,9vw,42px);
     font-weight:800;letter-spacing:-.04em;line-height:1.12;color:var(--fg)}
-  .commute-focus-headline.empty{font-size:clamp(22px,6vw,30px)}
+  .commute-focus-headline.empty{font-size:clamp(19px,5vw,23px)}
+  /* An exhausted timetable must never claim a full-size hero or bury the map. */
+  .commute-focus.no-departures .commute-focus-content{padding:14px 16px 10px}
+  .commute-focus.no-departures .commute-focus-headline.empty{
+    padding:0;margin:8px 0 2px;line-height:1.25;text-align:left;
+    color:var(--fg);letter-spacing:-.018em;font-weight:750}
+  .commute-focus.no-departures .commute-focus-route{margin-top:3px}
+  .commute-focus.no-departures .commute-focus-actions{margin-top:6px}
+  .commute-focus.no-departures .commute-options{padding:6px 8px}
   .commute-focus-train{font-size:clamp(17px,4.8vw,20px);font-weight:700;color:var(--fg)}
   .commute-focus-route{margin-top:6px;font-size:var(--fs-3);color:var(--muted)}
   .commute-focus-warning{margin-top:10px;font-size:var(--fs-2);color:var(--amber)}
@@ -472,25 +480,24 @@
   .theme-swatch.nord{background:#ECEFF4;color:#2E3440;box-shadow:inset 0 0 0 6px #D8DEE9}
   .theme-selected{margin-left:auto;font-size:var(--fs-2);font-weight:800;color:var(--fg)}
   .theme-hint{margin:0 14px 16px;font-size:var(--fs-2);color:var(--muted)}
-.ride-eta{position:relative;padding:13px 14px 10px;text-align:center}
+.ride-eta{position:relative;padding:10px 12px 8px;text-align:center}
   .ride-status{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;
-    gap:6px;min-height:28px;padding-left:42px}
+    gap:6px;min-height:24px;padding-left:42px
   .ride-status .badge{font-size:var(--fs-1)}
-  .ride-eta .eta-big{margin:3px 0 1px;font-size:clamp(34px,11vw,50px)}
+  .ride-eta .eta-big{margin:1px 0;font-size:clamp(34px,11vw,50px)}
   .ride-eta .eta-sub{line-height:1.3}
   .ride-eta .prog{margin:11px 3px 2px}
   .ride-eta .prog-lbls{margin:5px 3px 0}
   .ride-notifications{position:absolute;left:7px;top:5px;z-index:5;
     display:flex;align-items:center;gap:2px;max-width:calc(100% - 14px);
     min-height:44px;border-radius:13px}
-  .ride-notifications.expanded{padding-right:4px;background:var(--sheet-bg);
-    box-shadow:0 5px 18px var(--card-shadow);backdrop-filter:blur(10px)}
+  .ride-notifications.expanded{padding-right:4px;background:transparent;box-shadow:none}
   .ride-control{appearance:none;border:0;background:transparent;color:var(--muted-2);
     border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
     flex:none;min-width:44px;min-height:44px;padding:8px;cursor:pointer;
     transition:color .15s,background .15s}
   .ride-control:active{background:var(--surface-hover)}
-  .ride-control.on{color:var(--green);background:var(--surface-hover)}
+  .ride-control.on{color:var(--green);background:transparent}
   .ride-control:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
   .ride-control.alert-toggle{min-width:70px;font-size:var(--fs-1);font-weight:750;
     padding:8px 6px}
@@ -499,12 +506,17 @@
   .ride-notifications .icon-btn{appearance:none;border:0;background:transparent;
     border-radius:10px;min-width:44px;min-height:44px;width:44px;height:44px;
     color:var(--muted-2);box-shadow:none}
-  .ride-notifications .icon-btn.on{color:var(--green);background:var(--surface-hover)}
+  .ride-notifications .icon-btn.on{color:var(--green);background:transparent}
   .ride-notifications .icon-btn:focus-visible{outline:2px solid var(--focus);outline-offset:-3px}
-  .ride-stop-button{appearance:none;display:inline-flex;justify-content:center;
-    align-items:center;flex-wrap:wrap;gap:4px;min-height:44px;max-width:100%;
-    padding:4px 6px;border:0;background:transparent;color:var(--muted);
+  .ride-stop-button{appearance:none;display:flex;justify-content:center;
+    align-items:center;flex-wrap:wrap;gap:2px 5px;min-height:44px;width:100%;
+    padding:2px 4px;border:0;background:transparent;color:var(--muted);
     font:inherit;font-size:var(--fs-2);cursor:pointer;border-radius:8px}
+  /* Keep the chevron attached to the stop name, not orphaned on its own line. */
+  .ride-stop-target{display:inline-flex;align-items:center;gap:5px;max-width:100%}
+  .ride-stop-target strong{overflow-wrap:anywhere}
+  .ride-stop-target .chev{width:12px;height:12px;flex-shrink:0}
+  .ride-stop-details{white-space:nowrap}
   .ride-stop-button strong{color:var(--fg);font-weight:750;
     text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
   .ride-stop-button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -2916,7 +2928,7 @@ return html`
             <button type="button" className=${"ride-control ride-bell" + (notify ? " on" : "")}
               aria-label="Show notification options" title="Notification options"
               aria-expanded=${showTools} onClick=${() => setShowTools(!showTools)}>
-              <${BellIcon} size=${19} />
+              <${BellIcon} size=${16} />
             </button>
             ${showTools && html`
               <button type="button" className=${"ride-control alert-toggle" + (notify ? " on" : "")}
@@ -2942,10 +2954,11 @@ return html`
             <button type="button" className="ride-stop-button" onClick=${onChange}
               aria-label=${"Change destination stop from " + stop.name} title="Change stop">
               <span>${scheduledOnly ? "Scheduled at" : arrived ? "Stopped at" : phase === "passed" ? "Your stop was" : "Destination:"}</span>
-              <strong>${stop.name}</strong>
-              ${arrived && !scheduledOnly ? "" : html`<span>· ${fmtClock(stop.time)}</span>`}
-              <span>· Train ${train.num}</span>
-              <${Chevron} />
+              <span className="ride-stop-target">
+                <strong>${stop.name}</strong><${Chevron} />
+              </span>
+              ${arrived && !scheduledOnly ? "" : html`<span className="ride-stop-details">· ${fmtClock(stop.time)}</span>`}
+              <span className="ride-stop-details">· Train ${train.num}</span>
             </button>
           </div>
           ${train.schedDev > 60000 && html`
