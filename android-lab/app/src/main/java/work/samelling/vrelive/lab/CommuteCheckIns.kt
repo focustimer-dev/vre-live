@@ -525,7 +525,12 @@ class CommuteCheckReceiver : BroadcastReceiver() {
                 CommuteCheckIns.onReminder(context, intent.data?.lastPathSegment.orEmpty())
             CommuteCheckIns.LATER ->
                 CommuteCheckIns.later(context, intent.getStringExtra("profileId").orEmpty())
-            CommuteCheckIns.SKIP_DAY -> CommuteCheckIns.skipToday(context)
+            CommuteCheckIns.SKIP_DAY -> {
+                CommuteCheckIns.skipToday(context)
+                // Local confirmation is revoked first; remote cancellation is
+                // queued and retried on next launch if the receiver is killed.
+                CommutePushClient.cancelAll(context)
+            }
             Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED, Intent.ACTION_TIMEZONE_CHANGED,
             CommuteCheckIns.RECHECK -> CommuteCheckIns.reschedule(context)
