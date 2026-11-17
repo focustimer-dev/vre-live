@@ -109,5 +109,65 @@ try {
     body:JSON.stringify(input())
   }),{MONITOR_GATEWAY_TOKEN:token})).status,503,
   "must not activate monitoring without configured FCM delivery");
+  // Full mocked delivery: two riders share one GTFS fetch, two FCM messages,
+  // one OAuth token exchange, then the coordinator becomes completely idle.
+  const {webcrypto}=await import("node:crypto");
+  globalThis.crypto ||= webcrypto;
+  const pair=await crypto.subtle.generateKey(
+    {name:"RSASSA-PKCS1-v1_5",modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:"SHA-256"},
+    true,["sign","verify"]);
+  const der=await crypto.subtle.exportKey("pkcs8",pair.privateKey);
+  const account={project_id:"vre-live-test",client_email:"test@vre-live-test.iam.gserviceaccount.com",
+    private_key:"-----BEGIN PRIVATE KEY-----\n"+Buffer.from(der).toString("base64")+"\n-----END PRIVATE KEY-----"};
+  const env={FCM_SERVICE_ACCOUNT_JSON:JSON.stringify(account)};
+  const liveState=new Map();
+  let liveAlarm=null,oauthCalls=0,fcmCalls=0,sharedFeedCalls=0;
+  const coordinator=new CommuteMonitorCoordinator({storage:{
+    async get(k){return liveState.get(k);},
+    async put(k,v){liveState.set(k,structuredClone(v));},
+    async delete(k){liveState.delete(k);},
+    async setAlarm(t){liveAlarm=t;},
+    async deleteAlarm(){liveAlarm=null;}
+  }},env);
+  const addWatch=(ownerId,watchId)=>coordinator.fetch(new Request(
+    "https://coordinator.internal/subscribe",{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify(input(ownerId,watchId))}));
+  Date.now=()=>monday;
+  assert.equal((await addWatch("owner_0123456789","watch_0123456789")).status,201);
+  assert.equal((await addWatch("owner_abcdefghij","watch_abcdefghij")).status,201);
+  Date.now=()=>when("2026-11-16T12:00:00Z"); // 7 AM: scheduled departure minus 25m approach
+  globalThis.fetch=async (url,init)=>{
+    const address=String(url);
+    if(address.startsWith("https://gtfs.vre.org/")){
+      sharedFeedCalls++;
+      return new Response(new Uint8Array([0,0]),{status:200});
+    }
+    if(address==="https://oauth2.googleapis.com/token"){
+      oauthCalls++;
+      assert.match(String(init.body),/grant_type=/,"FCM uses Google OAuth JWT exchange");
+      return Response.json({access_token:"mock-short-lived-token",expires_in:3600});
+    }
+    if(address.startsWith("https://fcm.googleapis.com/v1/projects/")){
+      fcmCalls++;
+      assert.equal(init.headers.authorization,"Bearer mock-short-lived-token");
+      const envelope=JSON.parse(init.body);
+      assert.equal(envelope.message.data.kind,"leave_now");
+      assert.equal(envelope.message.notification.title,"Leave now for train 310");
+      assert.equal(envelope.message.android.notification.channel_id,"commute_leave_now_v1");
+      return Response.json({name:"projects/vre-live-test/messages/123"});
+    }
+    throw new Error("Unexpected outbound request "+address);
+  };
+  await coordinator.alarm();
+  assert.equal(sharedFeedCalls,2,"a tick shared between two riders fetches only two GTFS feeds");
+  assert.equal(oauthCalls,1,"one short-lived Google access token is reused for riders");
+  assert.equal(fcmCalls,2,"each opted-in device gets one leave-now notification");
+  assert.equal(Object.keys(await coordinator.load()).length,0,"delivered watches are removed");
+  assert.equal(liveAlarm,null,"successful final delivery deletes the coordinator alarm");
+  await coordinator.alarm();
+  assert.equal(sharedFeedCalls,2,"no next-minute polling after all deliveries");
+  assert.equal(fcmCalls,2,"alarm retries cannot redeliver an already removed watch");
+
 } finally {Date.now=oldNow;globalThis.fetch=oldFetch;}
 console.log("Event-driven monitor: schedule, shared feed, idle/cancel, auth and source parity passed");
