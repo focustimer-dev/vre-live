@@ -70,7 +70,7 @@ assert.match(editor,/autoArmRequested: !!\(androidRideAlert && alertPrefs\.enabl
   "new Android rides inherit global arrival setting");
 assert.match(editor,/if \(!alertPrefs\.enabled\) \{/,
   "ride bell respects global master switch");
-assert.doesNotMatch(editor,/Daily check-in notifications|Check-in time \(Eastern\)/,
+assert.doesNotMatch(editor,/draft\.checkInEnabled|change\("checkInEnabled"|field\("Check-in time \(Eastern\)"/,
   "per-commute check-in controls were removed");
 const build = read("android-lab/web/build-assets.mjs");
 assert.match(build,/"vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"/);
