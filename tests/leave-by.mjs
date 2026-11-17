@@ -137,10 +137,13 @@ assert.match(app, /No more trains today on this route\./,
 assert.match(app, /No VRE service today\./,
   "original timetable retains no-service state");
 const nextCard = app.indexOf('!myTrip && tab !== "preferences" && html');
-const plannerCard = app.indexOf("TodayCommute} profiles=", nextCard);
-assert.ok(nextCard >= 0 && plannerCard > nextCard,
-  "standard next-departure card precedes optional commute planning");
+const defaultSummary = app.indexOf('planProfile === null && todayCard', nextCard);
+const openedPlanner = app.indexOf('planProfile !== null && todayCard');
+assert.ok(nextCard >= 0 && defaultSummary > nextCard,
+  "without a selection overlay, the standard timetable precedes compact active summary");
+assert.ok(openedPlanner >= 0 && openedPlanner < nextCard,
+  "an explicitly opened planner is visible above the timetable");
 assert.equal((app.match(/TodayCommute\} profiles=/g) || []).length, 1,
-  "optional planner is rendered only once");
+  "planner component is instantiated only once");
 
 console.log("VRE leave-by calculations, confidence, DST and Android packaging passed");
