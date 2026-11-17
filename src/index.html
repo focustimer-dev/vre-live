@@ -2931,6 +2931,58 @@ ${lockError}
       </div>`;
   }
 
+function SwitchTrainSheet({ rows, currentTrain, now, onPick, onBrowse, onClose }) {
+    const closeRef = useRef(null);
+    useEffect(() => {
+      const previous = document.activeElement;
+      const dismiss = () => { closeRef.current?.click(); return true; };
+      window.vreDismissSheet = dismiss;
+      closeRef.current?.focus();
+      return () => {
+        if (window.vreDismissSheet === dismiss) delete window.vreDismissSheet;
+        if (previous?.isConnected) previous.focus();
+      };
+    }, []);
+    const eligible = rows.filter(r => r.status !== "none" && r.status !== "done"
+      && r.trip !== currentTrain?.tripId && r.num !== currentTrain?.num);
+    const sameDirection = eligible.filter(r => r.dir === currentTrain?.dir);
+    const selected = (sameDirection.length ? sameDirection : eligible).slice(0, 10);
+    return html`
+      <div className="sheet switch-sheet" role="dialog" aria-modal="true"
+        aria-label="Change train" onKeyDown=${e => { if (e.key === "Escape") onClose(); }}>
+        <div className="grab" aria-hidden="true"></div>
+        <div className="row">
+          <div><div className="tnum">Change train</div>
+            <div className="meta">Select a different train, then choose where to get off.</div></div>
+          <button ref=${closeRef} type="button" className="btn ghost"
+            onClick=${onClose} aria-label="Close train picker"><${XIcon} /></button>
+        </div>
+        <div className="switch-trains-list" role="group" aria-label="Other trains">
+          ${selected.length ? selected.map(r => {
+            const stop = (r.live?.stops || VRECore.schedStopsMs(r, now))
+              .find(st => st.time >= now - 60000);
+            const when = stop?.time ?? r.first;
+            const confidence = r.status === "live" && !staleMin(r.live, now)
+              ? "Live" : "Timetable";
+            return html`
+              <button key=${r.trip} type="button" className="switch-train-option"
+                onClick=${() => onPick(r.trip)} aria-label=${"Switch to train " + r.num}>
+                <span><strong>Train ${r.num} · ${r.line === "M" ? "Manassas" : "Fredericksburg"}</strong>
+                  <small>${r.dir === 1 ? "Toward DC" : "Outbound"} · ${confidence}
+                    ${stop ? " · " + stop.name : ""}</small></span>
+                <span className="switch-time">${fmtClock(when)} <${Chevron} /></span>
+              </button>`;
+          }) : html`<div className="meta" style=${{ padding: 12 }}>
+            No other trains are available in the timetable right now.
+          </div>`}
+        </div>
+        <div className="switch-actions">
+          <button className="btn outline" type="button" onClick=${onBrowse}>Full schedule</button>
+          <button className="btn ghost" type="button" onClick=${onClose}>Cancel</button>
+        </div>
+      </div>`;
+  }
+
   /* ---------------- bottom sheet: train details / destination picker ---------------- */
   function Sheet({ train, now, devSamples, activeTrip, boardingStation, defaultDest, busy, error, onDest, onWait, onClose }) {
     const boardingIndex = train.stops.findIndex(s => s.code === boardingStation);
@@ -3014,6 +3066,7 @@ ${lockError}
     const [tab, setTab] = useState(() =>
       window.location.pathname === "/__vre_android__/app/index.html" && new URLSearchParams(window.location.search).has("board") ? "board" : "map");
     const [selected, setSelected] = useState(null);  // tripId shown in sheet
+    const [switchTrainOpen, setSwitchTrainOpen] = useState(false);
     const [picking, setPicking] = useState(false);
     const [devlog, setDevlog] = useState(() => lsGet(DEV_KEY, {}));
     const widgetRoute = useMemo(() => {
@@ -3259,7 +3312,7 @@ ${lockError}
         };
         lsSet(RIDE_KEY, [...lsGet(RIDE_KEY, []), rec].slice(-100));
       }
-      setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false);
+      setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false); setSwitchTrainOpen(false);
     };
     const startRide = async code => {
       if (rideBusy) return;
@@ -3495,7 +3548,9 @@ ${lockError}
               pushActive=${!!myTrip.push} pushErr=${myTrip.pushErr || null} wake=${!!myTrip.wake} now=${now}
               onNotify=${toggleNotify} onWake=${toggleWake}
               onChange=${() => { if (myTrain) { setSelected(myTrain.tripId); setPicking(true); } }}
-              onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
+              onSwitchTrain=${() => { setSelected(null); setSwitchTrainOpen(true); }}
+              onLeave=${finishRide} lockButton=${lockControl(true)}
+              lockActive=${lockState === "on"} lockError=${lockError} />
           </div>`}
 
         ${planProfile !== null && todayCard}
@@ -3580,6 +3635,16 @@ ${lockError}
               ? `refresh in ${Math.ceil((MIN_FETCH_GAP - (now - lastFetch.current)) / 1000)}s`
               : "refresh now"}</button>
         </div>
+
+${switchTrainOpen && myTrip && html`
+          <${SwitchTrainSheet} rows=${schedRows} currentTrain=${myTrain} now=${now}
+            onPick=${tripId => {
+              setSwitchTrainOpen(false); setSelected(tripId); setPicking(false);
+            }}
+            onBrowse=${() => {
+              setSwitchTrainOpen(false); setSelected(null); setTab("sched");
+            }}
+            onClose=${() => setSwitchTrainOpen(false)} />`}
 
         ${selTrain && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
