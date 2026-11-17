@@ -3687,17 +3687,35 @@ ${lockError}
       if (!window.VreWidgetData) return;
       const live = Object.fromEntries(Object.entries(liveByTrip).map(([id, train]) =>
         [id, { ts: train.ts, stops: Object.fromEntries(train.stops.map(stop => [stop.code, stop.time])) }]));
+      // Explicitly confirmed onboard ride only: waiting-for-train snapshots
+      // never activate the native Journey Ribbon.
+      const origin = myTrip?.from && STATIONS[myTrip.from]
+        ? myTrip.from : myTrain?.stops?.find(stop => STATIONS[stop.code])?.code;
+      const originY = STATIONS[origin]?.y, destinationY = STATIONS[rideDest]?.y;
+      const freshRidePosition = !!observedTrain && !observedTrain.signalLost &&
+        !!observedTrain.ts && Date.now() - observedTrain.ts >= -60000 &&
+        Date.now() - observedTrain.ts <= 300000 &&
+        Number.isFinite(observedTrain.y);
+      const routeProgress = freshRidePosition && originY != null &&
+        destinationY != null && originY !== destinationY
+        ? Math.max(0, Math.min(100, Math.round(
+            100 * (observedTrain.y - originY) / (destinationY - originY))))
+        : null;
+      const nextRideStop = myTrain
+        ? VRECore.remainingStops(myTrain, Date.now())[0]?.code : null;
       const ride = rideTrip && rideDest
-        ? { trip: rideTrip, dest: rideDest, started: rideStarted, num: myTrain?.num, sourceTrip: myTrain?.sourceTripId || rideTrip,
+        ? { trip: rideTrip, dest: rideDest, from: origin || null, boarded: true,
+            started: rideStarted, num: myTrain?.num, sourceTrip: myTrain?.sourceTripId || rideTrip,
             lead: alertLead(myTrain, rideDest),
-            ts: observedTrain?.ts, eta: observedTrain && myStop?.time }
+            ts: observedTrain?.ts, eta: observedTrain && myStop?.time,
+            next: nextRideStop, progress: routeProgress, positionFresh: freshRidePosition }
         : waitingFor ? (() => {
             const train = liveByTrip[waitingFor.trip];
             const stop = train?.stops.find(s => s.code === waitingFor.dest);
             return { ...waitingFor, waiting: true, ts: train?.ts, eta: stop?.time };
           })() : null;
       window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor]);
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain, myStop?.time]);
     const lockBridge = window.VreLockCard;
     const [lockState, setLockState] = useState("off");
     const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
