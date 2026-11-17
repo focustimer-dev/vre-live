@@ -30,6 +30,10 @@ assert.equal(points(40),30,"northern endpoint");
 assert.equal(points(648),395,"southern endpoint");
 assert.ok(points(244)<200,"branch atlas compresses the full 700px network into 445px");
 assert.match(app,/function FollowLens\(/);
+assert.match(app,/\(train.y-prevY\)\/\(nextY-prevY\)/,
+  "fresh GPS position projects into the correct between-stop segment");
+assert.match(app,/const estimated = t.ghost \|\| t.signalLost \|\| !t.ts/,
+  "atlas distinguishes stale reporting from verified train positions");
 assert.match(app,/function BranchAtlas\(/);
 assert.match(app,/viewBox="0 0 390 284"/,"ride lens stays within short bounded viewport");
 assert.match(app,/viewBox="0 0 390 445"/,"system atlas fits into a much shorter card");
@@ -43,7 +47,7 @@ assert.match(app,/aria-label=\$\{`Train \$\{t.num\},/,
   "train markers remain individually accessible");
 assert.match(app,/e.preventDefault\(\);onPick\(t.tripId\)/,
   "train marker keyboard interaction survives");
-assert.match(app,/strokeDasharray=\$\{t.ghost\?"3 3":null\}/,
+assert.match(app,/strokeDasharray=\$\{estimated\?"3 3":null\}/,
   "timetable-only trains preserve dashed markers");
 assert.match(css,/\.lens-svg,\.atlas-svg\{display:block;width:100%;height:auto;/);
 assert.match(css,/\.atlas-train:focus-visible \.atlas-halo/);
