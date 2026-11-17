@@ -201,6 +201,10 @@ assert.match(css, /\.commute-options\[aria-expanded="true"\]\{[^}]*background:va
   "expanded Plan train steps back while Confirm train becomes primary");
 assert.match(css, /:root\[data-theme="electric-stars"\] \.commute-plan-confirm\{[^}]*var\(--action-bg\)/s,
   "expanded confirmation inherits the lilac primary treatment");
+assert.doesNotMatch(css, /:root\[data-theme="electric-stars"\] \.btn\.ghost\{/,
+  "a late generic ghost-button override must not turn lilac Plan train text pale");
+assert.match(css, /:root\[data-theme="electric-stars"\] \.commute-focus-actions \.commute-options\[aria-expanded="true"\]\{[^}]*color:var\(--fg\)/s,
+  "expanded disclosure uses neutral text while Confirm train becomes primary");
 assert.match(css, /:root\[data-theme="electric-stars"\] \.sheet\{[^}]*backdrop-filter:none/s,
   "night dialogs are opaque material, not decorative glass");
 assert.match(html, /className="card system-map-card"/,
