@@ -610,7 +610,7 @@
     color:var(--muted);font-weight:650}
   :root[data-theme="electric-stars"] .tabs button.on{
     background:var(--night-plum);color:var(--night-display);
-    box-shadow:inset 0 -2px 0 var(--night-orchid)}
+    box-shadow:none}
   :root[data-theme="electric-stars"] .tabs button:focus-visible{
     outline:2px solid var(--focus);outline-offset:-3px}
   :root[data-theme="electric-stars"] .card{
@@ -3255,19 +3255,23 @@ const ExitTrainIcon = () => html`
       <path d="M17.2 17.3l5.1 6.5m-5.1-6.5-4.4 7.1M12.6 14.2l-2.2 3"
         strokeWidth="2.7"/>
     </svg>`;
-  const ReverseTrainIcon = () => html`
-    <svg width="25" height="25" viewBox="0 0 24 24" fill="none"
-      aria-hidden="true" stroke="currentColor" strokeWidth="2.1"
+  // Two train fronts connected by one forward transfer arrow; not a route flip.
+  const TransferTrainIcon = () => html`
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none"
+      aria-hidden="true" stroke="currentColor" strokeWidth="1.6"
       strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 8.1h13l-3.4-3.4M18 8.1l-3.4 3.4"/>
-      <path d="M19 15.9H6l3.4 3.4M6 15.9l3.4-3.4"/>
+      <rect x="1.5" y="5" width="8.5" height="15" rx="2.5"/>
+      <path d="M3.5 9h4.5v5H3.5zM3.5 23l2-3m2 3-2-3"/>
+      <rect x="18" y="5" width="8.5" height="15" rx="2.5"/>
+      <path d="M20 9h4.5v5H20zM20 23l2-3m2 3-2-3"/>
+      <path d="M11.5 12.5h4.2m-2.5-3 3 3-3 3" strokeWidth="1.8"/>
     </svg>`;
   function RideQuickActions({ onSwitchTrain, onLeave }) {
     return html`
       <div className="ride-quick-actions" role="group" aria-label="Ride actions">
         <button type="button" className="ride-control" onClick=${onSwitchTrain}
           aria-label="Change train" title="Change train">
-          <${ReverseTrainIcon} />
+          <${TransferTrainIcon} />
         </button>
         <button type="button" className="ride-control ride-exit"
           onClick=${() => onLeave(true)}
