@@ -540,6 +540,18 @@
   .switch-sheet .switch-actions{display:flex;gap:8px;margin-top:12px}
   .switch-sheet .switch-actions .btn{min-height:44px}
   @media (prefers-reduced-motion:reduce){.ride-control{transition:none}}
+  .commute-focus-actions{margin-top:10px}
+  .commute-focus-actions .commute-options{width:auto;min-height:44px;
+    padding:8px 12px;color:var(--fg);border:1px solid var(--border)}
+  .commute-plan-note{padding:10px 8px}
+  .commute-plan-travel{display:flex;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;gap:10px;border-top:1px solid var(--line-separator);
+    padding:12px 8px 2px;font-weight:700;font-size:var(--fs-2);color:var(--muted)}
+  .commute-plan-travel-input{display:inline-flex;gap:8px;align-items:center;color:var(--fg)}
+  .commute-plan-travel-input input{width:72px;min-height:44px;padding:7px;
+    text-align:center;font:inherit;color:var(--fg);background:var(--bg);
+    border:1px solid var(--border);border-radius:9px}
+  .commute-plan-travel-input input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -2160,42 +2172,70 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive,
-      onPlan, planned, returning, onChangePlan, onOtherPlans, onTravelChange, travelOverride }) {
-    // Explicit Advanced Commute plans own both the headline and departures.
-    // The Basic Commute route is used only without a selected native plan.
-    const fromStation = planned?.profile.from || from;
-    const toStation = planned?.profile.to || to;
-    const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 3),
+  function CommuteCard({ from, to, now, liveByTrip, onFlip, onPlanTrain,
+      planned, nextAdvanced, returning, travelOverride, initialExpanded = false }) {
+    const fromStation = planned?.profile.from || nextAdvanced?.profile.from || from;
+    const toStation = planned?.profile.to || nextAdvanced?.profile.to || to;
+    const candidateProfile = planned?.profile || nextAdvanced?.profile || null;
+    const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 32),
       [fromStation, toStation, Math.floor(now / 15000), liveByTrip]);
-    const noDepartures = !planned && rows.length === 0;
+    const preferred = candidateProfile?.preferredTrains || [];
+    const planRows = candidateProfile && preferred.length
+      ? rows.filter(r => preferred.includes(r.num)) : rows;
+    const noDepartures = !planned && !nextAdvanced && rows.length === 0;
     const service = isServiceDay(new Date(now));
-    const [showDetails, setShowDetails] = useState(false);
+    const [showDetails, setShowDetails] = useState(initialExpanded);
     const [showMarey, setShowMarey] = useState(() => lsGet("vre-live-marey", false));
-    const f = planned?.forecast;
+    const [minutes, setMinutes] = useState(() => {
+      const n = travelOverride ?? candidateProfile?.travelMinutes;
+      return Number.isInteger(n) && n > 0 ? n : 10;
+    });
+    useEffect(() => {
+      const n = travelOverride ?? candidateProfile?.travelMinutes;
+      setMinutes(Number.isInteger(n) && n > 0 ? n : 10);
+    }, [candidateProfile?.id, travelOverride, fromStation, toStation]);
+    const forecast = planned?.forecast;
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
     }).format(new Date(ms));
-    const visibleRows = rows;
+    const futureDate = dep => new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric"
+    }).format(new Date(dep));
+    const confirm = row => {
+      if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
+      onPlanTrain({ profile: candidateProfile, from: fromStation, to: toStation,
+        train: String(row.num), today: !nextAdvanced || nextAdvanced.today }, minutes);
+      setShowDetails(false);
+    };
     return html`
-      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "")} aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
+      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "")}
+        aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
         <div className="commute-focus-content">
           <div className="commute-focus-label">
-            ${planned ? "YOUR NEXT COMMUTE" : returning ? "RETURN FROM " + STATIONS[fromStation].name : "NEXT TO " + STATIONS[toStation].name}
+            ${planned ? "YOUR NEXT COMMUTE" : nextAdvanced
+              ? nextAdvanced.profile.name + " · NEXT COMMUTE"
+              : returning ? "RETURN FROM " + STATIONS[fromStation].name
+              : "NEXT TO " + STATIONS[toStation].name}
           </div>
           ${planned ? html`
             <div className="commute-focus-headline" role="status">
-              ${f.state === "needs-travel-time" ? "Set travel time"
-                : f.state === "leave-now" ? "Leave now" : "Leave by " + clock(f.leaveBy)}
+              ${forecast.state === "needs-travel-time" ? "Set travel time"
+                : forecast.state === "leave-now" ? "Leave now"
+                : "Leave by " + clock(forecast.leaveBy)}
             </div>
-            <div className="commute-focus-train">Train ${planned.train} · ${clock(f.scheduled)}</div>
-            <div className="commute-focus-route">
-              ${STATIONS[planned.profile.from].name} → ${STATIONS[planned.profile.to].name}
-            </div>
-            ${f.confidence === "delay-unconfirmed" && html`
+            <div className="commute-focus-train">Train ${planned.train} · ${clock(forecast.scheduled)}</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
+            ${forecast.confidence === "delay-unconfirmed" && html`
               <div className="commute-focus-warning" role="status">
                 Delay unconfirmed; using scheduled departure.
               </div>`}
+          ` : nextAdvanced ? html`
+            <div className="commute-focus-headline">
+              ${nextAdvanced.today ? clock(nextAdvanced.dep)
+                : futureDate(nextAdvanced.dep) + " · " + clock(nextAdvanced.dep)}
+            </div>
+            <div className="commute-focus-train">Train ${nextAdvanced.train} · Timetable</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
           ` : rows.length ? html`
             <div className="commute-focus-headline">${fmtClock(rows[0].dep)}</div>
             <div className="commute-focus-train">Train ${rows[0].num} · ${fmtWhen(rows[0].dep, now)}</div>
@@ -2206,61 +2246,61 @@
             <div className="commute-focus-headline empty">
               ${service ? "No departures remaining today." : "No VRE service today."}
             </div>
-            <div className="commute-focus-route">
-              ${STATIONS[fromStation].name} → ${STATIONS[toStation].name}
-            </div>`}
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>`}
           <div className="commute-focus-actions">
-            ${planned ? html`<button type="button" className="btn"
-              onClick=${() => onChangePlan(planned.profile.id)}>Change train</button>`
-              : rows.length > 0 && onPlan && html`<button type="button" className="btn"
-                onClick=${onPlan}>Plan train</button>`}
             <button type="button" className="btn ghost commute-options"
-              aria-expanded=${showDetails} onClick=${() => setShowDetails(!showDetails)}>
-              ${showDetails ? "Fewer options" : "More options"}
-              <${Chevron} open=${showDetails} />
+              aria-expanded=${showDetails} aria-controls="inline-commute-blueprint"
+              onClick=${() => setShowDetails(!showDetails)}>
+              Plan train <${Chevron} open=${showDetails} />
             </button>
           </div>
           ${showDetails && html`
-            <div className="commute-extra">
+            <div className="commute-extra" id="inline-commute-blueprint">
               <div className="commute-extra-actions">
                 ${!planned && html`<button type="button" className="btn ghost" onClick=${onFlip}>
                   Swap direction
                 </button>`}
-                ${planned && planned.otherCount > 0 && html`
-                  <button type="button" className="btn ghost" onClick=${onOtherPlans}>
-                    Other planned trips (${planned.otherCount})
-                  </button>`}
               </div>
-              ${planned && html`
-                <${DailyTravelControl} profile=${planned.profile} override=${travelOverride}
-                  onChange=${value => onTravelChange(planned.profile.id, value)} />`}
-              ${visibleRows.length > 0 && html`
-                <div className="commute-extra-label">
-                  ${planned ? "Other departures" : "Departure details"}
-                </div>
-                ${visibleRows.map(r => html`
-                  <button key=${r.trip} className="srow" aria-label=${`Choose train ${r.num}`}
-                    onClick=${() => onPickLive(r.trip)}>
+              ${planRows.length > 0 ? html`
+                <div className="commute-extra-label">Choose a departure</div>
+                ${planRows.map(r => html`
+                  <button key=${r.trip} className="srow" aria-label=${`Plan train ${r.num}`}
+                    onClick=${() => confirm(r)}>
                     <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
                     <span className="mid">
                       <span className="l1">${fmtClock(r.dep)} from ${STATIONS[fromStation].name}</span>
                       <span className="l2">Arrives ${STATIONS[toStation].name} ${fmtClock(r.arr)}</span>
                     </span>
-                    <span className="right">
-                      <span className=${"badge " + (r.live ? "ok" : "dim")}>${fmtWhen(r.dep, now)}</span>
-                    </span>
+                    <span className="right"><span className="badge">${fmtWhen(r.dep, now)}</span></span>
+                    <${Chevron} />
                   </button>`)}
-              `}
-              ${rows.length > 0 && html`
+              ` : nextAdvanced && !nextAdvanced.today ? html`
+                <div className="meta commute-plan-note">
+                  Next saved departure: ${futureDate(nextAdvanced.dep)} at ${clock(nextAdvanced.dep)}.
+                  Confirm that train on its service day.
+                </div>`
+              : html`<div className="meta commute-plan-note">No future departures remain today on this route.</div>`}
+              ${planRows.length > 0 && html`
                 <div className="marey-wrap">
                   <button className="marey-toggle" aria-expanded=${showMarey}
                     onClick=${() => { lsSet("vre-live-marey", !showMarey); setShowMarey(!showMarey); }}>
                     Time-space chart <${Chevron} open=${showMarey} />
                   </button>
                   ${showMarey && html`
-                    <${Marey} from=${fromStation} to=${toStation} deps=${rows}
+                    <${Marey} from=${fromStation} to=${toStation} deps=${planRows}
                       liveByTrip=${liveByTrip} now=${now} />`}
                 </div>`}
+              <label className="commute-plan-travel" for="commute-plan-minutes">
+                <span>Travel time to station</span>
+                <span className="commute-plan-travel-input">
+                  <input id="commute-plan-minutes" type="number" inputMode="numeric"
+                    min="1" max="180" step="1" value=${minutes}
+                    onChange=${e => {
+                      const value = Number(e.target.value);
+                      if (Number.isInteger(value) && value >= 1 && value <= 180) setMinutes(value);
+                    }} /> min
+                </span>
+              </label>
             </div>`}
         </div>
       </div>`;
