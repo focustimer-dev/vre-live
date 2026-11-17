@@ -155,6 +155,7 @@ internal object CommutePushClient {
                     FirebaseMessaging.getInstance().deleteToken()
                 }
                 android.os.Handler(context.mainLooper).post {
+                    if (result) onSettingsUpdated(context)
                     done(result, if (result) "Device paired successfully"
                         else "Pairing failed. Check the code and preview service.")
                 }
