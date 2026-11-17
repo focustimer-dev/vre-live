@@ -66,11 +66,13 @@ export async function sendLeaveNow(env, watch, forecast, fetcher = fetch, now = 
         headers:{"authorization":"Bearer "+token,"content-type":"application/json"},
         body:JSON.stringify({message:{
           token:watch.fcmToken,
-          notification:{title,body},
-          data:{kind:"leave_now",watchId:watch.watchId,trainNumber:watch.trainNumber,
-            stationCode:watch.from,serviceDate:watch.serviceDate},
-          android:{priority:"HIGH",collapse_key:watch.watchId,
-            ttl:"120s",notification:{channel_id:"commute_leave_now_v1",tag:watch.watchId}}
+          // Data-only delivery is intentional: Android's FirebaseMessagingService
+          // must check current global consent and trip status before displaying.
+          // An OS-rendered notification payload could bypass a recent opt-out.
+          data:{kind:"leave_now",title,body,watchId:watch.watchId,
+            trainNumber:watch.trainNumber,stationCode:watch.from,
+            serviceDate:watch.serviceDate},
+          android:{priority:"HIGH",collapse_key:watch.watchId,ttl:"120s"}
         }})
       });
     if (response.ok) return {ok:true,invalid:false,retry:false};
