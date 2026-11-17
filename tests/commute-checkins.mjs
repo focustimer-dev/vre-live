@@ -33,7 +33,7 @@ assert.ok(app.includes('function TodayCommute('), "manual recovery/choice UI exi
 assert.ok(app.includes('onAction("reactivate", p.id)'), "manual recovery from skip");
 assert.ok(app.includes('onAction("skipTrip", selected.id)'), "one-trip skip exists");
 assert.ok(app.includes('onAction("skipToday", "")'), "whole-day skip exists");
-assert.ok(app.includes('Live leave-time alerts come later'), "does not promise live ETA alerts");
+assert.ok(app.includes('Live background reminders are not enabled yet'), "does not promise live ETA alerts");
 
 const css = read("android-lab/web/session.css");
 const activity = read("android-lab/app/src/main/java/work/samelling/vrelive/lab/MainActivity.kt");

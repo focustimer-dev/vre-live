@@ -28,7 +28,7 @@ for (const [pkg, file, url] of [
   await copyFile(new URL(`node_modules/${pkg}/LICENSE`, import.meta.url), join(output, `${pkg}-LICENSE.txt`));
 }
 
-for (const id of ["vre-core", "vre-commutes", "vre-app"]) {
+for (const id of ["vre-core", "vre-commutes", "vre-leave-by", "vre-app"]) {
   const block = page.match(new RegExp(`<script id="${id}">([\\s\\S]*?)</script>`));
   if (!block) throw new Error("Missing inline script: " + id);
   let code = block[1];
@@ -57,7 +57,7 @@ for (const id of ["vre-core", "vre-commutes", "vre-app"]) {
     code = feeds;
   }
   await writeFile(join(output, id + ".js"), code);
-  replace(block[0], id === "vre-core" ? '<script defer src="vre-core.js"></script>\n<script defer src="vre-commutes.js"></script>\n<script defer src="session.js"></script>' : "");
+  replace(block[0], id === "vre-core" ? '<script defer src="vre-core.js"></script>\n<script defer src="vre-commutes.js"></script>\n<script defer src="vre-leave-by.js"></script>\n<script defer src="session.js"></script>' : "");
 }
 
 replace('<div id="root"></div>', `<main id="session" class="lab-session">

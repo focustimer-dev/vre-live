@@ -87,6 +87,30 @@
   .waiting-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:14px 0 5px}
   .waiting-actions .btn{min-height:48px}
   .waiting-card .btn.ghost{padding-left:0}
+  .daily-travel-control{display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+    margin-top:7px;font-size:var(--fs-2);color:var(--muted)}
+  .daily-travel-control input{width:64px;max-width:64px;font:inherit;font-size:var(--fs-2);
+    color:var(--fg);background:var(--card);border:1px solid var(--border);
+    border-radius:8px;padding:5px 7px;text-align:center}
+  .daily-travel-control .btn{width:auto;padding:5px 8px}
+  .leave-by-card{margin:9px 0 3px;padding:12px;border-radius:12px;
+    border:1px solid var(--border);background:var(--card-2)}
+  .leave-by-label{color:var(--muted);font-size:var(--fs-2);font-weight:650}
+  .leave-by-time{font-size:clamp(25px,8vw,36px);font-weight:800;letter-spacing:-.03em;
+    font-variant-numeric:tabular-nums;line-height:1.15;margin:4px 0}
+  .leave-by-remaining{font-weight:700;font-size:var(--fs-2);margin:5px 0}
+  .leave-by-confidence{margin-top:5px}
+  .today-train-leave{display:block;color:var(--muted);font-size:var(--fs-1);font-weight:400;
+    margin-top:3px}
+  .today-compact{margin:12px 0}
+  .today-compact-body{padding:10px 14px 14px}
+  .today-compact-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .today-compact-top>div{min-width:0}
+  .today-compact-time{font-size:clamp(18px,5vw,25px);line-height:1.2;
+    font-weight:750;letter-spacing:-.02em;margin:5px 0}
+  .today-plan-edit{flex:none;white-space:nowrap}
+  .today-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .commute-plan-trigger{white-space:nowrap}
   .today-commute{margin-bottom:12px}
   .today-body{padding:10px 14px 12px}
   .today-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
@@ -1013,6 +1037,92 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
+<!-- ============= commute departure calculation (offline) ============= -->
+<script id="vre-leave-by">
+(function (g) {
+  "use strict";
+  // Forecast a leave time from a confirmed commute. No polling, alarms or background work.
+  const EAST = "America/New_York";
+  const fmt = new Intl.DateTimeFormat("en-US", { timeZone: EAST, year: "numeric",
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const parts = ms => Object.fromEntries(fmt.formatToParts(new Date(ms)).map(p => [p.type, p.value]));
+  // Convert an Eastern wall clock to an epoch even when the Android/device timezone differs.
+  // Commute trains don't depart in the ambiguous fall-back 01:00 hour.
+  function easternMinute(now, minute) {
+    const p = parts(now), wall = Date.UTC(+p.year, +p.month - 1, +p.day, 0, minute);
+    let guess = wall + 5 * 3600000;
+    for (let i = 0; i < 4; i++) {
+      const s = parts(guess);
+      const read = Date.UTC(+s.year, +s.month - 1, +s.day, +s.hour, +s.minute);
+      guess += wall - read;
+    }
+    return guess;
+  }
+  const finite = x => typeof x === "number" && Number.isFinite(x);
+  function calculate(profile, trainNumber, core, liveByTrip, history, now) {
+    if (!profile || !core || !finite(now) || !core.isServiceDay(new Date(now)))
+      return { state: "no-service" };
+    const trip = core.SCHEDULE.trips.find(t => String(t.num) === String(trainNumber)
+      && t.stops.findIndex(s => s[0] === profile.from) >= 0
+      && t.stops.findIndex(s => s[0] === profile.to) > t.stops.findIndex(s => s[0] === profile.from));
+    if (!trip || !profile.preferredTrains?.includes(String(trainNumber)))
+      return { state: "invalid-train" };
+    const key = core.serviceDateKey(now);
+    if (core.SCHEDULE.reducedService.includes(key) && !core.SCHEDULE.sTrains.has(trip.num))
+      return { state: "no-service" };
+    const boardingIndex = trip.stops.findIndex(s => s[0] === profile.from);
+    const scheduled = easternMinute(now, trip.stops[boardingIndex][1]);
+    const travel = Number(profile.travelMinutes), platform = Number(profile.platformMinutes),
+      buffer = Number(profile.bufferMinutes);
+    if (![travel, platform, buffer].every(n => Number.isInteger(n) && n >= 0) ||
+        travel + platform <= 0)
+      return { state: "needs-travel-time", scheduled };
+    const lead = travel + platform + buffer;
+    const live = liveByTrip?.[trip.trip] || null;
+    const fresh = live && !live.ghost && !live.signalLost && finite(live.ts) &&
+      live.ts <= now + 60000 && now - live.ts <= 5 * 60000;
+    const liveStop = fresh ? live.stops?.find(s => s.code === profile.from) : null;
+    const latestEta = finite(liveStop?.time) ? liveStop.time : null;
+    const nextIndex = fresh ? live.stops?.findIndex(s => s.code === live.nextStop) : -1;
+    const boardLiveIndex = fresh ? live.stops?.findIndex(s => s.code === profile.from) : -1;
+    const passed = fresh && nextIndex > boardLiveIndex && boardLiveIndex >= 0;
+    const positive = latestEta == null ? 0 : Math.max(0, latestEta - scheduled);
+    const recent = (Array.isArray(history?.[trip.trip]) ? history[trip.trip] : [])
+      .filter(s => Array.isArray(s) && finite(s[0]) && finite(s[1])
+        && s[0] <= now + 60000 && now - s[0] <= 12 * 60000)
+      .sort((a, b) => a[0] - b[0]);
+    const last = recent.at(-1), prior = recent.slice(0,-1).reverse().find(s =>
+      last && last[0] - s[0] >= 60000 && last[0] - s[0] <= 10 * 60000);
+    const deviation = finite(live?.schedDev) ? live.schedDev / 60000 : NaN;
+    // Avoid later departure advice from a single/deteriorating/stale GTFS fix.
+    const stableDelay = positive >= 2 * 60000 && positive <= 30 * 60000 &&
+      prior && last && last[1] >= 2 && prior[1] >= 2 &&
+      Math.abs(last[1] - prior[1]) <= 1 &&
+      last[1] >= prior[1] - 0.25 &&
+      finite(deviation) && Math.abs(last[1] - deviation) <= 1.5 &&
+      Math.abs(positive / 60000 - deviation) <= 2 &&
+      now - last[0] <= 4 * 60000;
+    let departure = scheduled, confidence = "schedule";
+    if (fresh && latestEta != null && latestEta < scheduled) {
+      departure = latestEta;
+      confidence = "earlier-live";
+    } else if (fresh && stableDelay) {
+      // Maximum later leave shift is 10 min, even for larger predicted delays.
+      departure += Math.min(positive, 10 * 60000);
+      confidence = "stable-delay";
+    } else if (fresh && positive > 0) confidence = "delay-unconfirmed";
+    const leaveBy = departure - lead * 60000;
+    const remaining = Math.ceil((leaveBy - now) / 60000);
+    return { state: passed || now > departure + 60000 ? "departed"
+      : remaining <= 0 ? "leave-now" : "upcoming",
+      confidence, train: String(trip.num), boarding: profile.from, scheduled,
+      predicted: latestEta, departure, leaveBy, remaining, leadMinutes: lead,
+      liveFresh: !!fresh };
+  }
+  g.VRELeaveBy = Object.freeze({ calculate, easternMinute });
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
 <!-- ============= app ============= -->
 <script id="vre-app">
 (function () {
@@ -1353,7 +1463,7 @@
             h("input", { type: "checkbox", checked: draft.days.includes(day),
               onChange: e => checkDay(day, e.target.checked) }), label))),
         h("div", { className: "meta" },
-          "Android check-in reminders are optional and local. Confirming a train does not yet activate live leave-time alerts or background monitoring."),
+          "Android check-ins are optional. Selecting a train shows a leave-by estimate while the app is open; automatic departure alerts and background monitoring aren't enabled yet."),
         error ? h("div", { className: "stale-note", role: "alert" }, error) : null,
         h("div", { className: "row", style: { gap: 8 } },
           h("button", { className: "btn", onClick: save }, "Save commute"),
@@ -1364,16 +1474,76 @@
       ));
   }
 
+  /* Read-only leave estimate for an explicitly chosen train; never activates monitoring. */
+  function LeaveByCard({ profile, train, forecast }) {
+    const time = ms => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York",
+      hour: "numeric", minute: "2-digit" }).format(new Date(ms));
+    if (forecast.state === "needs-travel-time") return html`
+      <div className="leave-by-card">
+        <strong>Train ${train} · travel time needed</strong>
+        <div className="meta">Set the minutes to reach the platform in Preferences → Advanced Commute.</div>
+      </div>`;
+    if (forecast.state === "no-service" || forecast.state === "invalid-train") return html`
+      <div className="leave-by-card"><div className="meta">
+        This train isn't scheduled for your saved commute today.
+      </div></div>`;
+    const departed = forecast.state === "departed";
+    const urgent = forecast.state === "leave-now";
+    const confidence = forecast.confidence === "stable-delay"
+      ? "Delay verified across updates · departure buffer capped at 10 min"
+      : forecast.confidence === "earlier-live"
+        ? "Earlier live prediction · leave time moved forward"
+        : forecast.confidence === "delay-unconfirmed"
+          ? "Train appears delayed, but keep the original leave time until confirmed"
+          : "Timetable-based leave time · live delays not yet verified";
+    return html`
+      <div className="leave-by-card" aria-label=${"Leave-by estimate for train " + train}>
+        <div className="leave-by-label">${departed ? "Departure time passed" : urgent ? "Leave now for your station" : "Leave for your station by"}</div>
+        <div className="leave-by-time" aria-label=${"Recommended leave time: " + time(forecast.leaveBy)}>
+          ${time(forecast.leaveBy)}
+        </div>
+        <div className="meta">Train ${train} departs ${time(forecast.scheduled)} ·
+          ${forecast.leadMinutes} min travel + buffer
+        </div>
+        ${!departed && !urgent && html`<div className="leave-by-remaining">
+          ${forecast.remaining} min until you should leave
+        </div>`}
+        <div className="meta leave-by-confidence">${confidence}</div>
+        <div className="meta">Calculated while the app is open. Automatic leave-time notifications are coming later.</div>
+      </div>`;
+  }
+
+  function DailyTravelControl({ profile, override, onChange }) {
+    const current = override == null ? profile.travelMinutes : override;
+    return html`
+      <div className="daily-travel-control">
+        <label for=${"travel-" + profile.id}>Travel time today</label>
+        <input id=${"travel-" + profile.id} type="number" min="0" max="180"
+          step="1" inputMode="numeric" value=${current}
+          onChange=${e => {
+            const n = Number(e.target.value);
+            if (e.target.value === "") { onChange(null); return; }
+            if (Number.isInteger(n) && n >= 0 && n <= 180) onChange(n);
+          }} />
+        <span>min</span>
+        ${override != null && html`
+          <button type="button" className="btn ghost" onClick=${() => onChange(null)}>
+            Reset
+          </button>`}
+      </div>`;
+  }
+
   /* Android-only, device-local commute choice. This does NOT start ride monitoring. */
-  function TodayCommute({ profiles, day, selectedId, onSelect, onAction }) {
+  function TodayCommute({ profiles, day, selectedId, onSelect, onAction, now, liveByTrip, samples, overrides, onTravelChange }) {
     if (!profiles.length) return null;
-    const now = Date.now();
     const dateKey = VRECore.serviceDateKey(now);
     if (!isServiceDay(new Date(now))) return null;
     const selected = profiles.find(p => p.id === selectedId);
-    const skippedDay = !!day?.skippedDay;
-    const planned = day?.planned || {};
-    const skipped = day?.skippedTrips || {};
+    const skippedDay = !!(day?.date === dateKey && day?.skippedDay);
+    // An Android bridge response from yesterday must never show today's old plans.
+    const todayState = day?.date === dateKey ? day : null;
+    const planned = todayState?.planned || {};
+    const skipped = todayState?.skippedTrips || {};
     const easternClock = Object.fromEntries(serviceClock.formatToParts(new Date(now))
       .map(p => [p.type, p.value]));
     const currentMinutes = Number(easternClock.hour) * 60 + Number(easternClock.minute);
@@ -1386,6 +1556,52 @@
       return String(hour % 12 || 12) + ":" + String(minutes % 60).padStart(2, "0") +
         (hour < 12 ? " AM" : " PM");
     };
+    // No active plan: keep the main screen focused on next departures.
+    // Full multi-profile choices only open after a direct "Plan train" action.
+    if (selectedId === null) {
+      const upcoming = profiles.map(p => {
+        const train = planned[p.id];
+        if (!train || skipped[p.id]) return null;
+        const forecast = VRELeaveBy.calculate({
+          ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+        }, train, VRECore, liveByTrip, samples, now);
+        return { profile: p, train, forecast };
+      }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
+        .sort((a, b) => (a.forecast.leaveBy ?? Infinity) - (b.forecast.leaveBy ?? Infinity));
+      if (!upcoming.length) return null;
+      const next = upcoming[0], p = next.profile, f = next.forecast;
+      const clock = ms => new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
+      }).format(new Date(ms));
+      return html`
+        <div className="card today-compact" aria-label="Upcoming planned commute">
+          <div className="card-h">Planned commute · Train ${next.train}</div>
+          <div className="today-compact-body">
+            <div className="today-compact-top">
+              <div>
+                <div className="meta">${p.name} · ${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
+                <div className="today-compact-time">${f.state === "needs-travel-time"
+                  ? "Travel time needed" : f.state === "leave-now"
+                    ? "Leave now" : "Leave by " + clock(f.leaveBy)}</div>
+                ${f.state !== "needs-travel-time" && html`
+                  <div className="meta">Train at ${clock(f.scheduled)} · ${f.remaining > 0
+                    ? f.remaining + " min until leave time" : "departure approaching"}</div>`}
+              </div>
+              <button className="btn ghost today-plan-edit" onClick=${() => onSelect(p.id)}>
+                Change train
+              </button>
+            </div>
+            ${f.confidence === "delay-unconfirmed" && html`
+              <div className="meta">Delay unconfirmed — keeping your scheduled leave time.</div>`}
+            <${DailyTravelControl} profile=${p} override=${overrides[p.id]}
+              onChange=${value => onTravelChange(p.id, value)} />
+            ${upcoming.length > 1 && html`
+              <button className="btn ghost" onClick=${() => onSelect("")}>
+                View ${upcoming.length - 1} other planned commute(s)
+              </button>`}
+          </div>
+        </div>`;
+    }
     return html`
       <div className="card today-commute">
         <div className="card-h">Today's commute</div>
@@ -1394,22 +1610,30 @@
             <div className="meta">You marked today as a non-riding day. You can change that below.</div>`
           : null}
           ${selected ? html`
-            <button className="btn ghost today-back" onClick=${() => onSelect(null)}>‹ All commutes</button>
+            <button className="btn ghost today-back" onClick=${() => onSelect("")}>‹ All commutes</button>
             <div className="today-head">
               <strong>${selected.name}</strong>
               <span className="meta">${STATIONS[selected.from].name} → ${STATIONS[selected.to].name}</span>
             </div>
             ${options.filter(t => t.departureMinutes >= currentMinutes - 2).length
-              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => html`
+              ? options.filter(t => t.departureMinutes >= currentMinutes - 2).map(t => {
+                const leave = VRELeaveBy.calculate({
+                  ...selected, travelMinutes: overrides[selected.id] ?? selected.travelMinutes
+                }, t.num, VRECore, liveByTrip, samples, now);
+                return html`
                 <button key=${t.num} className="today-train" onClick=${() => {
                   onAction("plan", selected.id, t.num); onSelect(null);
                 }}>
-                  <span>Train ${t.num}</span>
+                  <span>Train ${t.num}<small className="today-train-leave">${leave.leaveBy != null ?
+                    (leave.state === "departed" ? "Departure passed" : "Leave by " + new Intl.DateTimeFormat("en-US", {
+                      timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
+                    }).format(new Date(leave.leaveBy))) : "Set travel time in Advanced Commute"}</small></span>
                   <span>${timeLabel(t.departureMinutes)} <span aria-hidden="true">›</span></span>
-                </button>`)
+                </button>`;
+              })
               : html`<div className="meta">No preferred departures remain today.</div>`}
             <div className="meta today-footnote">
-              Choosing a train saves today's plan locally. Live leave-time alerts come later.
+              Choosing a train shows a leave-by estimate. Live background reminders are not enabled yet.
             </div>
             <button className="btn ghost" onClick=${() => { onAction("skipTrip", selected.id); onSelect(null); }}>
               Skip this trip
@@ -1421,7 +1645,13 @@
                   <strong>${p.name}</strong>
                   <div className="meta">${STATIONS[p.from].name} → ${STATIONS[p.to].name}</div>
                   ${planned[p.id]
-                    ? html`<div className="meta">Train ${planned[p.id]} planned · no live alerts yet</div>`
+                    ? html`
+                      <${LeaveByCard} profile=${p} train=${planned[p.id]}
+                        forecast=${VRELeaveBy.calculate({
+                          ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+                        }, planned[p.id], VRECore, liveByTrip, samples, now)} />
+                      <${DailyTravelControl} profile=${p} override=${overrides[p.id]}
+                        onChange=${value => onTravelChange(p.id, value)} />`
                     : skipped[p.id]
                       ? html`<div className="meta">Skipped today</div>`
                       : null}
@@ -1433,9 +1663,12 @@
                   ${planned[p.id] ? "Change" : "Choose train"}
                 </button>
               </div>`)}
-            <button className="btn ghost today-skip" onClick=${() => onAction("skipToday", "")}>
-              Not riding today
-            </button>`}
+            <div className="today-actions">
+              <button className="btn ghost today-skip" onClick=${() => {
+                onAction("skipToday", ""); onSelect(null);
+              }}>Not riding today</button>
+              <button className="btn ghost" onClick=${() => onSelect(null)}>Done</button>
+            </div>`}
         </div>
       </div>`;
   }
@@ -1481,7 +1714,7 @@
               <div className="card-h">Advanced Commute</div>
               <p className="pref-description">
                 Choose preferred trains and optional local daily check-ins.
-                Live leave-time alerts and background tracking are not active yet.
+                Leave-by estimates appear after you pick a train. Automatic background departure alerts aren't active yet.
               </p>
             </div>
             <${CommuteProfiles} record=${commutes} legacyRoute=${route} onSave=${onSaveCommutes} />`}
@@ -1489,7 +1722,7 @@
       </section>`;
   }
 
-  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive }) {
+  function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive, onPlan }) {
     const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
       [from, to, Math.floor(now / 15000), liveByTrip]);
     const service = isServiceDay(new Date(now));
@@ -1498,7 +1731,9 @@
       <div className="card">
         <div className="card-h row" style=${{ paddingRight: 10 }}>
           <span>Next to ${STATIONS[to].name}${auto ? "" : " · flipped"}</span>
-          <span style=${{ display: "flex", gap: 2 }}>
+          <span style=${{ display: "flex", gap: 4, alignItems: "center" }}>
+            ${onPlan && html`<button className="btn ghost commute-plan-trigger"
+              onClick=${onPlan}>Plan train</button>`}
             <button className="btn ghost" style=${{ padding: "4px 8px" }} onClick=${onFlip}
               aria-label="Swap direction"><${FlipIcon} /></button>
           </span>
@@ -2356,6 +2591,18 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [travelOverrides, setTravelOverrides] = useState(() => lsGet("vre-leave-day-overrides-v1", null));
+    const todayKey = VRECore.serviceDateKey(now);
+    const todayTravel = travelOverrides?.date === todayKey ? travelOverrides.values || {} : {};
+    const saveTravelOverride = (profileId, value) => {
+      if (value != null && (!Number.isInteger(value) || value < 0 || value > 180)) return;
+      const update = { ...todayTravel };
+      if (value == null) delete update[profileId];
+      else update[profileId] = value;
+      const record = { date: VRECore.serviceDateKey(Date.now()), values: update };
+      lsSet("vre-leave-day-overrides-v1", record);
+      setTravelOverrides(record);
+    };
     const [commuteDay, setCommuteDay] = useState(null);
     const [planProfile, setPlanProfile] = useState(() => {
       const requested = new URLSearchParams(window.location.search).get("plan");
@@ -2705,6 +2952,14 @@
     // line-color theming while riding: tint the accent to your line
     const accent = myTrip && myTrain ? { "--accent": LINE_COLOR[myTrain.line] } : null;
 
+    const todayCard = !myTrip && tab !== "preferences" &&
+      typeof window.VreCommutePrefs !== "undefined" ? html`
+        <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+          day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+          now=${now} liveByTrip=${liveByTrip} samples=${devlog}
+          overrides=${todayTravel} onTravelChange=${saveTravelOverride}
+          onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />` : null;
+
     return html`
       <div style=${accent}>
         <div className="hdr">
@@ -2761,10 +3016,7 @@
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
 
-        ${tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
-          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
-            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
-            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
+        ${planProfile !== null && todayCard}
 
         ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
@@ -2778,6 +3030,8 @@
                     auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
                     now=${now} liveByTrip=${liveByTrip}
                     onFlip=${() => setFlipDir(!showReturn)}
+                    onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
+                      ? () => setPlanProfile("") : null}
                     onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
                 })()
               : html`<div className="card">
@@ -2790,6 +3044,8 @@
                   </div>
                 </div>`}
           </div>`}
+
+        ${planProfile === null && todayCard}
 
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
@@ -2856,7 +3112,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();

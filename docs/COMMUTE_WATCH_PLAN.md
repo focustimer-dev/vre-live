@@ -35,6 +35,10 @@ Save commuter routines once, confirm intent daily, and only monitor a train afte
 
 ## Phase C: Predicted departure and active session UI
 
+**Phase C1 implementation (this PR):** Add an offline, purely client-side leave-by calculator backed by explicit daily train selection, the saved approach and platform minutes, and an Eastern-time conversion that survives DST and differing device time zones. The in-app Today’s Commute card shows a countdown/leave-now prompt for the chosen train, and selected-train choices preview their leave-by times. The clock uses scheduled departure unless fresh GPS and at least two stable, spaced delay observations justify moving the leave recommendation later, capped at ten minutes. Fresh evidence of an earlier departure moves the leave-by time earlier immediately. Stale, single-sample and recovering delay observations **never** move the recommended leave later. An unavailable train, service calendar exclusion, missing travel-time setup or already-departed train are shown explicitly. No automatic alerts, Android background alarms, Cloudflare sessions or polling are introduced by Phase C1; Phase C2/Phase D add demand-driven alert delivery with distinct review gates.
+
+
+
 - Keep **Planning to take train** distinct from **I'm riding this train**.
 - Leave-by = predicted platform departure − approach travel − platform access − safety buffer.
 - Only shift departure later on fresh, stable, position-backed evidence of delay; never rely on stale ETAs for a delayed leave recommendation.
