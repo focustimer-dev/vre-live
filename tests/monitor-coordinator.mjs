@@ -165,6 +165,11 @@ try {
   assert.equal(fcmCalls,2,"each opted-in device gets one leave-now notification");
   assert.equal(Object.keys(await coordinator.load()).length,0,"delivered watches are removed");
   assert.equal(liveAlarm,null,"successful final delivery deletes the coordinator alarm");
+  Date.now=()=>when("2026-11-16T12:01:00Z");
+  assert.equal((await addWatch("owner_0123456789","watch_0123456789")).status,200,
+    "replayed registration does not resurrect a delivered watch");
+  assert.equal(Object.keys(await coordinator.load()).length,0,
+    "success tombstone blocks duplicate leave-now alert after network retries");
   await coordinator.alarm();
   assert.equal(sharedFeedCalls,2,"no next-minute polling after all deliveries");
   assert.equal(fcmCalls,2,"alarm retries cannot redeliver an already removed watch");
