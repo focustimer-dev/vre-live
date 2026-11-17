@@ -2011,7 +2011,7 @@
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
     }).format(new Date(ms));
-    const visibleRows = planned ? rows : rows.slice(1);
+    const visibleRows = rows;
     return html`
       <div className="card commute-focus" aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
         <div className="commute-focus-content">
@@ -2068,7 +2068,7 @@
                   onChange=${value => onTravelChange(planned.profile.id, value)} />`}
               ${visibleRows.length > 0 && html`
                 <div className="commute-extra-label">
-                  ${planned ? "Other departures" : "Later departures"}
+                  ${planned ? "Other departures" : "Departure details"}
                 </div>
                 ${visibleRows.map(r => html`
                   <button key=${r.trip} className="srow" aria-label=${`Choose train ${r.num}`}
