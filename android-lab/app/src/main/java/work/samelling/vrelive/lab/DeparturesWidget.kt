@@ -106,7 +106,7 @@ internal class Timetable(context: Context) {
         val etaAt = ride.optLong("eta")
         val remaining = etaAt - now.toInstant().toEpochMilli()
         val eta = if (freshPosition && etaAt > 0 && remaining >= -60000L)
-            "${maxOf(0, (remaining + 59999L) / 60000L)}m" else "ETA —"
+            "${maxOf(0L, (remaining + 59999L) / 60000L)}m" else "ETA —"
         val next = ride.optString("next")
         val nextLabel = if (stations.has(next)) "Next: ${stations.getString(next)}"
             else "Next stop unavailable"
