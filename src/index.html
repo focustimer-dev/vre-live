@@ -42,24 +42,30 @@
   /* Stable semantic tokens; Electric Stars is dark-first for new installs.
      Surfaces ~60% abyss / ~30% petrol+plum, with cobalt/orchid/lilac accents.
      Keep small text AA readable: cobalt is NOT a body-text color. */
+  /* Electric Stars / Night Signal: restrained navy surfaces and one lilac action. */
   :root, :root[data-theme="electric-stars"] {
     color-scheme: dark;
-    --bg:#011629; --bg-glow:rgba(58,116,219,.10);
-    --card:#0C426D; --card-2:#372B68; --card-elevated:#273659;
-    --card-glow:rgba(190,116,205,.13); --card-glint:rgba(246,184,251,.52);
-    --card-shadow:rgba(0,12,26,.18); --nav:#372B68;
-    --border:rgba(246,184,251,.32); --border-soft:rgba(246,184,251,.19);
-    --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB; --meta-on-bg:#BE74CD;
-    --red:#FFADB8; --blue:#A3C8FF; --green:#BAF6DA; --amber:#FFE09A;
+    /* Preserve all six Electric Stars ingredients, but assign each a single job. */
+    --night-midnight:#011629; --night-petrol:#0C426D; --night-plum:#372B68;
+    --night-cobalt:#3A74DB; --night-orchid:#BE74CD; --night-lilac:#F6B8FB;
+    --night-display:#F3F5FA; --night-ink:#E4EAF2; --night-orchid-readable:#D4A0DF;
+    --bg:#011629; --bg-glow:rgba(58,116,219,.055);
+    --card:#102D49; --card-2:#193952; --card-elevated:#0C2742;
+    --card-glow:rgba(58,116,219,.04); --card-glint:rgba(166,203,255,.16);
+    --card-shadow:rgba(0,10,22,.30); --nav:#0C2742;
+    --border:rgba(166,203,255,.18); --border-soft:rgba(166,203,255,.11);
+    --fg:#E4EAF2; --muted:#B8C9DC; --muted-2:#C7D4E4;
+    --meta-ink:#D4A0DF; --meta-on-bg:#D4A0DF;
+    --red:#FF9BA7; --blue:#A6CBFF; --green:#BAF6DA; --amber:#FFE09A;
     --accent:#3A74DB; --action-bg:#F6B8FB; --action-fg:#011629;
-    --action-border:#3A74DB; --selected-bg:#F6B8FB; --selected-fg:#011629;
-    --sheet-bg:rgba(12,66,109,.96); --surface-hover:rgba(246,184,251,.09);
-    --banner-bg:rgba(255,224,154,.10); --danger-bg:rgba(255,173,184,.12);
-    --map-label-major:#F6B8FB; --map-ink:#011629; --map-highlight:#F6B8FB;
-    --map-stroke:#F6B8FB; --line-F:#FF9BA7; --line-M:#A6CBFF;
-    --line-ink:#011629; --line-separator:rgba(246,184,251,.22);
-    --accent-outline:#BE74CD; --ring:rgba(246,184,251,.8);
-    --tab-surface:#372B68; --focus:#F6B8FB; --pulse:rgba(186,246,218,.45);
+    --action-border:#F6B8FB; --selected-bg:#372B68; --selected-fg:#E4EAF2;
+    --sheet-bg:rgba(12,39,66,.98); --surface-hover:rgba(166,203,255,.09);
+    --banner-bg:rgba(255,224,154,.08); --danger-bg:rgba(255,155,167,.10);
+    --map-label-major:#E4EAF2; --map-ink:#011629; --map-highlight:#F6B8FB;
+    --map-stroke:#A6CBFF; --line-F:#FF9BA7; --line-M:#A6CBFF;
+    --line-ink:#011629; --line-separator:rgba(166,203,255,.14);
+    --accent-outline:#D4A0DF; --ring:rgba(246,184,251,.80);
+    --tab-surface:#0C2742; --focus:#F6B8FB; --pulse:rgba(186,246,218,.30);
     --radius:16px;
     /* type scale: micro / secondary / row / subhead / title / hero */
     --fs-1:11px; --fs-2:13px; --fs-3:14.5px; --fs-4:19px; --fs-5:24px; --fs-hero:52px;
@@ -577,6 +583,133 @@
   .srow.plan-choice.chosen{background:var(--surface-hover);box-shadow:inset 3px 0 var(--focus)}
   .srow.plan-choice:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
   .commute-plan-confirm{min-height:44px;margin-top:12px}
+  /*
+   * Electric Stars / Night Signal
+   * Quiet hierarchy: midnight canvas, flat rail-map instrument, a single
+   * featured-commute gradient, plum only on selected navigation, and one
+   * lilac action. Scoped to Electric Stars so Nord Light is unchanged.
+   */
+  :root[data-theme="electric-stars"] body{
+    background:radial-gradient(ellipse at 80% 0%,var(--bg-glow),transparent 46%),var(--bg);
+    background-attachment:fixed;
+  }
+  :root[data-theme="electric-stars"] ::selection{
+    background:var(--night-plum);color:var(--night-display);
+  }
+  :root[data-theme="electric-stars"] input,
+  :root[data-theme="electric-stars"] select,
+  :root[data-theme="electric-stars"] textarea{caret-color:var(--night-lilac)}
+  :root[data-theme="electric-stars"] .hdr h1{
+    color:var(--night-display);letter-spacing:-.025em;font-weight:750}
+  :root[data-theme="electric-stars"] .hdr h1 svg{color:var(--night-orchid)}
+  :root[data-theme="electric-stars"] .hdr .sub{color:var(--muted)}
+  :root[data-theme="electric-stars"] .tabs{
+    background:var(--tab-surface);border-color:transparent;
+    padding:4px;margin-bottom:10px}
+  :root[data-theme="electric-stars"] .tabs button{
+    color:var(--muted);font-weight:650}
+  :root[data-theme="electric-stars"] .tabs button.on{
+    background:var(--night-plum);color:var(--night-display);
+    box-shadow:inset 0 -2px 0 var(--night-orchid)}
+  :root[data-theme="electric-stars"] .tabs button:focus-visible{
+    outline:2px solid var(--focus);outline-offset:-3px}
+  :root[data-theme="electric-stars"] .card{
+    background:var(--card);border:1px solid var(--border-soft);
+    box-shadow:none;border-radius:var(--radius)}
+  :root[data-theme="electric-stars"] .card-h{
+    color:var(--muted);font-weight:650;letter-spacing:.065em}
+  :root[data-theme="electric-stars"] .commute-focus{
+    background:linear-gradient(158deg,var(--card-elevated),var(--card));
+    border-color:transparent;
+    box-shadow:0 9px 24px var(--card-shadow)}
+  :root[data-theme="electric-stars"] .commute-focus-content{
+    padding:16px 18px 14px}
+  :root[data-theme="electric-stars"] .commute-focus-label{
+    color:var(--meta-ink);font-weight:700;letter-spacing:.055em}
+  :root[data-theme="electric-stars"] .commute-focus-headline{
+    color:var(--night-display);font-variant-numeric:tabular-nums;
+    font-weight:800;letter-spacing:-.03em}
+  :root[data-theme="electric-stars"] .commute-focus-headline.empty{
+    color:var(--night-display)}
+  :root[data-theme="electric-stars"] .commute-focus-train{
+    color:var(--night-lilac);font-weight:700}
+  :root[data-theme="electric-stars"] .commute-focus-route{color:var(--muted)}
+  :root[data-theme="electric-stars"] .commute-focus-actions{
+    margin-top:12px}
+  :root[data-theme="electric-stars"] .commute-focus-actions .commute-options{
+    background:var(--action-bg);color:var(--action-fg);
+    border-color:transparent;min-height:44px;font-weight:750;
+    box-shadow:none}
+  :root[data-theme="electric-stars"] .commute-focus-actions .commute-options[aria-expanded="true"]{
+    background:var(--card-2);color:var(--fg);
+    border:1px solid var(--border-soft)}
+  :root[data-theme="electric-stars"] .commute-extra{
+    border-top-color:var(--line-separator);margin-top:13px;padding-top:9px}
+  :root[data-theme="electric-stars"] .commute-extra-label{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .srow.plan-choice.chosen{
+    background:var(--surface-hover);
+    box-shadow:inset 0 0 0 1px var(--accent-outline)}
+  :root[data-theme="electric-stars"] .srow .mid .l1{
+    color:var(--fg);font-weight:650}
+  :root[data-theme="electric-stars"] .srow .mid .l2{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .commute-plan-travel{
+    border-top-color:var(--line-separator)}
+  :root[data-theme="electric-stars"] .commute-plan-travel-label{
+    color:var(--fg);font-weight:650}
+  :root[data-theme="electric-stars"] .commute-plan-travel-stepper{
+    background:var(--card-elevated);border-color:var(--border)}
+  :root[data-theme="electric-stars"] .commute-plan-step{
+    color:var(--fg)}
+  :root[data-theme="electric-stars"] .commute-plan-travel-value input{
+    color:var(--night-display)}
+  :root[data-theme="electric-stars"] .commute-plan-confirm{
+    background:var(--action-bg);color:var(--action-fg);
+    border-color:transparent;font-weight:750}
+  :root[data-theme="electric-stars"] .commute-extra .marey-wrap{
+    border-top-color:var(--line-separator)}
+  :root[data-theme="electric-stars"] .commute-extra .marey-toggle{
+    color:var(--muted);font-weight:600}
+  :root[data-theme="electric-stars"] .system-map-card{
+    background:var(--card);border:0;box-shadow:none}
+  :root[data-theme="electric-stars"] .system-map-card .card-h{
+    padding:12px 14px 0;color:var(--muted)}
+  :root[data-theme="electric-stars"] .system-map-card .map-wrap{
+    padding:2px 3px 8px}
+  :root[data-theme="electric-stars"] .map-legend{
+    color:var(--muted)}
+  :root[data-theme="electric-stars"] .badge{
+    background:transparent;border-color:var(--border-soft)}
+  :root[data-theme="electric-stars"] .btn{
+    box-shadow:none}
+  :root[data-theme="electric-stars"] .btn.outline{
+    border-color:var(--border);color:var(--fg)}
+  :root[data-theme="electric-stars"] .chip.on{
+    background:var(--selected-bg);color:var(--selected-fg);
+    border-color:var(--selected-bg)}
+  :root[data-theme="electric-stars"] .sheet{
+    background:var(--sheet-bg);backdrop-filter:none;
+    -webkit-backdrop-filter:none;border-color:var(--border-soft)}
+  :root[data-theme="electric-stars"] .journey-views{
+    background:var(--card-elevated)}
+  :root[data-theme="electric-stars"] .journey-views button[aria-pressed="true"]{
+    background:var(--night-plum);color:var(--night-display)}
+  :root[data-theme="electric-stars"] .journey-icon{
+    color:var(--night-orchid-readable)}
+  :root[data-theme="electric-stars"] .theme-option[aria-pressed="true"]{
+    border-color:var(--night-orchid-readable);
+    box-shadow:0 0 0 1px var(--night-orchid-readable)}
+  :root[data-theme="electric-stars"] .theme-swatch.electric{
+    background:linear-gradient(155deg,var(--card),var(--bg));
+    color:var(--night-lilac);
+    box-shadow:inset 0 0 0 1px var(--night-petrol)}
+  @media(max-width:360px){
+    :root[data-theme="electric-stars"] .commute-focus-content{
+      padding:14px 14px 12px}
+    :root[data-theme="electric-stars"] .system-map-card .map-wrap{
+      padding:1px 2px 6px}
+  }
 </style>
 </head>
 <body>
@@ -3872,7 +4005,7 @@ ${lockError}
               lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
             }} />`
         : tab === "map" ? html`
-          <div className="card">
+          <div className="card system-map-card">
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
               ${data

@@ -2,12 +2,12 @@
 <resources>
     <!-- Native mirrors of the PWA semantic color tokens in src/index.html. -->
     <color name="vre_electric_bg">#011629</color>
-    <color name="vre_electric_card">#0C426D</color>
-    <color name="vre_electric_nav">#372B68</color>
-    <color name="vre_electric_fg">#F6B8FB</color>
-    <color name="vre_electric_muted">#E2D8F4</color>
+    <color name="vre_electric_card">#102D49</color>
+    <color name="vre_electric_nav">#0C2742</color>
+    <color name="vre_electric_fg">#E4EAF2</color>
+    <color name="vre_electric_muted">#B8C9DC</color>
     <color name="vre_electric_cobalt">#3A74DB</color>
-    <color name="vre_electric_border">#BE74CD</color>
+    <color name="vre_electric_border">#365670</color>
     <color name="vre_electric_line_f">#FF9BA7</color>
     <color name="vre_electric_line_m">#A6CBFF</color>
 
