@@ -2733,8 +2733,11 @@
       if (!VREAlerts.save(localStorage, settings)) return false;
       const clean = VREAlerts.normalize(settings);
       setAlertPrefs(clean);
+      const prompt = clean.enabled && (!alertPrefs.enabled ||
+        (clean.checkIns && !alertPrefs.checkIns) ||
+        (clean.arrival && !alertPrefs.arrival));
       nativeCommute({ type: "sync", version: 1, profiles: commutes.profiles,
-        alerts: clean, prompt: clean.enabled });
+        alerts: clean, prompt });
       return true;
     };
     const [travelOverrides, setTravelOverrides] = useState(() => lsGet("vre-leave-day-overrides-v1", null));
