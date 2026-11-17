@@ -279,6 +279,18 @@ class MainActivity : Activity() {
             reply.postMessage(JSONObject().put("paired",CommutePushClient.paired(this)).toString())
             return
         }
+        if (action == "unpair") {
+            AlertDialog.Builder(this)
+                .setTitle("Unpair this phone?")
+                .setMessage("Leave-now notifications will stop. Pairing again requires a new one-time code.")
+                .setNegativeButton("Keep paired", null)
+                .setPositiveButton("Unpair") { _, _ ->
+                    CommutePushClient.disconnect(this)
+                    reply.postMessage(JSONObject().put("paired",false).toString())
+                    Toast.makeText(this,"Phone unpaired",Toast.LENGTH_SHORT).show()
+                }.show()
+            return
+        }
         if (action != "pair") return
         if (!CommuteCheckIns.enabled(this)) {
             Toast.makeText(this, "Enable Notifications before pairing",Toast.LENGTH_LONG).show()
