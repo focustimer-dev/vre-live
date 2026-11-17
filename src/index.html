@@ -2200,14 +2200,30 @@
       const n = travelOverride ?? candidateProfile?.travelMinutes;
       return Number.isInteger(n) && n > 0 ? n : 10;
     });
+    const [minutesDraft, setMinutesDraft] = useState(() => String(minutes));
     useEffect(() => {
       const n = travelOverride ?? candidateProfile?.travelMinutes;
-      setMinutes(Number.isInteger(n) && n > 0 ? n : 10);
+      const normalized = Number.isInteger(n) && n > 0 ? n : 10;
+      setMinutes(normalized);
+      setMinutesDraft(String(normalized));
     }, [candidateProfile?.id, travelOverride, fromStation, toStation]);
     useEffect(() => {
       setSelectedTrain(nextAdvanced?.today ? nextAdvanced.train : planned?.train || null);
     }, [candidateProfile?.id, fromStation, toStation, nextAdvanced?.train]);
     const selectedRow = planRows.find(row => row.num === selectedTrain);
+    const enteredMinutes = Number(minutesDraft);
+    const minutesValid = /^\d{1,3}$/.test(minutesDraft) &&
+      Number.isInteger(enteredMinutes) && enteredMinutes >= 1 && enteredMinutes <= 180;
+    const adjustMinutes = delta => {
+      const base = minutesValid ? enteredMinutes : minutes;
+      const next = Math.max(1, Math.min(180, base + delta));
+      setMinutes(next);
+      setMinutesDraft(String(next));
+    };
+    const restoreMinutes = () => {
+      if (!minutesValid) setMinutesDraft(String(minutes));
+      else setMinutesDraft(String(enteredMinutes));
+    };
     const forecast = planned?.forecast;
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
@@ -2216,9 +2232,9 @@
       timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric"
     }).format(new Date(dep));
     const confirm = () => {
-      if (!selectedRow || !Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
+      if (!selectedRow || !minutesValid) return;
       onPlanTrain({ profile: candidateProfile, from: fromStation, to: toStation,
-        train: String(selectedRow.num), today: !nextAdvanced || nextAdvanced.today }, minutes);
+        train: String(selectedRow.num), today: !nextAdvanced || nextAdvanced.today }, enteredMinutes);
       setShowDetails(false);
     };
     return html`
