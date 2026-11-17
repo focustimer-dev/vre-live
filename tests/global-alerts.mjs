@@ -63,8 +63,10 @@ assert.match(editor,/Check-ins & Alerts/);
 assert.match(editor,/onSaveAlerts=\$\{saveAlertPrefs\}/);
 assert.match(editor,/alerts: alertPrefs, prompt: false/,
   "editing profile never requests notification permission");
-assert.match(editor,/type: "sync", version: 1, profiles: commutes.profiles,[\s\S]*?alerts: clean, prompt: clean.enabled/,
+assert.match(editor,/type: "sync", version: 1, profiles: commutes.profiles,[\s\S]*?alerts: clean, prompt \}/,
   "global settings are persisted to Android");
+assert.match(editor,/const prompt = clean.enabled && \(!alertPrefs.enabled \|\|/,
+  "only newly enabled notification capabilities prompt for OS permission");
 assert.match(editor,/Arrival alerts when riding/);
 assert.match(editor,/autoArmRequested: !!\(androidRideAlert && alertPrefs\.enabled/,
   "new Android rides inherit global arrival setting");
