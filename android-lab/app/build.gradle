@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services'
 }
 
 android {
@@ -32,6 +33,9 @@ android {
 dependencies {
     implementation 'androidx.webkit:webkit:1.14.0'
     implementation 'org.mobilitydata:gtfs-realtime-bindings:0.0.8'
+    // FCM only. No Analytics dependency or automatic token enrollment.
+    implementation platform('com.google.firebase:firebase-bom:35.2.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
 
 def webAssets = rootProject.layout.projectDirectory.dir('web')
