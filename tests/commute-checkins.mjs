@@ -23,12 +23,12 @@ assert.equal(enabled.checkInEnabled, true, "explicit opt-in stored");
 assert.equal(VRECommutes.normalizeProfile({ ...morning, checkInEnabled: "true" }, VRECore).checkInEnabled,
   false, "only boolean true opts in");
 assert.ok(app.includes('window.VreCommutePrefs?.postMessage'), "native bridge is only used when available");
-assert.ok(app.includes('type: "sync", version: 1, profiles: next.profiles, prompt: true'),
-  "explicit Save synchronizes with native scheduler");
-assert.ok(app.includes('type: "sync", version: 1, profiles: commutes.profiles, prompt: false'),
-  "app startup does not request notification permission");
-assert.ok(app.includes('Select at least one train before enabling check-ins.'), "opt-in needs selected train");
-assert.match(app, /Daily check-in notifications are available in the Android app/, "PWA makes local-only limitation explicit");
+assert.match(app, /type: "sync", version: 1, profiles: next.profiles,[\s\S]*?alerts: alertPrefs, prompt: false/,
+  "profile saves preserve global notification policy without permission prompt");
+assert.match(app, /type: "sync", version: 1, profiles: commutes.profiles, alerts: alertPrefs, prompt: false/,
+  "app startup respects existing notification policy without permission prompt");
+assert.match(app, /function GlobalAlertSettings\(/, "notification preferences are global");
+assert.match(app, /Check-ins & Alerts/, "global notification panel is visible in preferences");
 assert.ok(app.includes('function TodayCommute('), "manual recovery/choice UI exists");
 assert.ok(app.includes('onAction("reactivate", p.id)'), "manual recovery from skip");
 assert.ok(app.includes('onAction("skipTrip", selected.id)'), "one-trip skip exists");
@@ -48,8 +48,11 @@ assert.match(activity, /VreCommutePrefs/, "native bridge installed");
 assert.match(activity, /CommuteCheckIns\.reschedule\(this\)/, "native alarms reconcile on app open");
 assert.match(activity, /requestPermissions\(arrayOf\(Manifest.permission.POST_NOTIFICATIONS\), 43\)/,
   "notifications permission requested only on explicit save");
-assert.match(native, /if \(!p\.optBoolean\("checkInEnabled"\)/, "unsaved/disabled routines cannot schedule");
-assert.match(native, /if \(!notificationsAllowed\(context\)\) return/, "permission gate before scheduling");
+assert.match(native, /if \(!notificationsAllowed\(context\) \|\| !checkInsEnabled\(context\)\) return/,
+  "global check-in preference gates scheduled notifications");
+assert.match(native, /legacyTimes/, "pre-existing check-in timing remains available during migration");
+assert.match(native, /if \(!notificationsAllowed\(context\) \|\| !checkInsEnabled\(context\)\) return/,
+  "native check-in scheduling requires global consent and Android permission");
 assert.match(native, /if \(!notIn\(data\.optJSONArray\("noService"\), key\)\) return false/,
   "calendar excludes no-service days");
 assert.match(native, /if \(date\.dayOfWeek\.value >= 6\) return false/,
