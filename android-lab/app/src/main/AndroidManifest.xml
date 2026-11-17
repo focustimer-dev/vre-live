@@ -14,6 +14,15 @@
         android:label="VRE Live Lab"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.VRELiveLab">
+        <!-- Do not create a Firebase registration until the user explicitly opts in. -->
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+        <service android:name=".CommuteFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"

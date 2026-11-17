@@ -1,0 +1,20 @@
+# PREVIEW-ONLY Worker; intentionally separate from the production vre-live Worker.
+# Never deploy until auth gateway, FCM token registration and device QA are complete.
+name = "vre-live-commute-monitor-preview"
+main = "src/commute-monitor-worker.js"
+compatibility_date = "2026-10-30"
+workers_dev = true
+
+# DO alarms replace cron for confirmed trips. No [[triggers]] or crons here.
+[[durable_objects.bindings]]
+name = "COMMUTE_MONITOR"
+class_name = "CommuteMonitorCoordinator"
+
+[[migrations]]
+tag = "monitor_sqlite_v1"
+new_sqlite_classes = ["CommuteMonitorCoordinator"]
+
+# Secrets, configured OUTSIDE git:
+# PAIRING_CODE (24+ character randomly generated ONE-TIME secret; never ship inside Android)
+# Pairing is allowed only with a matching code; all later calls use per-device credentials.
+# FCM_SERVICE_ACCOUNT_JSON (Google service account; never commit/log)

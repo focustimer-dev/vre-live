@@ -1,0 +1,33 @@
+name: Commute Monitor Preview Validation
+
+on:
+  pull_request:
+    paths:
+      - "src/commute-monitor-worker.js"
+      - "src/monitor-*.js"
+      - "wrangler.commute-preview.toml"
+      - "tests/monitor-coordinator.mjs"
+      - "package.json"
+      - ".github/workflows/commute-monitor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  monitor-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check event-driven monitor behavior
+        run: node tests/monitor-coordinator.mjs
+      - name: Install Wrangler locally, no deployment credentials
+        run: npm install --ignore-scripts --no-audit --no-fund --no-package-lock
+      - name: Validate preview Durable Object bundle (dry run only)
+        run: ./node_modules/.bin/wrangler deploy --config wrangler.commute-preview.toml --dry-run --outdir /tmp/vre-commute-preview
+      - name: Verify dry-run output exists
+        run: test -d /tmp/vre-commute-preview
