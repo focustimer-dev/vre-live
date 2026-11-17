@@ -1751,7 +1751,8 @@
     }, []);
     const update = (key, value) => {
       if (settings.unsupportedVersion) return;
-      const proposed = VREAlerts.normalize({ ...settings, [key]: value });
+      const proposed = VREAlerts.normalize({ ...settings, [key]: value,
+        ...(key === "enabled" && !value ? { leaveNow: false } : {}) });
       onSave(key === "checkIns" && value ? VREAlerts.useSmartSchedule(proposed) : proposed);
     };
     const control = (label, detail, checked, onChange, disabled = false) => html`
@@ -1799,10 +1800,16 @@
               <div className="global-alert-migrate">
                 <strong>Event-driven leave-now alerts</strong>
                 <div className="meta">Connect this phone once to receive leave-now notices for trains you explicitly select.</div>
-                <button className="btn outline" disabled=${!settings.enabled}
-                  onClick=${() => window.VrePushPair?.postMessage("pair")}>
-                  ${pairState.paired ? "Phone paired" : "Pair this phone"}
-                </button>
+                ${pairState.paired ? html`
+                  <div className="meta">This phone is paired with the preview monitor.</div>
+                  <button className="btn outline" onClick=${() => {
+                    onSave(VREAlerts.normalize({ ...settings, leaveNow: false }));
+                    window.VrePushPair?.postMessage("unpair");
+                  }}>Unpair this phone</button>
+                ` : html`
+                  <button className="btn outline" disabled=${!settings.enabled}
+                    onClick=${() => window.VrePushPair?.postMessage("pair")}>Pair this phone</button>
+                `}
               </div>`}
             ${control("Leave-now notifications", "Only for confirmed trains, using the shared Cloudflare monitor",
               !!settings.leaveNow, value => update("leaveNow", value),
