@@ -1037,6 +1037,63 @@
 })(typeof window !== "undefined" ? window : globalThis);
 </script>
 
+<!-- ============= global notification preferences (offline) ============= -->
+<script id="vre-alerts">
+(function (g) {
+  "use strict";
+  const KEY = "vre-live-alerts-v1";
+  const ID = /^[A-Za-z0-9_-]{1,72}$/;
+  const DEFAULTS = Object.freeze({
+    version: 1, enabled: false, checkIns: false, arrival: true, leaveNow: false,
+    leadMinutes: 15, sound: false, vibration: false, scopeIds: null, legacyTimes: false
+  });
+  function normalize(raw) {
+    const value = raw && typeof raw === "object" ? raw : {};
+    const lead = Number(value.leadMinutes);
+    const scopeIds = Array.isArray(value.scopeIds)
+      ? [...new Set(value.scopeIds.filter(id => typeof id === "string" && ID.test(id)))] : null;
+    return {
+      version: 1, enabled: value.enabled === true, checkIns: value.checkIns === true,
+      arrival: value.arrival !== false, leaveNow: false, // No server-backed leave alerts yet.
+      leadMinutes: Number.isInteger(lead) && lead >= 5 && lead <= 90 ? lead : 15,
+      sound: value.sound === true, vibration: value.vibration === true,
+      scopeIds, legacyTimes: value.legacyTimes === true && scopeIds !== null
+    };
+  }
+  function migrate(profiles) {
+    const opted = (profiles || []).filter(p => p.checkInEnabled === true).map(p => p.id)
+      .filter(id => typeof id === "string" && ID.test(id));
+    if (!opted.length) return { ...DEFAULTS };
+    // Migrate only explicit historical opt-ins. Do not register new profiles until
+    // the user explicitly switches from legacy times to the global smart schedule.
+    return normalize({
+      enabled: true, checkIns: true, arrival: false, scopeIds: opted,
+      legacyTimes: true, leadMinutes: 15
+    });
+  }
+  function load(storage, profiles) {
+    try {
+      const saved = storage.getItem(KEY);
+      if (saved === null) return migrate(profiles);
+      const obj = JSON.parse(saved);
+      if (!obj || obj.version !== 1) return { ...DEFAULTS, unsupportedVersion: true };
+      return normalize(obj);
+    } catch (_) { return { ...DEFAULTS, storageError: true }; }
+  }
+  function save(storage, record) {
+    if (record.unsupportedVersion) return false;
+    try {
+      storage.setItem(KEY, JSON.stringify(normalize(record)));
+      return true;
+    } catch (_) { return false; }
+  }
+  function useSmartSchedule(record) {
+    return normalize({ ...record, legacyTimes: false, scopeIds: null });
+  }
+  g.VREAlerts = Object.freeze({ KEY, DEFAULTS, normalize, migrate, load, save, useSmartSchedule });
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+
 <!-- ============= commute departure calculation (offline) ============= -->
 <script id="vre-leave-by">
 (function (g) {
