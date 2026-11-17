@@ -3206,6 +3206,10 @@ ${lockError}
         : lsGet("vre-live-board", null) || (lsGet(ROUTE_KEY, null) || {}).a || "01";
     });
     const [summary, setSummary] = useState(null);
+    const [lastCompletedRide, setLastCompletedRide] = useState(() => {
+      const rides = lsGet(RIDE_KEY, []);
+      return Array.isArray(rides) ? rides.filter(r => r?.manuallyEnded).at(-1) || null : null;
+    });
     const [myTrip, setMyTrip] = useState(() => {
       const saved = lsGet(LS_KEY, null);
       return isCurrentRide(saved) ? (androidRideAlert ? { ...saved, notify: false, push: false, pushErr: null } : saved) : null;
@@ -3377,6 +3381,7 @@ ${lockError}
           manuallyEnded: true,
         };
         lsSet(RIDE_KEY, [...lsGet(RIDE_KEY, []), rec].slice(-100));
+        setLastCompletedRide(rec);
       }
       setSummary(rec); setMyTrip(null); setSelected(null); setPicking(false); setSwitchTrainOpen(false);
     };
@@ -3553,6 +3558,14 @@ ${lockError}
     const primaryPlan = !myTrip && typeof window.VreCommutePrefs !== "undefined"
       ? primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel)
       : null;
+    // Basic Commute owns the unplanned home card. An explicitly confirmed
+    // Advanced Commute may supply its own route even without a Basic setup.
+    const homeRoute = route || (primaryPlan
+      ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to } : null);
+    const homeLeg = useMemo(() => homeRoute
+      ? VRECommutes.homeLeg(homeRoute, flipDir, lastCompletedRide, now, VRECore, liveByTrip)
+      : null, [homeRoute?.a, homeRoute?.b, flipDir, lastCompletedRide?.t,
+        Math.floor(now / 15000), liveByTrip]);
     const todayCard = !myTrip && tab !== "preferences" && planProfile !== null &&
       typeof window.VreCommutePrefs !== "undefined" ? html`
         <${TodayCommute} profiles=${plannedProfiles}
@@ -3623,24 +3636,21 @@ ${lockError}
 
         ${!myTrip && tab !== "preferences" && planProfile === null && html`
           <div style=${{ marginBottom: 12 }}>
-            ${route
-              ? (() => {
-                  // Keep the existing default timetable and direction flip unchanged.
-                  const autoReturn = new Date(now).getHours() >= 12;
-                  const showReturn = flipDir === null ? autoReturn : flipDir;
-                  return html`<${CommuteCard}
-                    from=${showReturn ? route.b : route.a} to=${showReturn ? route.a : route.b}
-                    auto=${flipDir === null || (route === widgetRoute && flipDir === false)}
-                    now=${now} liveByTrip=${liveByTrip}
-                    onFlip=${() => setFlipDir(!showReturn)}
-                    onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
-                      ? () => setPlanProfile("") : null}
-                    planned=${primaryPlan} onChangePlan=${setPlanProfile}
-                    onOtherPlans=${() => setPlanProfile("")}
-                    onTravelChange=${saveTravelOverride}
-                    travelOverride=${primaryPlan ? todayTravel[primaryPlan.profile.id] : null}
-                    onPickLive=${id => { setSelected(id); setPicking(false); }} />`;
-                })()
+            ${homeLeg
+              ? html`<${CommuteCard}
+                  from=${primaryPlan?.profile.from || homeLeg.from}
+                  to=${primaryPlan?.profile.to || homeLeg.to}
+                  auto=${homeLeg.reason !== "manual"}
+                  returning=${!primaryPlan && homeLeg.returning}
+                  now=${now} liveByTrip=${liveByTrip}
+                  onFlip=${() => setFlipDir(!homeLeg.returning)}
+                  onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
+                    ? () => setPlanProfile("") : null}
+                  planned=${primaryPlan} onChangePlan=${setPlanProfile}
+                  onOtherPlans=${() => setPlanProfile("")}
+                  onTravelChange=${saveTravelOverride}
+                  travelOverride=${primaryPlan ? todayTravel[primaryPlan.profile.id] : null}
+                  onPickLive=${id => { setSelected(id); setPicking(false); }} />`
               : html`<div className="card">
                   <div className="card-h">Set up your commute</div>
                   <p className="pref-description">Save your usual stations to show your next departures here.</p>
@@ -3716,7 +3726,7 @@ ${switchTrainOpen && myTrip && html`
           <${Sheet} key=${selTrain.tripId} train=${selTrain} picking=${picking} now=${now}
             activeTrip=${myTrip} busy=${rideBusy} error=${rideStartError}
             boardingStation=${waitingFor?.trip === selTrain.tripId ? waitingFor.dest : null}
-            defaultDest=${route ? ((flipDir === null ? new Date(now).getHours() >= 12 : flipDir) ? route.a : route.b) : null}
+            defaultDest=${primaryPlan?.profile.to || homeLeg?.to || null}
             devSamples=${devlog[selTrain.tripId]}
             onBoard=${() => setPicking(true)}
             onWait=${code => {
