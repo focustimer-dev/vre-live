@@ -1734,6 +1734,7 @@
 
   /* One app-wide notification policy; Android channels still respect system overrides. */
   function GlobalAlertSettings({ settings, onSave, osAllowed }) {
+    const nativeCheckIns = typeof window.VreCommutePrefs !== "undefined";
     const update = (key, value) => {
       if (settings.unsupportedVersion) return;
       const proposed = VREAlerts.normalize({ ...settings, [key]: value });
@@ -1757,7 +1758,11 @@
             ${typeof window.VreCommutePrefs !== "undefined" && osAllowed === false && html`
               <div className="stale-note">Android notifications are disabled. Allow them in system settings to receive alerts.</div>`}
             ${control("Ask if I'm taking the train", "One check-in before your usual leave time",
-              settings.checkIns, value => update("checkIns", value), !settings.enabled)}
+              settings.checkIns, value => update("checkIns", value),
+              !settings.enabled || !nativeCheckIns)}
+            ${!nativeCheckIns && html`<div className="meta">
+              Daily check-in notifications are scheduled by the Android app.
+            </div>`}
             ${settings.enabled && settings.checkIns && html`
               <label className="fld global-alert-lead">
                 <span>Ask before I need to leave</span>
@@ -1779,10 +1784,14 @@
             ${control("Leave-now notifications", "Requires the upcoming event-driven monitoring release",
               false, () => {}, true)}
             <div className="global-alert-section">Commute notification style</div>
-            ${control("Sound", "Play a notification sound on commute check-ins",
-              settings.sound, value => update("sound", value), !settings.enabled)}
-            ${control("Vibration", "Vibrate for commute check-ins (off by default)",
-              settings.vibration, value => update("vibration", value), !settings.enabled)}
+            ${nativeCheckIns ? html`
+              ${control("Sound", "Play a notification sound on commute check-ins",
+                settings.sound, value => update("sound", value), !settings.enabled)}
+              ${control("Vibration", "Vibrate for commute check-ins (off by default)",
+                settings.vibration, value => update("vibration", value), !settings.enabled)}`
+            : html`<div className="meta">
+              Android manages commute sound and vibration; browser notifications follow your browser settings.
+            </div>`}
             <div className="meta">
               Changes save on this device. Android's notification-channel settings can override sound and vibration.
               In-app notification choices never start GTFS polling on their own.
