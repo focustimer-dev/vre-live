@@ -190,6 +190,55 @@ internal object CommuteCheckIns {
         return false
     }
 
+    /** Derive an opt-in prompt from the earliest preferred departure, without any feed requests. */
+    private fun checkInAt(context: Context, p: JSONObject, date: LocalDate, cfg: JSONObject): Long? {
+        if (!hasService(context, p, date)) return null
+        val id = p.optString("id")
+        val legacy = cfg.optBoolean("legacyTimes")
+        if (legacy) {
+            val allowed = cfg.optJSONArray("scopeIds") ?: return null
+            if (notIn(allowed, id) || !p.optBoolean("checkInEnabled")) return null
+            val time = runCatching { LocalTime.parse(p.optString("checkIn")) }.getOrNull() ?: return null
+            return date.atTime(time).atZone(zone).toInstant().toEpochMilli()
+        }
+        val scope = cfg.optJSONArray("scopeIds")
+        if (scope != null && notIn(scope, id)) return null
+        val data = runCatching { Timetable(context).data }.getOrNull() ?: return null
+        val reduced = !notIn(data.optJSONArray("reducedService"), date.format(stamp))
+        val selected = p.optJSONArray("preferredTrains") ?: return null
+        val preferred = mutableSetOf<String>()
+        for (i in 0 until selected.length()) preferred.add(selected.optString(i))
+        val trips = data.optJSONArray("trips") ?: return null
+        var earliest: Int? = null
+        for (i in 0 until trips.length()) {
+            val t = trips.optJSONObject(i) ?: continue
+            if (t.optString("num") !in preferred ||
+                (reduced && notIn(data.optJSONArray("sTrains"), t.optString("num")))) continue
+            val stops = t.optJSONArray("stops") ?: continue
+            val from = p.optString("from")
+            val to = p.optString("to")
+            var board = -1
+            var destination = -1
+            for (j in 0 until stops.length()) {
+                val code = stops.optJSONArray(j)?.optString(0).orEmpty()
+                if (code == from) board = j
+                if (code == to) destination = j
+            }
+            if (board < 0 || destination <= board) continue
+            val departure = stops.optJSONArray(board)?.optInt(1, -1) ?: -1
+            if (departure < 0) continue
+            earliest = if (earliest == null) departure else minOf(earliest, departure)
+        }
+        val minute = earliest ?: return null
+        val travel = p.optInt("travelMinutes", 0).coerceIn(0, 180)
+        val platform = p.optInt("platformMinutes", 0).coerceIn(0, 60)
+        val buffer = p.optInt("bufferMinutes", 0).coerceIn(0, 60)
+        if (travel + platform <= 0) return null // Must configure an actual station approach.
+        val askLead = cfg.optInt("leadMinutes", 15).coerceIn(5, 90)
+        return date.atStartOfDay(zone).plusMinutes(
+            (minute - travel - platform - buffer - askLead).toLong()).toInstant().toEpochMilli()
+    }
+
     private fun alarmIntent(context: Context): PendingIntent =
         PendingIntent.getBroadcast(context, ALARM_CODE,
             Intent(context, CommuteCheckReceiver::class.java).setAction(SHOW),
@@ -229,7 +278,8 @@ internal object CommuteCheckIns {
 
     fun reschedule(context: Context, after: Long = System.currentTimeMillis()) {
         cancelAlarm(context)
-        if (!notificationsAllowed(context)) return
+        if (!notificationsAllowed(context) || !checkInsEnabled(context)) return
+        val cfg = alerts(context)
         val profiles = storedProfiles(context)
         val now = ZonedDateTime.now(zone)
         val state = daily(context)
@@ -241,12 +291,11 @@ internal object CommuteCheckIns {
             if (d == 0 && state.optBoolean("skippedDay")) continue
             for (i in 0 until profiles.length()) {
                 val p = profiles.optJSONObject(i) ?: continue
-                if (!p.optBoolean("checkInEnabled") || !hasService(context, p, date)) continue
                 val id = p.optString("id")
                 if (d == 0 && (state.optJSONObject("skippedTrips")?.optBoolean(id) == true ||
-                        state.optJSONObject("confirmed")?.optBoolean(id) == true)) continue
-                val time = runCatching { LocalTime.parse(p.optString("checkIn")) }.getOrNull() ?: continue
-                val at = date.atTime(time).atZone(zone).toInstant().toEpochMilli()
+                        state.optJSONObject("confirmed")?.optBoolean(id) == true ||
+                        state.optJSONObject("prompted")?.optBoolean(id) == true)) continue
+                val at = checkInAt(context, p, date, cfg) ?: continue
                 if (at <= after || at >= nextAt) continue
                 nextAt = at
                 nextId = id
