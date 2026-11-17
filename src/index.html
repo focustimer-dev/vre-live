@@ -2114,9 +2114,14 @@
   }
 
   function CommuteCard({ from, to, auto, now, liveByTrip, onFlip, onPickLive,
-      onPlan, planned, onChangePlan, onOtherPlans, onTravelChange, travelOverride }) {
-    const rows = useMemo(() => nextDepartures(from, to, now, liveByTrip, 3),
-      [from, to, Math.floor(now / 15000), liveByTrip]);
+      onPlan, planned, returning, onChangePlan, onOtherPlans, onTravelChange, travelOverride }) {
+    // Explicit Advanced Commute plans own both the headline and departures.
+    // The Basic Commute route is used only without a selected native plan.
+    const fromStation = planned?.profile.from || from;
+    const toStation = planned?.profile.to || to;
+    const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 3),
+      [fromStation, toStation, Math.floor(now / 15000), liveByTrip]);
+    const noDepartures = !planned && rows.length === 0;
     const service = isServiceDay(new Date(now));
     const [showDetails, setShowDetails] = useState(false);
     const [showMarey, setShowMarey] = useState(() => lsGet("vre-live-marey", false));
@@ -2126,10 +2131,10 @@
     }).format(new Date(ms));
     const visibleRows = rows;
     return html`
-      <div className="card commute-focus" aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
+      <div className=${"card commute-focus" + (noDepartures ? " no-departures" : "")} aria-label=${planned ? "Upcoming planned commute" : "Next departure"}>
         <div className="commute-focus-content">
           <div className="commute-focus-label">
-            ${planned ? "YOUR NEXT COMMUTE" : "NEXT TO " + STATIONS[to].name}
+            ${planned ? "YOUR NEXT COMMUTE" : returning ? "RETURN FROM " + STATIONS[fromStation].name : "NEXT TO " + STATIONS[toStation].name}
           </div>
           ${planned ? html`
             <div className="commute-focus-headline" role="status">
@@ -2147,17 +2152,20 @@
           ` : rows.length ? html`
             <div className="commute-focus-headline">${fmtClock(rows[0].dep)}</div>
             <div className="commute-focus-train">Train ${rows[0].num} · ${fmtWhen(rows[0].dep, now)}</div>
-            <div className="commute-focus-route">${STATIONS[from].name} → ${STATIONS[to].name}</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
             ${rows[0].live && rows[0].dev >= 120000 && html`
               <div className="commute-focus-warning">Running +${Math.round(rows[0].dev / 60000)}m late</div>`}
           ` : html`
             <div className="commute-focus-headline empty">
-              ${service ? "No more trains today on this route." : "No VRE service today."}
+              ${service ? "No departures remaining today." : "No VRE service today."}
+            </div>
+            <div className="commute-focus-route">
+              ${STATIONS[fromStation].name} → ${STATIONS[toStation].name}
             </div>`}
           <div className="commute-focus-actions">
             ${planned ? html`<button type="button" className="btn"
               onClick=${() => onChangePlan(planned.profile.id)}>Change train</button>`
-              : onPlan && html`<button type="button" className="btn"
+              : rows.length > 0 && onPlan && html`<button type="button" className="btn"
                 onClick=${onPlan}>Plan train</button>`}
             <button type="button" className="btn ghost commute-options"
               aria-expanded=${showDetails} onClick=${() => setShowDetails(!showDetails)}>
@@ -2168,9 +2176,9 @@
           ${showDetails && html`
             <div className="commute-extra">
               <div className="commute-extra-actions">
-                <button type="button" className="btn ghost" onClick=${onFlip}>
+                ${!planned && html`<button type="button" className="btn ghost" onClick=${onFlip}>
                   Swap direction
-                </button>
+                </button>`}
                 ${planned && planned.otherCount > 0 && html`
                   <button type="button" className="btn ghost" onClick=${onOtherPlans}>
                     Other planned trips (${planned.otherCount})
@@ -2188,8 +2196,8 @@
                     onClick=${() => onPickLive(r.trip)}>
                     <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
                     <span className="mid">
-                      <span className="l1">${fmtClock(r.dep)} from ${STATIONS[from].name}</span>
-                      <span className="l2">Arrives ${STATIONS[to].name} ${fmtClock(r.arr)}</span>
+                      <span className="l1">${fmtClock(r.dep)} from ${STATIONS[fromStation].name}</span>
+                      <span className="l2">Arrives ${STATIONS[toStation].name} ${fmtClock(r.arr)}</span>
                     </span>
                     <span className="right">
                       <span className=${"badge " + (r.live ? "ok" : "dim")}>${fmtWhen(r.dep, now)}</span>
@@ -2203,7 +2211,7 @@
                     Time-space chart <${Chevron} open=${showMarey} />
                   </button>
                   ${showMarey && html`
-                    <${Marey} from=${from} to=${to} deps=${rows}
+                    <${Marey} from=${fromStation} to=${toStation} deps=${rows}
                       liveByTrip=${liveByTrip} now=${now} />`}
                 </div>`}
             </div>`}
