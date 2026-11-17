@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter
 internal object CommuteCheckIns {
     private const val STORE = "commute_checkins"
     private const val PROFILES = "profiles"
+    private const val ALERTS = "alerts"
     private const val DAY = "day"
     private const val NEXT_AT = "next_at"
     private const val NEXT_ID = "next_id"
@@ -65,13 +66,42 @@ internal object CommuteCheckIns {
         return JSONObject().put("date", dayKey()).put("skippedDay", false)
             .put("skippedTrips", JSONObject()).put("confirmed", JSONObject())
             .put("planned", JSONObject()).put("reminded", JSONObject())
+            .put("prompted", JSONObject())
     }
     private fun persistDaily(context: Context, daily: JSONObject) {
         prefs(context).edit().putString(DAY, daily.toString()).apply()
     }
+    /** Legacy per-profile opt-ins survive until the user explicitly switches to global scheduling. */
+    private fun alerts(context: Context): JSONObject {
+        val saved = prefs(context).getString(ALERTS, null)
+        if (saved != null) {
+            val parsed = runCatching { JSONObject(saved) }.getOrNull()
+            if (parsed?.optInt("version") == 1) return parsed
+            return JSONObject().put("version", -1).put("enabled", false)
+        }
+        val profiles = storedProfiles(context)
+        val ids = JSONArray()
+        for (i in 0 until profiles.length()) {
+            val p = profiles.optJSONObject(i) ?: continue
+            if (p.optBoolean("checkInEnabled")) ids.put(p.optString("id"))
+        }
+        return JSONObject().put("version", 1)
+            .put("enabled", ids.length() > 0).put("checkIns", ids.length() > 0)
+            .put("arrival", false).put("leaveNow", false)
+            .put("leadMinutes", 15).put("sound", false).put("vibration", false)
+            .put("legacyTimes", ids.length() > 0).put("scopeIds", ids)
+    }
+
+    fun enabled(context: Context): Boolean = alerts(context).optBoolean("enabled")
+    fun arrivalEnabled(context: Context): Boolean =
+        enabled(context) && alerts(context).optBoolean("arrival")
+    private fun checkInsEnabled(context: Context): Boolean =
+        enabled(context) && alerts(context).optBoolean("checkIns")
+
     fun state(context: Context): String = daily(context)
         .put("type", "state")
-        .put("notificationsAllowed", notificationsAllowed(context)).toString()
+        .put("notificationsAllowed", notificationsAllowed(context))
+        .put("globalEnabled", enabled(context)).toString()
 
     private fun notificationsAllowed(context: Context): Boolean {
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -93,7 +123,29 @@ internal object CommuteCheckIns {
             if (!Regex("([01][0-9]|2[0-3]):[0-5][0-9]").matches(clock)) return false
             if (p.optJSONArray("days") == null || p.optJSONArray("preferredTrains") == null) return false
         }
-        prefs(context).edit().putString(PROFILES, record.toString()).apply()
+        val incomingAlerts = record.optJSONObject("alerts")
+        if (incomingAlerts != null && incomingAlerts.optInt("version") != 1) return false
+        // Global policy is optional only for older clients; preserve existing policy
+        // rather than resetting user consent on a stale WebView sync.
+        val edit = prefs(context).edit().putString(PROFILES, record.toString())
+        if (incomingAlerts != null) {
+            val lead = incomingAlerts.optInt("leadMinutes", 15)
+            if (lead !in 5..90) return false
+            val scope = incomingAlerts.optJSONArray("scopeIds")
+            if (scope != null) for (i in 0 until scope.length()) {
+                if (!Regex("[A-Za-z0-9_-]{1,72}").matches(scope.optString(i))) return false
+            }
+            edit.putString(ALERTS, incomingAlerts.toString())
+        }
+        edit.apply()
+        if (!checkInsEnabled(context)) {
+            cancelReminders(context)
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val profiles = storedProfiles(context)
+            for (i in 0 until profiles.length()) {
+                manager?.cancel(notificationId(profiles.optJSONObject(i)?.optString("id").orEmpty()))
+            }
+        }
         reschedule(context)
         return true
     }
