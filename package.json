@@ -4,8 +4,9 @@
   "version": "0.0.0-recovered",
   "type": "module",
   "scripts": {
-    "check": "node tests/baseline.mjs && node tests/service-idle.mjs && node tests/commute-profiles.mjs && node tests/commute-checkins.mjs && node tests/ride-workflow.mjs && node tests/lab-upgrades.mjs && node tests/leave-by.mjs",
-    "dev": "wrangler dev"
+    "check": "node tests/baseline.mjs && node tests/service-idle.mjs && node tests/commute-profiles.mjs && node tests/commute-checkins.mjs && node tests/ride-workflow.mjs && node tests/lab-upgrades.mjs && node tests/leave-by.mjs && node tests/monitor-coordinator.mjs",
+    "dev": "wrangler dev",
+    "check:monitor": "node tests/monitor-coordinator.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
