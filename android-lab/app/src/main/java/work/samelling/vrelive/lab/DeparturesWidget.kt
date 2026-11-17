@@ -86,6 +86,36 @@ internal class Timetable(context: Context) {
             if (live) format(eta) else "", if (live) "Live arrival" else "Live ETA unavailable", "")
     }
 
+    // A confirmed boarding decision, not a waiting or planned train.
+    data class Ribbon(
+        val title: String, val eta: String, val detail: String,
+        val progress: Int?
+    )
+
+    fun rideRibbon(cache: JSONObject): Ribbon? {
+        val ride = cache.optJSONObject("ride") ?: return null
+        if (!ride.optBoolean("boarded") || ride.optBoolean("waiting")) return null
+        val now = ZonedDateTime.now(eastern)
+        val age = now.toInstant().toEpochMilli() - ride.optLong("started")
+        if (age !in -10000L..28800000L) return null
+        val destination = ride.optString("dest")
+        if (!stations.has(destination)) return null
+        val number = ride.optString("num").ifBlank { "Train" }
+        val title = "Train $number · ${stations.getString(destination)}"
+        val freshPosition = ride.optBoolean("positionFresh") && fresh(ride, now)
+        val etaAt = ride.optLong("eta")
+        val remaining = etaAt - now.toInstant().toEpochMilli()
+        val eta = if (freshPosition && etaAt > 0 && remaining >= -60000L)
+            "${maxOf(0, (remaining + 59999L) / 60000L)}m" else "ETA —"
+        val next = ride.optString("next")
+        val nextLabel = if (stations.has(next)) "Next: ${stations.getString(next)}"
+            else "Next stop unavailable"
+        val detail = "$nextLabel · ${if (freshPosition) "Live estimate" else "Position unconfirmed"}"
+        val progress = if (freshPosition && ride.has("progress") && !ride.isNull("progress"))
+            ride.optInt("progress").takeIf { it in 0..100 } else null
+        return Ribbon(title, eta, detail, progress)
+    }
+
     private fun fresh(item: JSONObject?, now: ZonedDateTime): Boolean =
         item != null && now.toInstant().toEpochMilli() - item.optLong("ts") in -60000L..300000L
 
@@ -153,6 +183,24 @@ class DeparturesWidget : AppWidgetProvider() {
         val prefs = context.getSharedPreferences("departures_widgets", Context.MODE_PRIVATE)
         val cache = runCatching { JSONObject(prefs.getString("snapshot", "{}").orEmpty()) }.getOrDefault(JSONObject())
         val (from, to) = timetable.direction(a, b)
+        val ribbon = timetable.rideRibbon(cache)
+        if (ribbon != null) {
+            val views = RemoteViews(context.packageName,
+                if (VreTheme.isNord(context)) R.layout.ride_ribbon_widget_nord
+                else R.layout.ride_ribbon_widget)
+            views.setTextViewText(R.id.ribbon_title, ribbon.title)
+            views.setTextViewText(R.id.ribbon_eta, ribbon.eta)
+            views.setTextViewText(R.id.ribbon_detail, ribbon.detail)
+            views.setViewVisibility(R.id.ribbon_progress,
+                if (ribbon.progress != null) View.VISIBLE else View.GONE)
+            ribbon.progress?.let { views.setProgressBar(R.id.ribbon_progress, 100, it, false) }
+            val intent = Intent(context, MainActivity::class.java)
+            views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(
+                context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            ))
+            manager.updateAppWidget(id, views)
+            return
+        }
         val ride = timetable.ride(cache)
         val rows = if (ride == null) timetable.route(from, to, cache) else listOf(ride.second)
         val views = RemoteViews(context.packageName,
