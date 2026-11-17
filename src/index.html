@@ -2967,9 +2967,14 @@
         androidRideAlert?.postMessage("cancel");
         alertSent.current = false;
         if (myTrip && myTrip.push) await pushUnsubscribe();
+        const defaultArrival = alertPrefs.enabled && alertPrefs.arrival;
         const next = {
           ...(same ? myTrip : {}), tripId: train.tripId, dest: code,
-          notify: same && !androidRideAlert ? !!myTrip.notify : false, push: false, pushErr: null,
+          notify: !androidRideAlert && (same ? !!myTrip.notify : defaultArrival &&
+            canNotify && Notification.permission === "granted"),
+          autoArmRequested: !!(androidRideAlert && alertPrefs.enabled &&
+            (same ? !!myTrip.notify || !!myTrip.autoArmRequested : defaultArrival)),
+          push: false, pushErr: null,
           n5: false, n0: false,
           boardedAt: same ? myTrip.boardedAt : Date.now(),
           from: same ? myTrip.from : waitingFor?.trip === train.tripId ? waitingFor.dest : null, snapshot: train,
@@ -2993,7 +2998,8 @@
         const title = state.phase === "atStop" ? "At your stop" : state.phase === "passed" ? "Stop passed"
           : state.phase === "waiting" || state.phase === "scheduledPast" ? "Awaiting update" : m <= 0 ? "Due" : m + " min";
         document.title = `${title} · ${myStop.name} — VRE Live`;
-        if (myTrip.notify && !myTrip.push && state.fresh && ["enroute", "due", "atStop"].includes(state.phase)) {
+        if (alertPrefs.enabled && myTrip.notify && !myTrip.push && state.fresh &&
+            ["enroute", "due", "atStop"].includes(state.phase)) {
           const left = myStop.time - now;
           const lead = alertLead(myTrain, myTrip.dest); // longer gaps warn earlier
           if (androidRideAlert) {
@@ -3011,7 +3017,7 @@
     }, [now]);
 
     useEffect(() => {
-      if (!androidRideAlert || !myTrip) return;
+      if (!androidRideAlert || !myTrip || !alertPrefs.enabled) return;
       const sync = () => {
         androidRideAlert.onmessage = ({ data }) => {
           setMyTrip(current => current ? { ...current, notify: data === "armed", push: false,
@@ -3023,6 +3029,26 @@
       document.addEventListener("visibilitychange", sync);
       return () => document.removeEventListener("visibilitychange", sync);
     }, [myTrip?.tripId, myTrip?.dest]);
+    // Widget snapshot is posted in the earlier effect; only then arm native
+    // background arrival monitoring for an explicitly started ride.
+    useEffect(() => {
+      if (!androidRideAlert || !myTrip?.autoArmRequested) return;
+      const ride = myTrip;
+      androidRideAlert.postMessage("arm");
+      setMyTrip(current => current && current.boardedAt === ride.boardedAt &&
+          current.tripId === ride.tripId && current.dest === ride.dest
+        ? { ...current, autoArmRequested: false } : current);
+    }, [myTrip?.boardedAt, myTrip?.dest, myTrip?.autoArmRequested]);
+
+    useEffect(() => {
+      if (alertPrefs.enabled) return;
+      androidRideAlert?.postMessage("cancel");
+      if (myTrip?.push) pushUnsubscribe();
+      setMyTrip(current => current && (current.notify || current.autoArmRequested || current.push)
+        ? { ...current, notify: false, autoArmRequested: false, push: false, pushErr: null }
+        : current);
+    }, [alertPrefs.enabled]);
+
     const servicePaused = !activeRide && !automaticServiceWindow(now);
     const age = fetchedAt ? now - fetchedAt : null;
     const health = !fetchedAt ? "dead" : error || age > REFRESH_MS + 60000 ? "stale" : "live";
@@ -3031,6 +3057,11 @@
     const pick = id => { setSelected(id === selected ? null : id); setPicking(false); };
     const toggleNotify = async () => {
       if (!myTrip) return;
+      if (!alertPrefs.enabled) {
+        setMyTrip({ ...myTrip, notify: false,
+          pushErr: "Turn on Notifications in Preferences → Check-ins & Alerts first" });
+        return;
+      }
       if (androidRideAlert) {
         if (myTrip.notify) {
           androidRideAlert.postMessage("cancel");
