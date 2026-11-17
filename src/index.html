@@ -44,7 +44,7 @@
     color-scheme: dark;
     --bg:#011629; --card:#0C426D; --card-2:#372B68; --nav:#372B68;
     --border:rgba(246,184,251,.32); --border-soft:rgba(246,184,251,.19);
-    --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB;
+    --fg:#F6B8FB; --muted:#E2D8F4; --muted-2:#D5C9E9; --meta-ink:#F6B8FB; --meta-on-bg:#BE74CD;
     --red:#FFADB8; --blue:#A3C8FF; --green:#BAF6DA; --amber:#FFE09A;
     --accent:#3A74DB; --action-bg:#F6B8FB; --action-fg:#011629;
     --action-border:#3A74DB; --selected-bg:#F6B8FB; --selected-fg:#011629;
@@ -63,7 +63,7 @@
     color-scheme: light;
     --bg:#ECEFF4; --card:#FFFFFF; --card-2:#E5E9F0; --nav:#D8DEE9;
     --border:#BAC5D1; --border-soft:rgba(76,86,106,.18);
-    --fg:#2E3440; --muted:#434C5E; --muted-2:#4C566A; --meta-ink:#434C5E;
+    --fg:#2E3440; --muted:#434C5E; --muted-2:#4C566A; --meta-ink:#434C5E; --meta-on-bg:#4C566A;
     --red:#9D3044; --blue:#365F90; --green:#236A4C; --amber:#8A551A;
     --accent:#365F90; --action-bg:#2E3440; --action-fg:#ECEFF4;
     --action-border:#365F90; --selected-bg:#2E3440; --selected-fg:#ECEFF4;
@@ -83,7 +83,7 @@
   #root{max-width:480px; margin:0 auto; padding:14px 14px 130px}
   .hdr{display:flex; align-items:center; justify-content:space-between; padding:6px 2px 14px}
   .hdr h1{font-size:var(--fs-4); font-weight:700; margin:0; letter-spacing:-.02em; display:flex; gap:9px; align-items:center}
-  .hdr .sub{font-size:var(--fs-1); color:var(--muted); text-align:right}
+  .hdr .sub{font-size:var(--fs-1); color:var(--meta-on-bg); text-align:right}
   .dot{width:8px; height:8px; border-radius:50%; background:var(--green); display:inline-block;
     box-shadow:0 0 0 0 var(--pulse); animation:pulse 2.4s infinite}
   .dot.stale{background:var(--amber); animation:none}
@@ -296,7 +296,7 @@
   .fld input:focus-visible{outline:2px solid var(--focus); outline-offset:2px}
   .srow:disabled{cursor:default}
   .train.ghost{cursor:pointer}
-  .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--muted-2); font-size:var(--fs-1)}
+  .foot{display:flex; justify-content:space-between; align-items:center; padding:14px 4px 0; color:var(--meta-on-bg); font-size:var(--fs-1)}
   .empty{padding:34px 20px; text-align:center; color:var(--muted); font-size:var(--fs-2)}
   .err{margin-top:12px; border:1px solid var(--red); background:var(--danger-bg); color:var(--red);
     border-radius:12px; padding:11px 14px; font-size:var(--fs-2)}
