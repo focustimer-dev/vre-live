@@ -1906,6 +1906,29 @@
       </div>`;
   }
 
+  function AppearanceSettings({ theme, onThemeChange }) {
+    const choices = [
+      { id: "electric-stars", name: "Electric Stars", detail: "Midnight Abyss · Petrol Navy · Orchid Mesh", symbol: "✦", swatch: "electric" },
+      { id: "nord-light", name: "Nord Light", detail: "Snow Storm · Polar Night · Frost", symbol: "◈", swatch: "nord" }
+    ];
+    return html`
+      <div className="card">
+        <div className="card-h">Appearance</div>
+        <p className="pref-description">Choose colors for maps, cards, controls and home-screen widgets. Saved on this device.</p>
+        <div className="theme-choices" role="group" aria-label="Color theme">
+          ${choices.map(choice => html`
+            <button key=${choice.id} type="button" className="theme-option"
+              aria-pressed=${theme === choice.id}
+              onClick=${() => onThemeChange(choice.id)}>
+              <span aria-hidden="true" className=${"theme-swatch " + choice.swatch}>${choice.symbol}</span>
+              <span><strong>${choice.name}</strong><small>${choice.detail}</small></span>
+              ${theme === choice.id && html`<span className="theme-selected">Selected</span>`}
+            </button>`)}
+        </div>
+        <p className="theme-hint">Cobalt accents are for borders, progress and large text, never small body copy.</p>
+      </div>`;
+  }
+
   /* Keep routine configuration out of the timetable: simple route first, then optional preferences. */
   function PreferencesPanel({ section, onSection, route, commutes, onSaveRoute, onSaveCommutes, alertPrefs, onSaveAlerts, osAllowed, theme, onThemeChange }) {
     const open = name => onSection(name);
@@ -1930,6 +1953,11 @@
                   <small>App notifications, commute check-ins, sound and vibration</small>
                 </span><span className="pref-arrow" aria-hidden="true">›</span>
               </button>
+              <button className="pref-choice" type="button" onClick=${() => open("appearance")}>
+                <span><strong>Appearance</strong>
+                  <small>Electric Stars dark · Nord Light</small>
+                </span><span className="pref-arrow" aria-hidden="true">›</span>
+              </button>
             </div>
           </div>`
         : html`
@@ -1950,6 +1978,8 @@
           : section === "alerts" ? html`
             <${GlobalAlertSettings} settings=${alertPrefs} onSave=${onSaveAlerts}
               osAllowed=${osAllowed} />`
+          : section === "appearance" ? html`
+            <${AppearanceSettings} theme=${theme} onThemeChange=${onThemeChange} />`
           : html`
             <div className="card">
               <div className="card-h">Advanced Commute</div>
