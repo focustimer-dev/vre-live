@@ -2852,9 +2852,19 @@
   // B: Branch Atlas. Its compact geometry deliberately discards geographic
   // distance while retaining real station topology, train identity and status.
   const ATLAS_MAJOR = new Set(["01","03","04","05","06","09","0C","SP","0D","0F","12"]);
-  function atlasY(y) { return 30 + (y - 40) * (365 / 608); }
-  function atlasPath(codes) {
-    return codes.map((c,i) => `${i ? "L" : "M"}${STATIONS[c].x},${atlasY(STATIONS[c].y)}`).join(" ");
+  function atlasY(y, line = "F") {
+    // Schematic spacing, not geographical distance: each station keeps
+    // enough vertical room for legible labels on a compact phone.
+    const codes = line === "M" ? LINE_M : LINE_F;
+    if (y <= STATIONS[codes[0]].y) return 25;
+    for (let i=1;i<codes.length;i++) {
+      const a=STATIONS[codes[i-1]].y, b=STATIONS[codes[i]].y;
+      if (y <= b) return 25 + ((i-1) + Math.max(0,Math.min(1,(y-a)/(b-a))))*25;
+    }
+    return 25 + (codes.length-1)*25;
+  }
+  function atlasPath(codes,line) {
+    return codes.map((c,i) => `${i ? "L" : "M"}${STATIONS[c].x},${atlasY(STATIONS[c].y,line)}`).join(" ");
   }
   function atlasTrainMarkers(items) {
     const groups = { F: [], M: [] };
@@ -2865,11 +2875,11 @@
       group.sort((a,b) => a.y-b.y);
       let last = -30;
       const markers = group.map(t => {
-        const y = Math.max(30, atlasY(t.y), last + 31);
+        const y = Math.max(30, atlasY(t.y,t.line), last + 31);
         last = y;
         return { ...t, markerX: t.line === "M" ? 40 : 350, markerY: y };
       });
-      const overflow = Math.max(0, last - 421);
+      const overflow = Math.max(0, last - 325);
       return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
     });
   }
@@ -2878,16 +2888,16 @@
     for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
     return html`<div className="branch-atlas">
-      <svg className="atlas-svg" viewBox="0 0 390 445" role="img"
+      <svg className="atlas-svg" viewBox="0 0 390 350" role="img"
         aria-label="Compact VRE system atlas showing Fredericksburg and Manassas lines and selectable train positions">
-        <path d=${atlasPath(LINE_F)} fill="none" stroke=${LINE_COLOR.F}
+        <path d=${atlasPath(LINE_F,"F")} fill="none" stroke=${LINE_COLOR.F}
           strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
-        <path d=${atlasPath(LINE_M)} fill="none" stroke=${LINE_COLOR.M}
+        <path d=${atlasPath(LINE_M,"M")} fill="none" stroke=${LINE_COLOR.M}
           strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
         ${Object.entries(STATIONS).map(([code,station]) => {
           const major = ATLAS_MAJOR.has(code) || code === ride?.dest;
           const side = LINE_M.indexOf(code) > 3 ? -1 : 1;
-          const y = atlasY(station.y);
+          const y = atlasY(station.y, side < 0 ? "M" : "F");
           return html`<g key=${code}>
             <circle cx=${station.x} cy=${y} r=${major ? 5.2 : 3.1}
               fill="var(--map-ink)" stroke=${side < 0 ? LINE_COLOR.M : LINE_COLOR.F}
@@ -2909,8 +2919,8 @@
             aria-label=${`Train ${t.num}, ${estimated ? "position unconfirmed" : "reported position"}. Select train.`}
             onClick=${()=>onPick(t.tripId)}
             onKeyDown=${e=>{ if(e.key==="Enter"||e.key===" "){e.preventDefault();onPick(t.tripId);} }}>
-            <path d=${`M${t.x},${atlasY(t.y)} L${t.markerX},${t.markerY}`}
-              stroke=${color} strokeWidth="1.4" fill="none" opacity=".50"/>
+            <path d=${`M${t.x},${atlasY(t.y,t.line)} L${t.markerX},${t.markerY}`}
+              stroke=${color} strokeWidth="1.4" fill="none" opacity=".40"/>
             <circle cx=${t.markerX} cy=${t.markerY} r="22" fill="transparent"/>
             <circle className="atlas-halo" cx=${t.markerX} cy=${t.markerY} r="16"
               fill="var(--map-ink)" stroke=${selectedTrain?"var(--map-highlight)":color}
