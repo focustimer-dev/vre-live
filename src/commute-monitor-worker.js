@@ -130,6 +130,9 @@ export class CommuteMonitorCoordinator {
       let watch;
       try {watch=validatedWatch(body,now);}catch(e){return fail(e.message,422);}
       const key=ownerId+":"+watchId;
+      const delivered=await this.ctx.storage.get("delivered")||{};
+      if(delivered[key]&&delivered[key]>now)
+        return respond({ok:true,alreadyDelivered:true,watchId});
       const existing=watches[key];
       if(existing){
         if(existing.tripId!==watch.tripId||existing.from!==watch.from||
@@ -194,6 +197,9 @@ export class CommuteMonitorCoordinator {
       byTrip={};
     }
     const history=await this.ctx.storage.get("deviations")||{};
+    const delivered=await this.ctx.storage.get("delivered")||{};
+    for(const [key,until] of Object.entries(delivered))
+      if(until<=now) delete delivered[key];
     for(const w of active){
       const train=byTrip[w.tripId];
       const deviation=train?.schedDev;
@@ -216,6 +222,7 @@ export class CommuteMonitorCoordinator {
       // so exactly-once device delivery cannot be guaranteed.
       const outcome=await sendLeaveNow(this.env,w,forecast);
       if(outcome.ok||outcome.invalid){
+        if(outcome.ok) delivered[key]=w.scheduled+45*60000;
         delete watches[key];
       }else{
         watches[key]={...w,attempts:w.attempts+1,nextRetry:now+60000};
@@ -226,6 +233,7 @@ export class CommuteMonitorCoordinator {
       if(!Object.values(watches).some(w=>w.tripId===id)) delete history[id];
     }
     await this.ctx.storage.put("deviations",history);
+    await this.ctx.storage.put("delivered",delivered);
     await this.save(watches);
   }
 }
