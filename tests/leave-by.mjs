@@ -118,10 +118,18 @@ assert.match(app,/todayState = day\?\.date === dateKey \? day : null/,
 assert.match(app,/Automatic leave-time notifications are coming later/,
   "no claim that background alerts already operate");
 
-assert.match(app, /if \(selectedId === null\) \{[\s\S]*?if \(!upcoming\.length\) return null;/,
-  "without an active plan, the oversized multi-profile list stays hidden");
-assert.match(app, /aria-label="Upcoming planned commute"/,
-  "planned train renders a compact next-departure summary");
+assert.match(app, /if \(selectedId === null\) return null;/,
+  "the multi-profile planner only appears after an explicit user action");
+assert.match(app, /aria-label=\$\{planned \? "Upcoming planned commute" : "Next departure"\}/,
+  "focused card distinguishes planned commute from timetable departures");
+assert.match(app, /function primaryPlannedCommute\(/,
+  "primary commute is selected without displaying the full profile list");
+assert.match(app, /planned=\$\{primaryPlan\}/,
+  "the focused card receives the selected planned commute");
+assert.match(app, /aria-expanded=\$\{showDetails\} onClick=\$\{\(\) => setShowDetails\(!showDetails\)\}/,
+  "secondary actions require explicit More options expansion");
+assert.match(app, /visibleRows\.map\(r => html`[\s\S]*?onClick=\$\{\(\) => onPickLive\(r\.trip\)\}/,
+  "expanded departure rows remain selectable");
 assert.match(app, /onPlan=\$\{commutes\.profiles\.some\(p => p\.preferredTrains\.length > 0\)/,
   "profiles expose on-demand train planning from the standard timetable");
 assert.match(app, /onClick=\$\{onPlan\}>Plan train<\/button>/,
@@ -136,13 +144,10 @@ assert.match(app, /No more trains today on this route\./,
   "original timetable retains no-more-trains state");
 assert.match(app, /No VRE service today\./,
   "original timetable retains no-service state");
-const nextCard = app.indexOf('!myTrip && tab !== "preferences" && html');
-const defaultSummary = app.indexOf('planProfile === null && todayCard', nextCard);
+const nextCard = app.indexOf('!myTrip && tab !== "preferences" && planProfile === null && html');
 const openedPlanner = app.indexOf('planProfile !== null && todayCard');
-assert.ok(nextCard >= 0 && defaultSummary > nextCard,
-  "without a selection overlay, the standard timetable precedes compact active summary");
-assert.ok(openedPlanner >= 0 && openedPlanner < nextCard,
-  "an explicitly opened planner is visible above the timetable");
+assert.ok(nextCard >= 0 && openedPlanner >= 0 && openedPlanner < nextCard,
+  "the focused departure card is default and planner is shown on explicit request");
 assert.equal((app.match(/TodayCommute\} profiles=/g) || []).length, 1,
   "planner component is instantiated only once");
 
