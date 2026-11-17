@@ -1879,8 +1879,9 @@
     const upcoming = profiles.map(p => {
       const train = planned[p.id];
       if (!train || skipped[p.id]) return null;
+      const travel = overrides[p.id] ?? p.travelMinutes;
       const forecast = VRELeaveBy.calculate({
-        ...p, travelMinutes: overrides[p.id] ?? p.travelMinutes
+        ...p, travelMinutes: Number.isInteger(travel) && travel > 0 ? travel : 10
       }, train, VRECore, liveByTrip, samples, now);
       return { profile: p, train, forecast };
     }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
@@ -3293,6 +3294,7 @@ ${lockError}
         : lsGet("vre-live-board", null) || (lsGet(ROUTE_KEY, null) || {}).a || "01";
     });
     const [summary, setSummary] = useState(null);
+    const [inlinePlan, setInlinePlan] = useState(() => lsGet("vre-live-inline-plan-v1", null));
     const [lastCompletedRide, setLastCompletedRide] = useState(() => {
       const rides = lsGet(RIDE_KEY, []);
       return Array.isArray(rides) ? rides.filter(r => r?.manuallyEnded).at(-1) || null : null;
@@ -3642,17 +3644,52 @@ ${lockError}
     const accent = myTrip && myTrain ? { "--accent": LINE_COLOR[myTrain.line] } : null;
 
     const plannedProfiles = commutes.profiles.filter(p => p.preferredTrains.length > 0);
-    const primaryPlan = !myTrip && typeof window.VreCommutePrefs !== "undefined"
+    const nativePrimary = !myTrip && typeof window.VreCommutePrefs !== "undefined"
       ? primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel)
       : null;
-    // Basic Commute owns the unplanned home card. An explicitly confirmed
-    // Advanced Commute may supply its own route even without a Basic setup.
+    const todayInline = inlinePlan?.date === todayKey ? inlinePlan : null;
+    const localPrimary = !myTrip && todayInline ? (() => {
+      const p = { id: "inline-basic", name: "Commute",
+        from: todayInline.from, to: todayInline.to,
+        preferredTrains: [todayInline.train],
+        travelMinutes: todayInline.minutes, platformMinutes: 0, bufferMinutes: 5 };
+      const forecast = VRELeaveBy.calculate(p, todayInline.train, VRECore, liveByTrip, devlog, now);
+      return ["upcoming", "leave-now"].includes(forecast.state)
+        ? { profile: p, train: todayInline.train, forecast, local: true } : null;
+    })() : null;
+    const primaryPlan = nativePrimary || localPrimary;
+    const nextAdvanced = !myTrip ? VRECommutes.nextScheduled(
+      commutes.profiles, commuteDay, now, VRECore, VRELeaveBy) : null;
     const homeRoute = route || (primaryPlan
-      ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to } : null);
+      ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to }
+      : nextAdvanced ? { a: nextAdvanced.profile.from, b: nextAdvanced.profile.to } : null);
     const homeLeg = useMemo(() => homeRoute
       ? VRECommutes.homeLeg(homeRoute, flipDir, lastCompletedRide, now, VRECore, liveByTrip)
       : null, [homeRoute?.a, homeRoute?.b, flipDir, lastCompletedRide?.t,
         Math.floor(now / 15000), liveByTrip]);
+    const manualRoute = flipDir !== null || !!widgetRoute;
+    const nextBasic = homeLeg
+      ? nextDepartures(homeLeg.from, homeLeg.to, now, liveByTrip, 1)[0] : null;
+    const featuredAdvanced = !primaryPlan && !manualRoute && nextAdvanced &&
+      (!nextBasic || nextAdvanced.dep <= nextBasic.dep) ? nextAdvanced : null;
+    const activeProfile = primaryPlan?.profile || featuredAdvanced?.profile || null;
+    const planOverride = activeProfile && todayTravel[activeProfile.id] != null
+      ? todayTravel[activeProfile.id] : null;
+    const confirmInlinePlan = (choice, travelMinutes) => {
+      if (!choice.today || !Number.isInteger(travelMinutes) ||
+          travelMinutes < 1 || travelMinutes > 180) return;
+      if (choice.profile?.id && choice.profile.id !== "inline-basic" &&
+          choice.profile.preferredTrains.includes(choice.train) &&
+          typeof window.VreCommutePrefs !== "undefined") {
+        saveTravelOverride(choice.profile.id, travelMinutes);
+        nativeCommute({ type: "plan", profileId: choice.profile.id, train: choice.train });
+      } else {
+        const record = { date: VRECore.serviceDateKey(Date.now()),
+          from: choice.from, to: choice.to, train: choice.train, minutes: travelMinutes };
+        lsSet("vre-live-inline-plan-v1", record);
+        setInlinePlan(record);
+      }
+    };
     const todayCard = !myTrip && tab !== "preferences" && planProfile !== null &&
       typeof window.VreCommutePrefs !== "undefined" ? html`
         <${TodayCommute} profiles=${plannedProfiles}
@@ -3725,19 +3762,13 @@ ${lockError}
           <div style=${{ marginBottom: 12 }}>
             ${homeLeg
               ? html`<${CommuteCard}
-                  from=${primaryPlan?.profile.from || homeLeg.from}
-                  to=${primaryPlan?.profile.to || homeLeg.to}
-                  auto=${homeLeg.reason !== "manual"}
+                  from=${homeLeg.from} to=${homeLeg.to}
                   returning=${!primaryPlan && homeLeg.returning}
                   now=${now} liveByTrip=${liveByTrip}
+                  planned=${primaryPlan} nextAdvanced=${featuredAdvanced}
+                  travelOverride=${planOverride}
                   onFlip=${() => setFlipDir(!homeLeg.returning)}
-                  onPlan=${commutes.profiles.some(p => p.preferredTrains.length > 0)
-                    ? () => setPlanProfile("") : null}
-                  planned=${primaryPlan} onChangePlan=${setPlanProfile}
-                  onOtherPlans=${() => setPlanProfile("")}
-                  onTravelChange=${saveTravelOverride}
-                  travelOverride=${primaryPlan ? todayTravel[primaryPlan.profile.id] : null}
-                  onPickLive=${id => { setSelected(id); setPicking(false); }} />`
+                  onPlanTrain=${confirmInlinePlan} />`
               : html`<div className="card">
                   <div className="card-h">Set up your commute</div>
                   <p className="pref-description">Save your usual stations to show your next departures here.</p>
