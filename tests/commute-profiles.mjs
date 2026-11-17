@@ -34,7 +34,7 @@ assert.doesNotMatch(appScript, /onEdit=|onEdit, onFlip/,
 assert.match(appScript, /setPreferencesSection\("commute"\); setTab\("preferences"\)/,
   "first-run commute setup opens the basic editor through Preferences");
 assert.match(appScript, /<\$\{CommuteCard\}/, "existing live timetable remains");
-assert.match(appScript, /onFlip=\$\{\(\) => setFlipDir\(!showReturn\)\}/,
+assert.match(appScript, /onFlip=\$\{\(\) => setFlipDir\(!homeLeg\.returning\)\}/,
   "manual timetable direction flip remains");
 assert.equal((appScript.match(/<\$\{RouteSetup\}/g) || []).length, 1,
   "basic route editor exists only within Preferences");
