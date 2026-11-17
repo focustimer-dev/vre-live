@@ -710,6 +710,44 @@
     :root[data-theme="electric-stars"] .system-map-card .map-wrap{
       padding:1px 2px 6px}
   }
+  /* A / Follow Lens: readable current ride in a short, stable viewport. */
+  .follow-lens{padding:4px 5px 0}
+  .lens-eyebrow{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:8px 12px 0;color:var(--muted);font-size:var(--fs-1)}
+  .lens-service{font-weight:750;color:var(--fg)}
+  .lens-svg,.atlas-svg{display:block;width:100%;height:auto;max-width:100%;overflow:visible}
+  .lens-stop{font:650 13px system-ui,sans-serif;fill:var(--muted)}
+  .lens-stop.emphasis{font-weight:800;fill:var(--fg)}
+  .lens-destination{fill:var(--map-highlight);font:700 9px system-ui,sans-serif;letter-spacing:.05em}
+  .lens-arrival{padding:1px 16px 10px;color:var(--muted);font-size:var(--fs-2)}
+  .lens-arrival strong{color:var(--fg)}
+  /* B / Branch Atlas: two lines, schematic rather than geographical length. */
+  .branch-atlas{padding:3px 4px 4px}
+  .atlas-label{font:600 11px system-ui,sans-serif;fill:var(--map-label-major)}
+  .atlas-label.destination{font-weight:800;fill:var(--map-highlight)}
+  .atlas-train{cursor:pointer;outline:none}
+  .atlas-halo{transition:stroke-width .12s ease}
+  .atlas-train-num{font:800 11px system-ui,sans-serif;pointer-events:none}
+  .atlas-train:focus-visible .atlas-halo,.atlas-train:focus .atlas-halo{
+    stroke:var(--focus);stroke-width:3.5}
+  .atlas-caption{font-size:var(--fs-1);color:var(--muted);padding:0 8px 7px;text-align:right}
+  .follow-lens svg [role=button]{cursor:pointer;outline:none}
+  .follow-lens svg [role=button]:focus-visible circle:nth-child(2),
+  .follow-lens svg [role=button]:focus circle:nth-child(2){
+    stroke:var(--focus);stroke-width:4}
+  .journey-head{padding:9px 8px 8px}
+  .journey-icon{width:29px;height:36px}
+  .journey-title strong{font-size:20px}
+  .journey-views{background:var(--surface-hover)}
+  .journey-views button{font-size:var(--fs-2);padding:0 9px}
+  @media (max-width:355px){
+    .atlas-label{font-size:10.5px}
+    .journey-title strong{font-size:18px}
+    .journey-views button{padding:0 7px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .atlas-halo,.journey-map.focused{animation:none;transition:none}
+  }
 </style>
 </head>
 <body>
@@ -4047,7 +4085,7 @@ ${lockError}
             <div className="map-legend" aria-label="Map marker legend">
               <span><i className="map-key solid" aria-hidden="true"></i>Live feed</span>
               <span><i className="map-key scheduled" aria-hidden="true"></i>Timetable estimate</span>
-              <span className="map-position-note">Frame: your train · dashed marker: estimated position.</span>
+              <span className="map-position-note">Follow: your train · System: both lines · Dashed: timetable estimate.</span>
             </div>
           </div>`
         : tab === "sched" ? html`
