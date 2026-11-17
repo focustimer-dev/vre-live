@@ -238,7 +238,7 @@ assert.match(app, /onClick=\$\{\(\)=>onPick\(t\.tripId\)\}/,
   "atlas train markers remain selectable");
 assert.match(app, /e\.preventDefault\(\);onPick\(t\.tripId\)/,
   "atlas train markers remain keyboard operable");
-assert.match(app, /strokeDasharray=\$\{t\.ghost\?"3 3":null\}/,
+assert.match(app, /strokeDasharray=\$\{estimated\?"3 3":null\}/,
   "schedule-only train markers stay visibly distinguishable");
 const assets = read("android-lab/web/build-assets.mjs");
 assert.ok(assets.includes("const bootstrapStart ="), "theme bootstrap must be extracted");
