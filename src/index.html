@@ -2718,6 +2718,16 @@
     }, []);
     const [route, setRoute] = useState(() => widgetRoute || lsGet(ROUTE_KEY, null));
     const [commutes, setCommutes] = useState(() => VRECommutes.load(localStorage, VRECore));
+    const [alertPrefs, setAlertPrefs] = useState(() =>
+      VREAlerts.load(localStorage, VRECommutes.load(localStorage, VRECore).profiles));
+    const saveAlertPrefs = settings => {
+      if (!VREAlerts.save(localStorage, settings)) return false;
+      const clean = VREAlerts.normalize(settings);
+      setAlertPrefs(clean);
+      nativeCommute({ type: "sync", version: 1, profiles: commutes.profiles,
+        alerts: clean, prompt: clean.enabled });
+      return true;
+    };
     const [travelOverrides, setTravelOverrides] = useState(() => lsGet("vre-leave-day-overrides-v1", null));
     const todayKey = VRECore.serviceDateKey(now);
     const todayTravel = travelOverrides?.date === todayKey ? travelOverrides.values || {} : {};
@@ -2741,7 +2751,8 @@
     const saveCommutes = next => {
       if (!VRECommutes.save(localStorage, next, VRECore)) return false;
       setCommutes(next);
-      nativeCommute({ type: "sync", version: 1, profiles: next.profiles, prompt: true });
+      nativeCommute({ type: "sync", version: 1, profiles: next.profiles,
+        alerts: alertPrefs, prompt: false });
       return true;
     };
     useEffect(() => {
@@ -2752,8 +2763,8 @@
         if (data && data.type === "state") setCommuteDay(data);
       };
       // No alerts are enabled by a one-time legacy migration.
-      if (!commutes.unsupportedVersion) nativeCommute({
-        type: "sync", version: 1, profiles: commutes.profiles, prompt: false
+      if (!commutes.unsupportedVersion && !alertPrefs.unsupportedVersion) nativeCommute({
+        type: "sync", version: 1, profiles: commutes.profiles, alerts: alertPrefs, prompt: false
       });
       else nativeCommute({ type: "state" });
       return () => { bridge.onmessage = null; };
@@ -3177,6 +3188,8 @@
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
             route=${route} commutes=${commutes} onSaveCommutes=${saveCommutes}
+            alertPrefs=${alertPrefs} onSaveAlerts=${saveAlertPrefs}
+            osAllowed=${commuteDay?.notificationsAllowed}
             onSaveRoute=${r => {
               lsSet(ROUTE_KEY, r); setRoute(r); setFlipDir(null);
             }} />`
@@ -3239,7 +3252,7 @@
   }
 
   // exposed for the node render test (test_render.mjs)
-  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
+  window.__VRE_APP = { mapLabelBoxes, focusLayout, layoutMarkers, App, Map, ScheduleCard, EtaBanner, Sheet, CommuteCard, RouteSetup, CommuteProfiles, PreferencesPanel, GlobalAlertSettings, SummaryCard, Sparkline, Marey, BoardCard, WaitingCard, waitingArrival, TodayCommute, LeaveByCard, DailyTravelControl };
 
   ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
 })();
