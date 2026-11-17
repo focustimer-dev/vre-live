@@ -26,9 +26,12 @@ assert.equal(lens.stops[1].code,"04","the next stop is placed near the focused t
 assert.equal(lens.destination,"08","destination preserved even if outside lens");
 assert.equal(view(null,"08",now).stops.length,0,"empty/unavailable positions are safe");
 const points=runInNewContext(app.slice(atlasFrom,atlasTo)+"\n;atlasY",{STATIONS:stops});
-assert.equal(points(40),30,"northern endpoint");
-assert.equal(points(648),395,"southern endpoint");
-assert.ok(points(244)<200,"branch atlas compresses the full 700px network into 445px");
+assert.equal(points(40),25,"northern endpoint");
+assert.equal(points(648),325,"southern endpoint");
+assert.equal(points(stops["01"]?.y ?? 40),25, "atlas preserves top-of-line position");
+assert.match(app,/const ATLAS_MAJOR = new Set\(\["01","03","04"/,
+  "key shared trunk stations remain labeled");
+assert.ok(points(244)<200,"branch atlas uses station-spaced schematic coordinates");
 assert.match(app,/function FollowLens\(/);
 assert.match(app,/\(train.y-prevY\)\/\(nextY-prevY\)/,
   "fresh GPS position projects into the correct between-stop segment");
@@ -36,7 +39,7 @@ assert.match(app,/const estimated = t.ghost \|\| t.signalLost \|\| !t.ts/,
   "atlas distinguishes stale reporting from verified train positions");
 assert.match(app,/function BranchAtlas\(/);
 assert.match(app,/viewBox="0 0 390 284"/,"ride lens stays within short bounded viewport");
-assert.match(app,/viewBox="0 0 390 445"/,"system atlas fits into a much shorter card");
+assert.match(app,/viewBox="0 0 390 350"/,"system atlas fits within a 350px SVG viewport");
 assert.match(app,/const focused = !!activeTrain && !overview/,
   "an explicitly active ride defaults to Follow Lens");
 assert.match(app,/setOverviewTrip\(value \? myTripId : null\)/,
