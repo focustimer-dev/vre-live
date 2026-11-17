@@ -52,6 +52,6 @@ assert.match(app, /setSwitchTrainOpen\(false\); setSelected\(tripId\); setPickin
   "new train selection hands off to the existing train sheet");
 assert.match(app, /onChange=\$\{\(\) => \{ if \(myTrain\)/,
   "change-stop path remains separate from change-train path");
-assert.match(app, /setSwitchTrainOpen\(false\);\s*setSummary/,
+assert.match(app, /setSummary\(rec\); setMyTrip\(null\); setSelected\(null\); setPicking\(false\); setSwitchTrainOpen\(false\);/,
   "no stale switch picker after finishing a ride");
 console.log("VRE compact ride controls: static interaction and layout contracts passed");
