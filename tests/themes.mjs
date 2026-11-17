@@ -49,6 +49,60 @@ for (const [stored, expected] of [
 
 const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1];
 assert.ok(css, "missing app stylesheet");
+
+// A previous release contained a missing } after .ride-status. Modern WebView
+// interpreted all subsequent selectors as nested CSS, so static rule-presence
+// assertions passed while the travel-time stepper rendered as browser defaults.
+// Verify braces AND the intended *cascade scope*, including quoted/commented braces.
+{
+  let depth = 0, comment = false, quoted = "", escaped = false;
+  const targetRules = [
+    ".ride-status .badge{",
+    ".ride-notifications{",
+    ".ride-control{",
+    ".commute-plan-travel-stepper{",
+    ".commute-plan-step{",
+    ".commute-plan-travel-value input{",
+    ".commute-plan-confirm{"
+  ];
+  const positions = new Map(targetRules.map(rule => {
+    const at = css.indexOf(rule);
+    assert.ok(at >= 0, "missing required CSS rule " + rule);
+    return [at, rule];
+  }));
+  const opened = [];
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i], next = css[i + 1];
+    if (comment) {
+      if (char === "*" && next === "/") { comment = false; i++; }
+      continue;
+    }
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quoted) quoted = "";
+      continue;
+    }
+    if (char === "/" && next === "*") { comment = true; i++; continue; }
+    if (char === '"' || char === "'") { quoted = char; continue; }
+    if (positions.has(i)) assert.equal(depth, 0,
+      positions.get(i) + " must be a top-level rule, not inside another selector");
+    if (char === "{") { depth++; opened.push(i); }
+    if (char === "}") {
+      assert.ok(depth > 0, "unmatched CSS closing brace at " + i);
+      depth--;
+      opened.pop();
+    }
+  }
+  assert.equal(depth, 0,
+    "unclosed CSS block at offset " + opened.at(-1) +
+    " can nest later controls and break Android WebView styling");
+  assert.equal(quoted, "", "unterminated CSS quote");
+  assert.equal(comment, false, "unterminated CSS comment");
+  assert.match(css, /\.ride-status\{[^{}]*padding-left:42px\}/,
+    "ride-status must close before all subsequent ride and planner rules");
+}
+
 const dark = css.match(/:root, :root\[data-theme="electric-stars"\]\s*\{([\s\S]*?)\n  \}/)?.[1];
 const light = css.match(/:root\[data-theme="nord-light"\]\s*\{([\s\S]*?)\n  \}/)?.[1];
 assert.ok(dark && light, "both themes must define semantic token overrides");
