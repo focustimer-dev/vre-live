@@ -43,6 +43,10 @@ assert.equal((appScript.match(/<\$\{CommuteProfiles\}/g) || []).length, 1,
 assert.match(appScript, /No alerts are enabled here/, "basic commute does not promise alerts");
 assert.match(appScript, /Automatic background departure alerts aren't active yet/,
   "advanced commute does not promise live alerts");
+assert.match(appScript, /function GlobalAlertSettings\(/, "global notification settings component exists");
+assert.match(appScript, /open\("alerts"\)/, "Preferences has a Check-ins & Alerts entry");
+assert.equal((appScript.match(/Ask if I'm taking the train on my commute days/g) || []).length, 0,
+  "advanced profile no longer repeats the old check-in checkbox");
 const coreContext = runInNewContext(script("vre-core") + "\n;globalThis");
 const prefContext = runInNewContext(script("vre-commutes") + "\n;globalThis");
 const core = coreContext.VRECore, prefs = prefContext.VRECommutes;
@@ -50,7 +54,7 @@ assert.ok(core && prefs);
 assert.ok(page.includes("function CommuteProfiles("), "editor is in app");
 assert.ok(page.includes("VRECommutes.load(localStorage, VRECore)"), "profiles are loaded");
 assert.ok(page.includes("VRECommutes.save(localStorage, next, VRECore)"), "profiles are persisted");
-assert.ok(builder.includes('["vre-core", "vre-commutes", "vre-leave-by", "vre-app"]'), "Android packages profile logic");
+assert.ok(builder.includes('["vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre-app"]'), "Android packages profile logic");
 assert.ok(builder.includes('defer src="vre-commutes.js"'), "Android loads profiles before app");
 assert.ok(!/\bfetch\s*\(|\bscheduled\s*\(|serviceWorker|navigator\./.test(script("vre-commutes")),
   "preference model never polls or creates alarms");
