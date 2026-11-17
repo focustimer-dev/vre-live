@@ -2952,6 +2952,14 @@
     // line-color theming while riding: tint the accent to your line
     const accent = myTrip && myTrain ? { "--accent": LINE_COLOR[myTrain.line] } : null;
 
+    const todayCard = !myTrip && tab !== "preferences" &&
+      typeof window.VreCommutePrefs !== "undefined" ? html`
+        <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
+          day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
+          now=${now} liveByTrip=${liveByTrip} samples=${devlog}
+          overrides=${todayTravel} onTravelChange=${saveTravelOverride}
+          onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />` : null;
+
     return html`
       <div style=${accent}>
         <div className="hdr">
@@ -3008,6 +3016,8 @@
               onLeave=${finishRide} lockButton=${lockControl(true)} lockError=${lockError} />
           </div>`}
 
+        ${planProfile !== null && todayCard}
+
         ${!myTrip && tab !== "preferences" && html`
           <div style=${{ marginBottom: 12 }}>
             ${route
@@ -3035,12 +3045,7 @@
                 </div>`}
           </div>`}
 
-        ${!myTrip && tab !== "preferences" && typeof window.VreCommutePrefs !== "undefined" && html`
-          <${TodayCommute} profiles=${commutes.profiles.filter(p => p.preferredTrains.length > 0)}
-            day=${commuteDay} selectedId=${planProfile} onSelect=${setPlanProfile}
-            now=${now} liveByTrip=${liveByTrip} samples=${devlog}
-            overrides=${todayTravel} onTravelChange=${saveTravelOverride}
-            onAction=${(type, profileId, train) => nativeCommute({ type, profileId, train })} />`}
+        ${planProfile === null && todayCard}
 
         ${tab === "preferences" ? html`
           <${PreferencesPanel} section=${preferencesSection} onSection=${setPreferencesSection}
