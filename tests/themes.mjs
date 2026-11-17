@@ -55,7 +55,7 @@ const tokens = str => Object.fromEntries([...str.matchAll(/--([a-zA-Z0-9-]+):\s*
 const a = tokens(dark), b = tokens(light);
 const required = [
   "bg","card","card-2","nav","border","border-soft","fg","muted","muted-2",
-  "meta-ink","red","blue","green","amber","accent","action-bg","action-fg",
+  "meta-ink","meta-on-bg","red","blue","green","amber","accent","action-bg","action-fg",
   "action-border","selected-bg","selected-fg","sheet-bg","surface-hover",
   "banner-bg","danger-bg","map-label-major","map-ink","map-highlight","map-stroke",
   "line-F","line-M","line-ink","line-separator","accent-outline","ring","tab-surface","focus","pulse"
@@ -85,7 +85,7 @@ for (const [theme,palette] of [["Electric Stars",a],["Nord Light",b]]) {
   for (const [fore,back] of [
     ["fg","bg"],["fg","card"],["fg","card-2"],
     ["muted","card"],["muted-2","card"],["meta-ink","card"],
-    ["action-fg","action-bg"],["selected-fg","selected-bg"]
+    ["action-fg","action-bg"],["selected-fg","selected-bg"],["meta-on-bg","bg"]
   ]) {
     const ratio=contrast(palette[fore],palette[back]);
     assert.ok(ratio>=4.5,`${theme} ${fore} on ${back} only ${ratio.toFixed(2)}:1 (requires WCAG AA 4.5)`);
