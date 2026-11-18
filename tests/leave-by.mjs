@@ -29,7 +29,7 @@ assert.ok(nextWeekday.rows.length > 0 && nextWeekday.rows.every(row =>
   VRECore.serviceDateKey(row.time) === "20261118" && !row.live));
 assert.match(tomorrowBoard("06", Date.parse("2026-11-21T01:30:00Z")).reason, /weekends/);
 assert.match(tomorrowBoard("06", Date.parse("2026-11-26T01:30:00Z")).reason, /holiday/);
-const reducedBoard = tomorrowBoard("06", Date.parse("2026-12-24T01:30:00Z"));
+const reducedBoard = tomorrowBoard("06", Date.parse("2026-12-29T01:30:00Z"));
 assert.ok(reducedBoard.rows.length > 0 && reducedBoard.rows.every(row => VRECore.SCHEDULE.sTrains.has(row.num)));
 
 const time = iso => Date.parse(iso);

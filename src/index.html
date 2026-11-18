@@ -738,7 +738,9 @@
   .atlas-station{cursor:pointer;outline:none}
   .atlas-station:focus-visible .atlas-station-dot,.atlas-station[aria-pressed="true"] .atlas-station-dot{
     stroke:var(--focus);stroke-width:3;r:6}
-  .atlas-station-name{min-height:24px;padding:0 8px;color:var(--fg);font-size:var(--fs-2)}
+  .atlas-station-name{min-height:44px;padding:0 8px;color:var(--fg);font-size:var(--fs-2);
+    display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .atlas-station-name .btn{min-height:44px;flex-shrink:0}
   .board-tomorrow{padding:10px 0 2px}
   .board-tomorrow h2{font-size:var(--fs-3);margin:0}
   .board-tomorrow p{font-size:var(--fs-2);color:var(--muted);margin:4px 0}
@@ -2978,7 +2980,7 @@
       return markers.map(t => ({...t, markerY:Math.max(24,t.markerY-overflow)}));
     });
   }
-  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, now, onPick }) {
+  function BranchAtlas({ trains, ghosts, selected, myTripId, ride, activeTrain, now, onPick, onViewStation }) {
     const all = new globalThis.Map();
     for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
@@ -3039,14 +3041,16 @@
           </g>`;
         })}
       </svg>
-      <div className="atlas-station-name" role="status">
-        ${stationCode ? STATIONS[stationCode].name : "Tap a station dot to see its name"}
+      <div className="atlas-station-name">
+        <span role="status">${stationCode ? STATIONS[stationCode].name : "Tap a station dot to see its name"}</span>
+        ${stationCode && onViewStation && html`<button type="button" className="btn ghost"
+          onClick=${() => onViewStation(stationCode)}>View departures</button>`}
       </div>
       <div className="atlas-caption">Schematic view · Distances not to scale</div>
     </div>`;
   }
 
-  function Map({ trains, ghosts, selected, myTripId, myTrain: rideTrain, ride, now, onPick }) {
+  function Map({ trains, ghosts, selected, myTripId, myTrain: rideTrain, ride, now, onPick, onViewStation }) {
     const [overviewTrip, setOverviewTrip] = useState(null);
     const overview = !!myTripId && overviewTrip === myTripId;
     const setOverview = value => setOverviewTrip(value ? myTripId : null);
@@ -3079,7 +3083,8 @@
       ${!focused && html`<div className="journey-map">
           <${BranchAtlas} trains=${trains} ghosts=${ghosts}
               activeTrain=${activeTrain} selected=${selected}
-              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick} />
+              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick}
+              onViewStation=${onViewStation} />
       </div>`}
       ${activeTrain && html`<div className=${"ride-board journey-map" + (focused ? " focused" : "")}>
       <button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
@@ -3706,6 +3711,7 @@ ${lockError}
     const [now, setNow] = useState(Date.now());
     const [tab, setTab] = useState(() =>
       window.location.pathname === "/__vre_android__/app/index.html" && new URLSearchParams(window.location.search).has("board") ? "board" : "map");
+    const [boardFromMap, setBoardFromMap] = useState(false);
     const [selected, setSelected] = useState(null);  // tripId shown in sheet
     const [switchTrainOpen, setSwitchTrainOpen] = useState(false);
     const [picking, setPicking] = useState(false);
@@ -4249,7 +4255,7 @@ ${lockError}
           <button className=${tab === "sched" ? "on" : ""} role="tab" aria-selected=${tab === "sched"}
             onClick=${() => setTab("sched")}>Schedule</button>
           <button className=${tab === "board" ? "on" : ""} role="tab" aria-selected=${tab === "board"}
-            onClick=${() => setTab("board")}>Board</button>
+            onClick=${() => { setBoardFromMap(false); setTab("board"); }}>Board</button>
           <button className=${"pref-nav " + (tab === "preferences" ? "on" : "")}
             role="tab" aria-selected=${tab === "preferences"}
             aria-label="Preferences" title="Preferences"
@@ -4330,7 +4336,8 @@ ${lockError}
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
               <${Map} trains=${trains} ghosts=${ghostTrains} selected=${selected}
-                myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick} />
+                myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick}
+                onViewStation=${station => { setBoardSta(station); setBoardFromMap(true); setTab("board"); }} />
               ${!data && html`<div className="meta">${servicePaused ? "Live refresh is paused." : error || "Loading live data…"}</div>`}
             </div>
             <div className="map-legend" aria-label="Map marker legend">
@@ -4347,6 +4354,8 @@ ${lockError}
         : html`
           <div className="card">
             <div className="card-h">Departure board</div>
+            ${boardFromMap && html`<button type="button" className="btn ghost"
+              onClick=${() => { setBoardFromMap(false); setTab("map"); }}>Back to map</button>`}
             <${BoardCard} station=${boardSta} rows=${boardRows} now=${now}
               onStation=${setBoardSta} onPickLive=${id => { pick(id); }} />
           </div>`}
