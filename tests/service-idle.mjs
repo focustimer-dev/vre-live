@@ -17,15 +17,20 @@ for (const [date, open] of [
   ["2026-11-16", true], ["2026-11-21", false],
   ["2026-11-26", false], ["2026-11-27", false],
   ["2026-06-19", false], ["2027-06-18", false], ["2026-07-03", true],
-  ["2026-12-24", true], ["2026-12-25", false],
-  ["2026-12-29", true], ["2026-12-30", true],
+  ["2026-12-24", false], ["2026-12-25", false],
+  ["2026-12-28", true], ["2026-12-29", true], ["2026-12-30", true],
   ["2026-12-31", true], ["2027-01-01", false],
 ]) {
   assert.equal(VRECore.isServiceDay(midday(date)), open, "service day: " + date);
 }
-assert.equal(VRECore.SCHEDULE.reducedService.includes("20261224"), true);
+assert.equal(VRECore.SCHEDULE.reducedService.includes("20261224"), false);
+assert.equal(VRECore.SCHEDULE.reducedService.includes("20261228"), true);
 assert.equal(VRECore.SCHEDULE.sTrains.has("302"), true);
 assert.equal(VRECore.SCHEDULE.sTrains.has("300"), false);
+
+assert.equal(VRECore.stationBoard("04", Date.parse("2026-12-24T10:00:00Z"), null).length, 0);
+const reducedBoard = VRECore.stationBoard("04", Date.parse("2026-12-28T10:00:00Z"), null, Infinity);
+assert.ok(reducedBoard.length > 0 && reducedBoard.every(row => VRECore.SCHEDULE.sTrains.has(row.num)));
 
 const sliceBetween = (text, start, end) => {
   const i = text.indexOf(start);
@@ -54,15 +59,16 @@ for (const iso of [
   "2026-11-26T13:00:00Z", // Thanksgiving
   "2026-11-27T13:00:00Z", // day after Thanksgiving
   "2026-12-25T13:00:00Z", // Christmas
-  "2026-12-24T18:00:00Z", // S schedule midday gap, 1 PM Eastern
+  "2026-12-24T11:00:00Z", // Christmas Eve closure during morning commute
+  "2026-12-28T18:00:00Z", // S schedule midday gap, 1 PM Eastern
 ]) {
   assert.equal(browserWindow(when(iso), true), false, "browser idle " + iso);
   assert.equal(cronWindow(when(iso)), false, "server idle " + iso);
 }
 for (const iso of [
   "2026-11-16T11:00:00Z", // regular service, 6 AM Eastern
-  "2026-12-24T11:00:00Z", // reduced S schedule, 6 AM Eastern
-  "2026-12-24T23:00:00Z", // reduced S schedule, 6 PM Eastern
+  "2026-12-28T11:00:00Z", // reduced S schedule, 6 AM Eastern
+  "2026-12-28T23:00:00Z", // reduced S schedule, 6 PM Eastern
 ]) {
   assert.equal(browserWindow(when(iso), true), true, "browser service " + iso);
   assert.equal(cronWindow(when(iso)), true, "server service " + iso);

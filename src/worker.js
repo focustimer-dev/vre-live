@@ -402,8 +402,9 @@ var manifest_default = {
   }
   for (let year = 2026; year <= 2040; year++) SCHEDULE.noService.push(...vreNoServiceDates(year));
   SCHEDULE.noService = [...new Set(SCHEDULE.noService)].sort();
-  // VRE's published S-service dates; do not treat these as full closures.
-  SCHEDULE.reducedService = ["20260703", "20261224", "20261229", "20261230", "20261231"];
+  // Reviewed against https://www.vre.org/schedule/: Christmas Eve is closed; Dec 28–31 use S service.
+  SCHEDULE.noService = [...new Set([...SCHEDULE.noService, "20261224"])].sort();
+  SCHEDULE.reducedService = ["20260703", "20261228", "20261229", "20261230", "20261231"];
   // S trains from VRE's May 4, 2026 reduced-service timetable.
   SCHEDULE.sTrains = new Set(["302", "306", "310", "314", "301", "305", "309", "313",
     "324", "328", "330", "334", "325", "329", "333", "335"]);
@@ -471,8 +472,10 @@ var manifest_default = {
   __name(schedPositionNow, "schedPositionNow");
   function nextDepartures(fromCode, toCode, nowMs, liveByTrip, count = 3) {
     if (!isServiceDay(new Date(nowMs))) return [];
+    const reduced = SCHEDULE.reducedService.includes(serviceDateKey(nowMs));
     const out = [];
     for (const t of SCHEDULE.trips) {
+      if (reduced && !SCHEDULE.sTrains.has(t.num)) continue;
       const iA = t.stops.findIndex((s) => s[0] === fromCode);
       const iB = t.stops.findIndex((s) => s[0] === toCode);
       if (iA < 0 || iB < 0 || iA >= iB) continue;
@@ -511,8 +514,10 @@ var manifest_default = {
   __name(driftPosition, "driftPosition");
   function stationBoard(code, nowMs, liveByTrip, count = 8) {
     if (!isServiceDay(new Date(nowMs))) return [];
+    const reduced = SCHEDULE.reducedService.includes(serviceDateKey(nowMs));
     const out = [];
     for (const t of SCHEDULE.trips) {
+      if (reduced && !SCHEDULE.sTrains.has(t.num)) continue;
       const idx = t.stops.findIndex((s) => s[0] === code);
       if (idx < 0) continue;
       const stops = schedStopsMs(t, nowMs);
