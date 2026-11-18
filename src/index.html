@@ -735,6 +735,13 @@
   /* B / Branch Atlas: two lines, schematic rather than geographical length. */
   .branch-atlas{padding:3px 4px 4px}
   .atlas-label{font:600 11px system-ui,sans-serif;fill:var(--map-label-major)}
+  .atlas-station{cursor:pointer;outline:none}
+  .atlas-station:focus-visible .atlas-station-dot,.atlas-station[aria-pressed="true"] .atlas-station-dot{
+    stroke:var(--focus);stroke-width:3;r:6}
+  .atlas-station-name{min-height:24px;padding:0 8px;color:var(--fg);font-size:var(--fs-2)}
+  .board-tomorrow{padding:10px 0 2px}
+  .board-tomorrow h2{font-size:var(--fs-3);margin:0}
+  .board-tomorrow p{font-size:var(--fs-2);color:var(--muted);margin:4px 0}
   .atlas-label.destination{font-weight:800;fill:var(--map-highlight)}
   .atlas-train{cursor:pointer;outline:none}
   .atlas-halo{transition:stroke-width .12s ease}
@@ -2633,8 +2640,25 @@
     return dm < 90 ? `${dm}m` : fmtClock(t);
   };
 
+  function tomorrowStationBoard(station, now) {
+    const tomorrowNoon = VRELeaveBy.easternMinute(now, 12 * 60) + 24 * 60 * 60000;
+    const midnight = VRELeaveBy.easternMinute(tomorrowNoon, 0);
+    const weekday = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York", weekday: "long",
+    }).format(midnight);
+    const { reducedService, sTrains } = VRECore.SCHEDULE;
+    const reduced = reducedService.includes(VRECore.serviceDateKey(midnight));
+    const rows = VRECore.stationBoard(station, midnight, null, Infinity)
+      .filter(row => !reduced || sTrains.has(row.num));
+    const reason = weekday === "Saturday" || weekday === "Sunday"
+      ? "VRE does not run on weekends." : !isServiceDay(new Date(midnight))
+        ? "VRE has a scheduled holiday closure." : "no trains are scheduled to serve this station.";
+    return { rows, reason };
+  }
+
   function BoardCard({ station, rows, now, onStation, onPickLive }) {
-    const service = isServiceDay(new Date(now));
+    const tomorrow = rows.length ? null : tomorrowStationBoard(station, now);
+    const displayed = tomorrow?.rows || rows;
     return html`
       <div>
         <div style=${{ padding: "12px 16px 4px" }}>
@@ -2644,24 +2668,28 @@
               ${ALL_CODES.map(c => html`<option key=${c} value=${c}>${STATIONS[c].name}</option>`)}
             </select>
           </label>
-          ${window.VreStationShortcut && html`
-            <button type="button" className="btn ghost"
-              onClick=${() => window.VreStationShortcut.postMessage(JSON.stringify({
-                station, label: STATIONS[station].name
-              }))}>Pin this station to Home</button>`}
+          ${tomorrow && html`<section className="board-tomorrow" aria-label="Tomorrow’s service">
+            ${tomorrow.rows.length
+              ? html`<h2>Tomorrow’s schedule</h2>`
+              : html`<h2>No trains tomorrow</h2><p>${tomorrow.reason}</p>`}
+          </section>`}
         </div>
         <div style=${{ padding: "4px 8px 10px" }}>
-          ${rows.length ? rows.map(r => {
+          ${displayed.length ? displayed.map(r => {
             const seen = r.ts && now - r.ts > 5 * 60000 ? Math.round((now - r.ts) / 60000) : null;
             const late = r.live && r.dev >= 120000;
+            const Row = tomorrow ? "div" : "button";
             return html`
-              <button key=${r.trip} className=${"brow" + (r.live ? " live" : "") + (seen ? " stale" : "")}
-                onClick=${() => onPickLive(r.trip)} aria-label=${`Choose train ${r.num}`}>
+              <${Row} key=${r.trip} className=${"brow" + (r.live ? " live" : "") + (seen ? " stale" : "")}
+                onClick=${tomorrow ? undefined : () => onPickLive(r.trip)}
+                aria-label=${tomorrow ? undefined : `Choose train ${r.num}`}>
                 <span className="numchip" style=${{ background: LINE_COLOR[r.line] }}>${r.num}</span>
                 <span className="bmid">
                   <span className="bhead"><${MiniDir} up=${r.dir === 1} color=${LINE_COLOR[r.line]} /> ${r.head}
                     ${r.terminus && html`<span className="badge dim">arrives</span>`}</span>
-                  <span className="bsub">${fmtClock(r.time)}
+                  <span className="bsub">${tomorrow ? new Date(r.time).toLocaleTimeString("en-US", {
+                    timeZone: "America/New_York", hour: "numeric", minute: "2-digit",
+                  }) : fmtClock(r.time)}
                     ${r.live ? (seen
                         ? html`<span className="stale-note">seen ${seen}m ago</span>`
                         : html`<span className="badge ok" style=${{ padding: "1px 7px" }}><span className="livedot"></span>live</span>`)
@@ -2669,10 +2697,10 @@
                     ${late && html`<span className="badge late" style=${{ padding: "1px 7px" }}>+${Math.round(r.dev / 60000)}m</span>`}
                   </span>
                 </span>
-                <span className="big">${fmtBoard(r.time, now)}</span>
-              </button>`;
+                ${!tomorrow && html`<span className="big">${fmtBoard(r.time, now)}</span>`}
+              </${Row}>`;
           })
-          : html`<div className="empty">${service ? "No more trains at this station today." : "No VRE service today."}</div>`}
+          : null}
         </div>
       </div>`;
   }
@@ -2950,8 +2978,10 @@
     for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
     const focusedLine = all.get(selected || myTripId)?.line;
+    const [stationCode, setStationCode] = useState(null);
+    const toggleStation = code => setStationCode(current => current === code ? null : code);
     return html`<div className="branch-atlas">
-      <svg className="atlas-svg" viewBox="0 0 390 350" role="img"
+      <svg className="atlas-svg" viewBox="0 0 390 350" role="group"
         aria-label="Compact VRE system atlas showing Fredericksburg and Manassas lines and selectable train positions">
         <path d=${atlasPath(LINE_F,"F")} fill="none" stroke=${LINE_COLOR.F}
           strokeWidth=${focusedLine === "F" ? 6 : 4.5} strokeLinecap="round" strokeLinejoin="round"
@@ -2963,8 +2993,17 @@
           const major = ATLAS_MAJOR.has(code) || code === ride?.dest;
           const side = LINE_M.indexOf(code) > 3 ? -1 : 1;
           const y = atlasY(station.y, side < 0 ? "M" : "F");
-          return html`<g key=${code}>
-            <circle cx=${station.x} cy=${y} r=${major ? 5.2 : 3.1}
+          return html`<g key=${code} className="atlas-station" role="button" tabIndex="0"
+            aria-label=${station.name} aria-pressed=${stationCode === code}
+            onClick=${() => toggleStation(code)}
+            onKeyDown=${event => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleStation(code);
+              }
+            }}>
+            <rect x=${station.x - 24} y=${y - 12} width="48" height="24" fill="transparent"/>
+            <circle className="atlas-station-dot" cx=${station.x} cy=${y} r=${major ? 5.2 : 3.1}
               fill="var(--map-ink)" stroke=${side < 0 ? LINE_COLOR.M : LINE_COLOR.F}
               strokeWidth="2"/>
             ${major && html`<text x=${station.x + side * 12} y=${y+4}
@@ -2995,6 +3034,9 @@
           </g>`;
         })}
       </svg>
+      <div className="atlas-station-name" role="status">
+        ${stationCode ? STATIONS[stationCode].name : "Tap a station dot to see its name"}
+      </div>
       <div className="atlas-caption">Schematic view · Distances not to scale</div>
     </div>`;
   }
@@ -4282,12 +4324,9 @@ ${lockError}
           <div className="card system-map-card">
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
-              ${data
-                ? (trains.length || ghostTrains.length || myTrain)
-                  ? html`<${Map} trains=${trains} ghosts=${ghostTrains} selected=${selected}
-                      myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick} />`
-                  : html`<div className="empty">No trains reporting right now.<br/>VRE runs weekday commuter service.</div>`
-                : html`<div className="empty">${servicePaused ? "Live refresh is paused. Check Schedule or refresh below." : error || "Loading live data…"}</div>`}
+              <${Map} trains=${trains} ghosts=${ghostTrains} selected=${selected}
+                myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick} />
+              ${!data && html`<div className="meta">${servicePaused ? "Live refresh is paused." : error || "Loading live data…"}</div>`}
             </div>
             <div className="map-legend" aria-label="Map marker legend">
               <span><i className="map-key solid" aria-hidden="true"></i>Live feed</span>
