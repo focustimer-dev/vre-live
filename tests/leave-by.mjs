@@ -56,6 +56,12 @@ assert.equal(confirmed.leaveBy, time("2026-11-16T12:06:00Z"), "stable +6m delay 
 const single = plan(profile,"310",feed,{[train.trip]: [[now-30000,6]]});
 assert.equal(single.confidence,"delay-unconfirmed");
 assert.equal(single.leaveBy,base.leaveBy,"one delayed observation never moves leave later");
+const afterTimetable = scheduled + 2 * 60000;
+const delayedAfterTimetable = { [train.trip]: { ...feed[train.trip], ts: afterTimetable } };
+assert.equal(plan(profile, "310", delayedAfterTimetable, {}, afterTimetable).state,
+  "leave-now", "a fresh future departure estimate prevents a premature train switch");
+assert.equal(plan(profile, "310", {}, {}, afterTimetable).state, "departed",
+  "a timetable-only train becomes eligible for a switch after the scheduled departure");
 const recovery = plan(profile,"310",feed,{
   [train.trip]: [[now-4*60000,6],[now-60000,4]]
 });
