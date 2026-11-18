@@ -16,6 +16,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.RemoteViews
 import org.json.JSONObject
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -29,12 +30,40 @@ internal class Timetable(context: Context) {
 
     data class Row(val train: String, val time: String, val status: String, val line: String)
 
-    fun direction(a: String, b: String): Pair<String, String> =
-        if (ZonedDateTime.now(eastern).hour < 12) a to b else b to a
+    data class RouteBoard(val from: String, val to: String, val rows: List<Row>)
 
-    fun route(from: String, to: String, cache: JSONObject): List<Row> {
-        val now = ZonedDateTime.now(eastern)
+    fun routeBoard(a: String, b: String, cache: JSONObject,
+                   now: ZonedDateTime = ZonedDateTime.now(eastern)): RouteBoard {
         val date = now.toLocalDate()
+        val completed = cache.optJSONObject("completed")
+        val endedAt = completed?.optLong("t") ?: 0
+        val completedDate = Instant.ofEpochMilli(endedAt).atZone(eastern).toLocalDate()
+        val previousOrigin = completed?.optString("from")
+        val previousDestination = completed?.optString("dest")
+        val outbound = previousOrigin == a && previousDestination == b
+        val inbound = previousOrigin == b && previousDestination == a
+        val matches = endedAt > 0 && endedAt <= now.toInstant().toEpochMilli() &&
+            !completedDate.isBefore(date.minusDays(14)) && (outbound || inbound)
+        val returning = if (matches && completedDate == date) outbound else now.hour >= 12
+        val (from, to) = if (returning) b to a else a to b
+        val today = route(from, to, cache, now, date)
+        if (today.isNotEmpty() || !matches) return RouteBoard(from, to, today)
+
+        // A completed outbound ride still leaves the same-day return leg available.
+        // Once the day is done, the next commute starts at the configured morning origin.
+        for (days in 1L..14L) {
+            val serviceDate = date.plusDays(days)
+            val label = if (days == 1L) "Tomorrow" else serviceDate.format(serviceDayLabel)
+            val rows = route(a, b, cache, now, serviceDate, label)
+            if (rows.isNotEmpty()) return RouteBoard(a, b, rows)
+        }
+        return RouteBoard(from, to, today)
+    }
+
+    private val serviceDayLabel = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.US)
+
+    private fun route(from: String, to: String, cache: JSONObject, now: ZonedDateTime,
+                      date: LocalDate, previewLabel: String? = null): List<Row> {
         val holidays = data.getJSONArray("noService")
         if (date.dayOfWeek.value >= 6 ||
             (0 until holidays.length()).any { holidays.getString(it) == date.format(DateTimeFormatter.BASIC_ISO_DATE) }
@@ -49,12 +78,13 @@ internal class Timetable(context: Context) {
             val scheduled = date.atStartOfDay(eastern)
                 .plusMinutes(stops.getJSONArray(start).getLong(1)).toInstant().toEpochMilli()
             val live = cache.optJSONObject("live")?.optJSONObject(trip.getString("trip"))
-            val updated = if (fresh(live, now)) live?.optJSONObject("stops")?.optLong(from) ?: 0 else 0
+            val updated = if (previewLabel == null && fresh(live, now)) live?.optJSONObject("stops")?.optLong(from) ?: 0 else 0
             val departure = updated.takeIf { it > 0 } ?: scheduled
             if (departure < now.toInstant().toEpochMilli()) return@mapNotNull null
             val delay = (departure - scheduled) / 60000
             departure to Row(trip.getString("num"), format(departure),
                 when {
+                    previewLabel != null -> "$previewLabel · Scheduled"
                     updated <= 0 -> "Scheduled"
                     delay > 0 -> "+$delay min"
                     delay < 0 -> "${-delay} min early"
@@ -182,7 +212,6 @@ class DeparturesWidget : AppWidgetProvider() {
     ) {
         val prefs = context.getSharedPreferences("departures_widgets", Context.MODE_PRIVATE)
         val cache = runCatching { JSONObject(prefs.getString("snapshot", "{}").orEmpty()) }.getOrDefault(JSONObject())
-        val (from, to) = timetable.direction(a, b)
         val ribbon = timetable.rideRibbon(cache)
         if (ribbon != null) {
             val views = RemoteViews(context.packageName,
@@ -202,11 +231,13 @@ class DeparturesWidget : AppWidgetProvider() {
             return
         }
         val ride = timetable.ride(cache)
-        val rows = if (ride == null) timetable.route(from, to, cache) else listOf(ride.second)
+        val board = if (ride == null) timetable.routeBoard(a, b, cache) else null
+        val rows = board?.rows ?: listOfNotNull(ride?.second)
         val views = RemoteViews(context.packageName,
             if (VreTheme.isNord(context)) R.layout.route_widget_nord else R.layout.route_widget)
-        val title = if (ride == null) "${timetable.stations.getString(from)} → ${timetable.stations.getString(to)}"
-            else ride.first
+        val title = if (board != null)
+            "${timetable.stations.getString(board.from)} → ${timetable.stations.getString(board.to)}"
+            else ride?.first.orEmpty()
         views.setTextViewText(R.id.widget_station, title)
         views.setTextViewText(R.id.route_first, rows.firstOrNull()?.let { styled(context, it, true) } ?: "No more departures today")
         val width = manager.getAppWidgetOptions(id).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
@@ -214,7 +245,8 @@ class DeparturesWidget : AppWidgetProvider() {
         views.setViewVisibility(R.id.route_second, if (width >= 240 && second != null) View.VISIBLE else View.GONE)
         if (second != null) views.setTextViewText(R.id.route_second, styled(context, second, false))
         val intent = Intent(context, MainActivity::class.java)
-        if (ride == null) intent.setAction("work.samelling.vrelive.lab.OPEN_BOARD").putExtra("station", from).putExtra("destination", to)
+        if (board != null) intent.setAction("work.samelling.vrelive.lab.OPEN_BOARD")
+            .putExtra("station", board.from).putExtra("destination", board.to)
         views.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(
             context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         ))
