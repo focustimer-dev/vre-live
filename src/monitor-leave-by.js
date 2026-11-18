@@ -72,7 +72,7 @@
     } else if (fresh && positive > 0) confidence = "delay-unconfirmed";
     const leaveBy = departure - lead * 60000;
     const remaining = Math.ceil((leaveBy - now) / 60000);
-    return { state: passed || now > departure + 60000 ? "departed"
+    return { state: passed || now > Math.max(departure, latestEta ?? departure) + 60000 ? "departed"
       : remaining <= 0 ? "leave-now" : "upcoming",
       confidence, train: String(trip.num), boarding: profile.from, scheduled,
       predicted: latestEta, departure, leaveBy, remaining, leadMinutes: lead,
