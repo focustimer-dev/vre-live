@@ -3857,8 +3857,11 @@ ${lockError}
             const stop = train?.stops.find(s => s.code === waitingFor.dest);
             return { ...waitingFor, waiting: true, ts: train?.ts, eta: stop?.time };
           })() : null;
-      window.VreWidgetData.postMessage(JSON.stringify({ live, ride }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time]);
+      const completed = lastCompletedRide && {
+        from: lastCompletedRide.from, dest: lastCompletedRide.dest, t: lastCompletedRide.t,
+      };
+      window.VreWidgetData.postMessage(JSON.stringify({ live, ride, completed }));
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time, lastCompletedRide]);
     const lockBridge = window.VreLockCard;
     const [lockState, setLockState] = useState("off");
     const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
