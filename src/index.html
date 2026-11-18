@@ -453,12 +453,28 @@
   .journey-views button[aria-pressed="true"]{background:var(--selected-bg);color:var(--selected-fg)}
   .journey-views button:focus-visible,.journey-next:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
   .journey-map{overflow:hidden;position:relative}
-  .journey-map.focused{animation:journey-reveal .7s cubic-bezier(.16,1,.3,1)}
+  .journey-map.focused{animation:journey-reveal .22s cubic-bezier(.16,1,.3,1)}
   @keyframes journey-reveal{from{clip-path:inset(4% 0 4% 0 round 16px)}to{clip-path:inset(0 round 0)}}
   .journey-next{appearance:none;font:inherit;color:var(--fg);width:100%;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 10px 15px;border:0;border-top:1px solid var(--border);background:transparent;cursor:pointer}
   .journey-next strong{display:block;font-size:17px;line-height:1.3}
   .journey-next small{display:block;font-size:12px;color:var(--muted);margin-top:3px}
-  .journey-next .journey-time{font-size:14px;font-weight:600;text-align:right;white-space:nowrap}
+  .journey-next .journey-time{font-size:clamp(18px,6vw,30px);font-weight:800;
+    font-variant-numeric:tabular-nums;letter-spacing:-.025em;text-align:right;
+    flex:0 0 auto;max-width:45%;line-height:1.05}
+  .journey-next .journey-time.status{font-size:var(--fs-2);line-height:1.25}
+  .ride-board{padding:0 4px}
+  .ride-board .journey-next{padding-block:12px}
+  .ride-board .journey-foot{display:flex;gap:8px;align-items:center;padding-bottom:9px}
+  .ride-board .journey-foot strong{color:var(--fg)}
+  .ride-board .journey-foot::before{content:"";width:8px;height:8px;flex:none;
+    border:2px solid var(--accent,var(--muted));border-radius:50%}
+  .ride-stops summary{min-height:44px;padding:0 10px;display:flex;gap:8px;align-items:center;
+    border-top:1px solid var(--border);cursor:pointer;color:var(--fg);font-size:var(--fs-2)}
+  .ride-stops summary::-webkit-details-marker{display:none}
+  .ride-stops summary svg{width:14px;height:14px}
+  .ride-stops[open] summary svg{transform:rotate(90deg)}
+  .ride-stops summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+  .ride-stops:not([open]) .follow-lens{display:none}
   .journey-foot{font-size:12px;color:var(--muted);padding:0 10px 12px}
   @media(max-width:350px){.journey-head{gap:6px;padding-left:4px;padding-right:4px}.journey-title{gap:7px}.journey-title strong{font-size:21px}.journey-views button{padding:0 7px}.journey-icon{width:29px}}
   @media(prefers-reduced-motion:reduce){.journey-map.focused{animation:none}.journey-map .train{transition:none}}
@@ -2837,11 +2853,11 @@
       : yFor(activeLocal) - (activeLocal > 0 ? 22 : 0);
     return html`<div className="follow-lens">
       <div className="lens-eyebrow">
-        <span>${fresh ? "Live train position" : positionLabel}</span>
+        <span>${positionLabel}</span>
         <span className="lens-service">Train ${train.num}</span>
       </div>
       <svg className="lens-svg" viewBox="0 0 390 284" role="img"
-        aria-label=${`Following train ${train.num}. ${fresh ? "Live position" : "Position unconfirmed"}. ${next ? "Next station "+(STATIONS[next.code]?.name || next.code) : "Next station unavailable"}.`}>
+        aria-label=${`Following train ${train.num}. ${positionLabel}. ${next ? "Next station "+(STATIONS[next.code]?.name || next.code) : "Next station unavailable"}.`}>
         <path d="M86 25 V244" fill="none" stroke=${line} strokeWidth="5"
           strokeLinecap="round" opacity=".24"/>
         <path d=${`M86 25 V${Math.max(25,activeY)}`} fill="none"
@@ -2917,13 +2933,16 @@
     const all = new globalThis.Map();
     for (const t of [...(ghosts || []), ...(trains || []), ...(activeTrain ? [activeTrain] : [])]) all.set(t.tripId,t);
     const markers = atlasTrainMarkers([...all.values()]);
+    const focusedLine = all.get(selected || myTripId)?.line;
     return html`<div className="branch-atlas">
       <svg className="atlas-svg" viewBox="0 0 390 350" role="img"
         aria-label="Compact VRE system atlas showing Fredericksburg and Manassas lines and selectable train positions">
         <path d=${atlasPath(LINE_F,"F")} fill="none" stroke=${LINE_COLOR.F}
-          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+          strokeWidth=${focusedLine === "F" ? 6 : 4.5} strokeLinecap="round" strokeLinejoin="round"
+          opacity=${focusedLine && focusedLine !== "F" ? .28 : .9}/>
         <path d=${atlasPath(LINE_M,"M")} fill="none" stroke=${LINE_COLOR.M}
-          strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity=".84"/>
+          strokeWidth=${focusedLine === "M" ? 6 : 4.5} strokeLinecap="round" strokeLinejoin="round"
+          opacity=${focusedLine && focusedLine !== "M" ? .28 : .9}/>
         ${Object.entries(STATIONS).map(([code,station]) => {
           const major = ATLAS_MAJOR.has(code) || code === ride?.dest;
           const side = LINE_M.indexOf(code) > 3 ? -1 : 1;
@@ -2994,20 +3013,26 @@
           <button type="button" aria-pressed=${overview} onClick=${() => setOverview(true)}>System</button>
         </div>
       </div>`}
-      <div className=${"journey-map" + (focused ? " focused" : "")}>
-        ${focused
-          ? html`<${FollowLens} train=${activeTrain} ride=${ride} now=${t_now}
-              fresh=${fresh} positionLabel=${positionLabel} onPick=${onPick} />`
-          : html`<${BranchAtlas} trains=${trains} ghosts=${ghosts}
+      ${!focused && html`<div className="journey-map">
+          <${BranchAtlas} trains=${trains} ghosts=${ghosts}
               activeTrain=${activeTrain} selected=${selected}
-              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick} />`}
-      </div>
-      ${activeTrain && html`<button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
+              myTripId=${myTripId} ride=${ride} now=${t_now} onPick=${onPick} />
+      </div>`}
+      ${activeTrain && html`<div className=${"ride-board journey-map" + (focused ? " focused" : "")}>
+      <button type="button" className="journey-next" onClick=${() => onPick(activeTrain.tripId)} aria-label="Change your destination">
         <div><strong>${nextStop ? `${nextLabel}: ${nextStop.name || STATIONS[nextStop.code]?.name || nextStop.code}` : "Next stop unavailable"}</strong>
           <small>${positionLabel}${activeTrain.ts ? ` · ${Math.max(0, Math.floor((t_now-activeTrain.ts)/60000))} min ago` : ""}</small></div>
-        <span className="journey-time">${nextTime}</span>
+        <span className=${"journey-time" + (/^\d/.test(nextTime) || nextTime === "Due" ? "" : " status")}>${nextTime}</span>
       </button>
-      ${ride && STATIONS[ride.dest] && html`<div className="journey-foot">Your stop: ${STATIONS[ride.dest].name} · Tap above to change</div>`}`}
+      ${ride && STATIONS[ride.dest] && html`<div className="journey-foot">Your stop <strong>${STATIONS[ride.dest].name}</strong></div>`}
+      ${focused && html`<details className="ride-stops" key=${activeTrain.tripId}>
+        <summary><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="m6 3 5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>Stops ahead</summary>
+        <${FollowLens} train=${activeTrain} ride=${ride} now=${t_now}
+          fresh=${fresh} positionLabel=${positionLabel} onPick=${onPick} />
+      </details>`}
+      </div>`}
       </div>`;
   }
 
@@ -4212,7 +4237,7 @@ ${lockError}
             <div className="card-h">System map · ${trains.length} train${trains.length === 1 ? "" : "s"} reporting</div>
             <div className="map-wrap">
               ${data
-                ? (trains.length || ghostTrains.length)
+                ? (trains.length || ghostTrains.length || myTrain)
                   ? html`<${Map} trains=${trains} ghosts=${ghostTrains} selected=${selected}
                       myTripId=${myTrain && myTrain.tripId} myTrain=${myTrain} ride=${ride} now=${now} onPick=${pick} />`
                   : html`<div className="empty">No trains reporting right now.<br/>VRE runs weekday commuter service.</div>`
@@ -4221,7 +4246,7 @@ ${lockError}
             <div className="map-legend" aria-label="Map marker legend">
               <span><i className="map-key solid" aria-hidden="true"></i>Live feed</span>
               <span><i className="map-key scheduled" aria-hidden="true"></i>Timetable estimate</span>
-              <span className="map-position-note">Follow: your train · System: both lines · Dashed: timetable estimate.</span>
+              <span className="map-position-note">Dashed markers show unconfirmed positions.</span>
             </div>
           </div>`
         : tab === "sched" ? html`
