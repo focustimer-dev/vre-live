@@ -48,7 +48,7 @@ for (const id of ["vre-core", "vre-commutes", "vre-alerts", "vre-leave-by", "vre
     const stations = Object.fromEntries(Object.entries(VRECore.STATIONS).map(([id, s]) => [id, s.name]));
     const departures = Object.fromEntries(Object.keys(stations).map(id => [id, []]));
     for (const trip of VRECore.SCHEDULE.trips) {
-      for (const [id, minute] of trip.stops.slice(0, -1)) departures[id].push([minute, trip.head]);
+      for (const [id, minute] of trip.stops.slice(0, -1)) departures[id].push([minute, trip.head, trip.num]);
     }
     for (const rows of Object.values(departures)) rows.sort((a, b) => a[0] - b[0]);
     await writeFile(join(output, "widget-schedule.json"), JSON.stringify({

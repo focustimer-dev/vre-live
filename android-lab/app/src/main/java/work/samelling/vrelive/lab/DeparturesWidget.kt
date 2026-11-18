@@ -195,7 +195,10 @@ internal class Timetable(context: Context) {
         }
         val rows = data.getJSONObject("departures").optJSONArray(station)
             ?: return "No scheduled departures today"
+        val reduced = contains(data.optJSONArray("reducedService"), dateKey)
+        val special = data.optJSONArray("sTrains")
         val next = (0 until rows.length()).asSequence().map { rows.getJSONArray(it) }
+            .filter { !reduced || contains(special, it.optString(2)) }
             .map { row ->
                 val minute = row.getInt(0)
                 val departure = date.atStartOfDay(eastern).plusHours((minute / 60).toLong())
