@@ -21,6 +21,17 @@ assert.doesNotMatch(script("vre-leave-by"),
   /fetch\(|postMessage\(|AlarmManager|serviceWorker|setInterval\(|setTimeout\(/,
   "the forecast is pure: no polling, notifications or background work");
 
+const tomorrowBoard = runInNewContext(app.slice(app.indexOf("  function tomorrowStationBoard("),
+  app.indexOf("  function BoardCard(")) + "\n;tomorrowStationBoard",
+  { VRECore, VRELeaveBy, isServiceDay: VRECore.isServiceDay });
+const nextWeekday = tomorrowBoard("06", Date.parse("2026-11-18T01:30:00Z"));
+assert.ok(nextWeekday.rows.length > 0 && nextWeekday.rows.every(row =>
+  VRECore.serviceDateKey(row.time) === "20261118" && !row.live));
+assert.match(tomorrowBoard("06", Date.parse("2026-11-21T01:30:00Z")).reason, /weekends/);
+assert.match(tomorrowBoard("06", Date.parse("2026-11-26T01:30:00Z")).reason, /holiday/);
+const reducedBoard = tomorrowBoard("06", Date.parse("2026-12-24T01:30:00Z"));
+assert.ok(reducedBoard.rows.length > 0 && reducedBoard.rows.every(row => VRECore.SCHEDULE.sTrains.has(row.num)));
+
 const time = iso => Date.parse(iso);
 const now = time("2026-11-16T11:45:00Z"); // Mon 6:45 AM EST
 const profile = { id: "am", name: "Morning", from: "06", to: "03",
