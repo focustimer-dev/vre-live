@@ -1704,7 +1704,7 @@
     } else if (fresh && positive > 0) confidence = "delay-unconfirmed";
     const leaveBy = departure - lead * 60000;
     const remaining = Math.ceil((leaveBy - now) / 60000);
-    return { state: passed || now > departure + 60000 ? "departed"
+    return { state: passed || now > Math.max(departure, latestEta ?? departure) + 60000 ? "departed"
       : remaining <= 0 ? "leave-now" : "upcoming",
       confidence, train: String(trip.num), boarding: profile.from, scheduled,
       predicted: latestEta, departure, leaveBy, remaining, leadMinutes: lead,
@@ -2086,6 +2086,9 @@
         ${!departed && !urgent && html`<div className="leave-by-remaining">
           ${forecast.remaining} min until you should leave
         </div>`}
+        ${forecast.liveFresh && forecast.predicted > forecast.scheduled && html`
+          <div className="meta">Original leave-by ${time(forecast.scheduled - forecast.leadMinutes * 60000)}
+            · Live departure estimate ${time(forecast.predicted)}</div>`}
         <div className="meta leave-by-confidence">${confidence}</div>
         <div className="meta">Calculated while the app is open. Automatic leave-time notifications are coming later.</div>
       </div>`;
@@ -2112,10 +2115,11 @@
   }
 
   /* One primary recommendation for the home card; never mix yesterday's plans into today. */
-  function primaryPlannedCommute(profiles, day, now, liveByTrip, samples, overrides) {
+  function primaryPlannedCommute(profiles, day, now, liveByTrip, samples, overrides, departed = false) {
     if (!profiles.length || !isServiceDay(new Date(now))) return null;
     const dateKey = VRECore.serviceDateKey(now);
     const todayState = day?.date === dateKey ? day : null;
+    if (todayState?.skippedDay) return null;
     const planned = todayState?.planned || {};
     const skipped = todayState?.skippedTrips || {};
     const upcoming = profiles.map(p => {
@@ -2126,7 +2130,8 @@
         ...p, travelMinutes: Number.isInteger(travel) && travel > 0 ? travel : 10
       }, train, VRECore, liveByTrip, samples, now);
       return { profile: p, train, forecast };
-    }).filter(x => x && ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state))
+    }).filter(x => x && (departed ? x.forecast.state === "departed"
+      : ["upcoming", "leave-now", "needs-travel-time"].includes(x.forecast.state)))
       .sort((a, b) => (a.forecast.leaveBy ?? Infinity) - (b.forecast.leaveBy ?? Infinity));
     return upcoming.length ? { ...upcoming[0], otherCount: upcoming.length - 1 } : null;
   }
@@ -2416,10 +2421,10 @@
   }
 
   function CommuteCard({ from, to, now, liveByTrip, onFlip, onPlanTrain,
-      planned, nextAdvanced, returning, travelOverride, initialExpanded = false }) {
-    const fromStation = planned?.profile.from || nextAdvanced?.profile.from || from;
-    const toStation = planned?.profile.to || nextAdvanced?.profile.to || to;
-    const candidateProfile = planned?.profile || nextAdvanced?.profile || null;
+      planned, replacement, nextAdvanced, returning, travelOverride, initialExpanded = false }) {
+    const fromStation = planned?.profile.from || replacement?.profile.from || nextAdvanced?.profile.from || from;
+    const toStation = planned?.profile.to || replacement?.profile.to || nextAdvanced?.profile.to || to;
+    const candidateProfile = planned?.profile || replacement?.profile || nextAdvanced?.profile || null;
     const rows = useMemo(() => nextDepartures(fromStation, toStation, now, liveByTrip, 32),
       [fromStation, toStation, Math.floor(now / 15000), liveByTrip]);
     const preferred = candidateProfile?.preferredTrains || [];
@@ -2461,6 +2466,8 @@
       else setMinutesDraft(String(enteredMinutes));
     };
     const forecast = planned?.forecast;
+    const delayed = forecast?.liveFresh && forecast.predicted > forecast.scheduled;
+    const originalLeaveBy = delayed ? forecast.scheduled - forecast.leadMinutes * 60000 : null;
     const clock = ms => new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York", hour: "numeric", minute: "2-digit"
     }).format(new Date(ms));
@@ -2486,15 +2493,24 @@
           ${planned ? html`
             <div className="commute-focus-headline" role="status">
               ${forecast.state === "needs-travel-time" ? "Set travel time"
+                : delayed ? "Leave by " + clock(originalLeaveBy)
                 : forecast.state === "leave-now" ? "Leave now"
                 : "Leave by " + clock(forecast.leaveBy)}
             </div>
-            <div className="commute-focus-train">Train ${planned.train} · ${clock(forecast.scheduled)}</div>
+            <div className="commute-focus-train">Train ${planned.train} · ${delayed ? "Live estimate " + clock(forecast.predicted) : clock(forecast.scheduled)}</div>
             <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
             ${forecast.confidence === "delay-unconfirmed" && html`
               <div className="commute-focus-warning" role="status">
-                Delay unconfirmed; using scheduled departure.
+                Delay estimate can change. Leave-by uses the timetable.
               </div>`}
+          ` : replacement ? html`
+            <div className="commute-focus-headline">Train ${replacement.missed} has departed</div>
+            <div className="commute-focus-train">Next train ${replacement.train} · ${clock(replacement.dep)}</div>
+            <div className="commute-focus-route">${STATIONS[fromStation].name} → ${STATIONS[toStation].name}</div>
+            <button type="button" className="btn" onClick=${() => onPlanTrain({
+              profile: replacement.profile, from: fromStation, to: toStation,
+              train: replacement.train, today: true
+            }, replacement.minutes)}>Switch to this train</button>
           ` : nextAdvanced ? html`
             <div className="commute-focus-headline">
               ${nextAdvanced.today ? clock(nextAdvanced.dep)
@@ -3828,7 +3844,7 @@ ${lockError}
     const rideTrip = myTrip?.tripId;
     useEffect(() => {
       if (!window.VreWidgetData) return;
-      const live = Object.fromEntries(Object.entries(liveByTrip).map(([id, train]) =>
+      const live = Object.fromEntries(Object.entries(liveByTrip).filter(([, train]) => !train.signalLost && !train.ghost).map(([id, train]) =>
         [id, { ts: train.ts, stops: Object.fromEntries(train.stops.map(stop => [stop.code, stop.time])) }]));
       // Explicitly confirmed onboard ride only: waiting-for-train snapshots
       // never activate the native Journey Ribbon.
@@ -3860,8 +3876,12 @@ ${lockError}
       const completed = lastCompletedRide && {
         from: lastCompletedRide.from, dest: lastCompletedRide.dest, t: lastCompletedRide.t,
       };
-      window.VreWidgetData.postMessage(JSON.stringify({ live, ride, completed }));
-    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time, lastCompletedRide]);
+      const profiles = commutes.profiles.map(({ id, from, to, travelMinutes, platformMinutes, bufferMinutes }) =>
+        ({ id, from, to, travelMinutes, platformMinutes, bufferMinutes }));
+      window.VreWidgetData.postMessage(JSON.stringify({
+        live, ride, completed, profiles, travelOverrides, inlinePlan,
+      }));
+    }, [liveByTrip, rideTrip, rideDest, rideStarted, observedTrain, waitingFor, myTrip?.from, myTrain?.tripId, myTrain?.y, myStop?.time, lastCompletedRide, commutes.profiles, travelOverrides, inlinePlan]);
     const lockBridge = window.VreLockCard;
     const [lockState, setLockState] = useState("off");
     const lockTripKey = myTrip ? [rideTrip, rideDest, rideStarted].join(":")
@@ -4093,20 +4113,39 @@ ${lockError}
       ? primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel)
       : null;
     const todayInline = inlinePlan?.date === todayKey ? inlinePlan : null;
-    const localPrimary = !myTrip && todayInline ? (() => {
+    const localPlan = !myTrip && todayInline ? (() => {
       const p = { id: "inline-basic", name: "Commute",
         from: todayInline.from, to: todayInline.to,
         preferredTrains: [todayInline.train],
-        travelMinutes: todayInline.minutes, platformMinutes: 0, bufferMinutes: 5 };
+        travelMinutes: todayInline.minutes, platformMinutes: todayInline.platformMinutes ?? 0,
+        bufferMinutes: todayInline.bufferMinutes ?? 5 };
       const forecast = VRELeaveBy.calculate(p, todayInline.train, VRECore, liveByTrip, devlog, now);
-      return ["upcoming", "leave-now"].includes(forecast.state)
-        ? { profile: p, train: todayInline.train, forecast, local: true } : null;
+      return { profile: p, train: todayInline.train, forecast, local: true };
     })() : null;
-    const primaryPlan = nativePrimary || localPrimary;
+    const localPrimary = ["upcoming", "leave-now"].includes(localPlan?.forecast.state) ? localPlan : null;
+    const primaryPlan = localPrimary || nativePrimary;
+    const missedPlan = !myTrip && !waitingFor && !primaryPlan
+      ? localPlan?.forecast.state === "departed" ? localPlan
+        : primaryPlannedCommute(plannedProfiles, commuteDay, now, liveByTrip, devlog, todayTravel, true)
+      : null;
+    const replacement = missedPlan ? (() => {
+      const { profile, train } = missedPlan;
+      const minutes = todayTravel[profile.id] ?? (profile.travelMinutes || 10);
+      const next = nextDepartures(profile.from, profile.to, now, liveByTrip, 32).find(row => {
+        const candidate = String(row.num);
+        if (candidate === String(train) || row.dep <= now) return false;
+        const forecast = VRELeaveBy.calculate({
+          ...profile, travelMinutes: minutes, preferredTrains: [candidate],
+        }, candidate, VRECore, liveByTrip, devlog, now);
+        return forecast.state === "upcoming" || forecast.state === "leave-now";
+      });
+      return next ? { profile, missed: train, minutes, train: String(next.num), dep: next.dep } : null;
+    })() : null;
     const nextAdvanced = !myTrip ? VRECommutes.nextScheduled(
       commutes.profiles, commuteDay, now, VRECore, VRELeaveBy) : null;
     const homeRoute = route || (primaryPlan
       ? { a: primaryPlan.profile.from, b: primaryPlan.profile.to }
+      : replacement ? { a: replacement.profile.from, b: replacement.profile.to }
       : nextAdvanced ? { a: nextAdvanced.profile.from, b: nextAdvanced.profile.to } : null);
     const homeLeg = useMemo(() => homeRoute
       ? VRECommutes.homeLeg(homeRoute, flipDir, lastCompletedRide, now, VRECore, liveByTrip)
@@ -4127,10 +4166,14 @@ ${lockError}
           choice.profile.preferredTrains.includes(choice.train) &&
           typeof window.VreCommutePrefs !== "undefined") {
         saveTravelOverride(choice.profile.id, travelMinutes);
+        lsSet("vre-live-inline-plan-v1", null);
+        setInlinePlan(null);
         nativeCommute({ type: "plan", profileId: choice.profile.id, train: choice.train });
       } else {
         const record = { date: VRECore.serviceDateKey(Date.now()),
-          from: choice.from, to: choice.to, train: choice.train, minutes: travelMinutes };
+          from: choice.from, to: choice.to, train: choice.train, minutes: travelMinutes,
+          platformMinutes: choice.profile?.platformMinutes ?? 0,
+          bufferMinutes: choice.profile?.bufferMinutes ?? 5 };
         lsSet("vre-live-inline-plan-v1", record);
         setInlinePlan(record);
       }
@@ -4210,7 +4253,7 @@ ${lockError}
                   from=${homeLeg.from} to=${homeLeg.to}
                   returning=${!primaryPlan && homeLeg.returning}
                   now=${now} liveByTrip=${liveByTrip}
-                  planned=${primaryPlan} nextAdvanced=${featuredAdvanced}
+                  planned=${primaryPlan} nextAdvanced=${featuredAdvanced} replacement=${replacement}
                   travelOverride=${planOverride}
                   onFlip=${() => setFlipDir(!homeLeg.returning)}
                   onPlanTrain=${confirmInlinePlan} />`
